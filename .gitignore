@@ -1,0 +1,5 @@
+*.o
+msg_cluster
+.project
+log/
+libmsg_dumper.so
