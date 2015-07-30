@@ -14,8 +14,6 @@ char* MsgDumperWrapper::FACILITY_NAME[] = {"Log", "Com", "Sql", "Remote", "Syslo
 
 MsgDumperWrapper::MsgDumperWrapper() :
 	ref_count(0),
-//	severity(MSG_DUMPER_SEVIRITY_ERROR),
-//	facility(MSG_DUMPER_FACILITY_LOG),
 	api_handle(NULL),
 	fp_msg_dumper_initialize(NULL),
 	fp_msg_dumper_get_version(NULL),

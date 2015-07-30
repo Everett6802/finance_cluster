@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include "msg_dumper_wrapper.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +41,11 @@ extern const char *ConnectionRetDescription[];
 
 const char* GetErrorDescription(short error_code);
 
+extern const unsigned short SHORT_STRING_SIZE;
+extern const unsigned short STRING_SIZE;
+extern const unsigned short LONG_STRING_SIZE;
+extern const unsigned short EX_LONG_STRING_SIZE;
+
 extern const char* CHECK_KEEPALIVE_TAG;
 extern const char* CHECK_SERVER_CANDIDATE_TAG;
 extern const int CHECK_KEEPALIVE_TAG_LEN;
@@ -52,6 +58,37 @@ extern const int PORT_NO;
 extern const int RECV_BUF_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Functions
+void sigroutine(int signo);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interface
+class MsgRecvObserverInf
+{
+public:
+	virtual unsigned short update(const char* ip, const char* message)=0;
+	virtual ~MsgRecvObserverInf();
+};
+typedef MsgRecvObserverInf* PMSG_RECV_OBSERVER_INF;
+
+class MsgTransferInf
+{
+public:
+	virtual short send(unsigned char* buf)=0;
+	virtual short recv(unsigned char** buf)=0;
+	virtual ~MsgTransferInf();
+};
+typedef MsgTransferInf* PMSG_TRANSFER_INF;
+
+class MsgNotifyInf
+{
+public:
+	virtual short nofity(short notify_type)=0;
+	virtual ~MsgNotifyInf();
+};
+typedef MsgNotifyInf* PMSG_NOTIFY_INF;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Write log through syslog
 
 #define DECLARE_MSG_DUMPER()\
@@ -61,7 +98,7 @@ MsgDumperWrapper* msg_dumper;
 msg_dumper = MsgDumperWrapper::get_instance();
 
 #define RELEASE_MSG_DUMPER()\
-if (error_writer != NULL)\
+if (msg_dumper != NULL)\
 {\
 	msg_dumper->release();\
 	msg_dumper = NULL;\
@@ -95,23 +132,27 @@ WRITE_MSG_DUMPER_END()
 
 #if defined SHOW_MSG_DUMPER
 
-#define WRITE_DEBUG_MSG_DUMPER(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
-#define WRITE_INFO_MSG_DUMPER(message) WRITE_MSG_DUMPER(LOG_INFO, message)
-#define WRITE_ERR_MSG_DUMPER(message) WRITE_MSG_DUMPER(LOG_ERR, message)
+#define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
+#define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
+#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARN, message)
+#define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
 
-#define WRITE_DEBUG_FORMAT_MSG_DUMPER(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_DEBUG, message_format, __VA_ARGS__)
-#define WRITE_INFO_FORMAT_MSG_DUMPER(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_INFO, message_format, __VA_ARGS__)
-#define WRITE_ERR_FORMAT_MSG_DUMPER(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_ERR, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_DEBUG(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_DEBUG, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_INFO(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_INFO, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_WARN(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_WARN, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_ERROR(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_ERR, message_format, __VA_ARGS__)
 
 #else
 
-#define WRITE_DEBUG_MSG_DUMPER(message)
-#define WRITE_INFO_MSG_DUMPER(message)
-#define WRITE_ERR_MSG_DUMPER(message)
+#define WRITE_DEBUG(message)
+#define WRITE_INFO(message)
+#define WRITE_WARN(message)
+#define WRITE_ERROR(message)
 
-#define WRITE_DEBUG_FORMAT_MSG_DUMPER(buf_size, message_format, ...)
-#define WRITE_INFO_FORMAT_MSG_DUMPER(buf_size, message_format, ...)
-#define WRITE_ERR_FORMAT_MSG_DUMPER(buf_size, message_format, ...)
+#define WRITE_FORMAT_DEBUG(buf_size, message_format, ...)
+#define WRITE_FORMAT_INFO(buf_size, message_format, ...)
+#define WRITE_FORMAT_WARN(buf_size, message_format, ...)
+#define WRITE_FORMAT_ERROR(buf_size, message_format, ...)
 
 #endif
 

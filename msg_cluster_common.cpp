@@ -1,3 +1,7 @@
+#include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/time.h>
 #include "msg_cluster_common.h"
 
 
@@ -56,13 +60,33 @@ const char *GetErrorDescription(short error_code)
 		return RetDescription[error_code];
 }
 
+const unsigned short SHORT_STRING_SIZE = 32;
+const unsigned short STRING_SIZE = 64;
+const unsigned short LONG_STRING_SIZE = 256;
+const unsigned short EX_LONG_STRING_SIZE = LONG_STRING_SIZE * 2;
+
 const char* CHECK_KEEPALIVE_TAG = "!1@2#3$4%5^6&7*8";
 const char* CHECK_SERVER_CANDIDATE_TAG = "*@ServerCandidate@*";
 const int CHECK_KEEPALIVE_TAG_LEN = strlen(CHECK_KEEPALIVE_TAG);
 const char* END_OF_PACKET = "\r\n\r\n";
-const int KEEPALIVE_DELAY_TIME = 30 * 1000;
-const int KEEPALIVE_PERIOD = 30 * 1000;
+const int KEEPALIVE_DELAY_TIME = 3;
+const int KEEPALIVE_PERIOD = 3;
 
 const char* CONF_FODLERNAME = "conf";
 const int PORT_NO = 6802;
 const int RECV_BUF_SIZE = 512;
+
+void sigroutine(int signo)
+{
+  switch (signo)
+  {
+    case SIGALRM:
+      printf("Catch a signal -- SIGALRM \n");
+      signal(SIGALRM, sigroutine);
+      break;
+    case SIGVTALRM:
+      printf("Catch a signal -- SIGVTALRM \n");
+      signal(SIGVTALRM, sigroutine);
+      break;
+  }
+}
