@@ -4,6 +4,8 @@
 #include <sys/time.h>
 #include "msg_cluster_common.h"
 
+using namespace std;
+
 
 const unsigned short RET_SUCCESS = 0;
 
@@ -17,6 +19,7 @@ const unsigned short RET_FAILURE_INCORRECT_CONFIG = 7;
 const unsigned short RET_FAILURE_HANDLE_THREAD = 8;
 const unsigned short RET_FAILURE_INCORRECT_PATH = 9;
 const unsigned short RET_FAILURE_IO_OPERATION = 10;
+const unsigned short RET_FAILURE_SYSTEM_API = 11;
 
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
 const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 1;
@@ -38,7 +41,8 @@ const char *RetDescription[] =
 	"Failure Incorrect Config",
 	"Failure Handle Thread",
 	"Failure Incorrect Path",
-	"Failure IO Operation"
+	"Failure IO Operation",
+	"Failure System API"
 };
 
 const char *ConnectionRetDescription[] =
@@ -65,10 +69,10 @@ const unsigned short STRING_SIZE = 64;
 const unsigned short LONG_STRING_SIZE = 256;
 const unsigned short EX_LONG_STRING_SIZE = LONG_STRING_SIZE * 2;
 
-const char* CHECK_KEEPALIVE_TAG = "!1@2#3$4%5^6&7*8";
-const char* CHECK_SERVER_CANDIDATE_TAG = "*@ServerCandidate@*";
-const int CHECK_KEEPALIVE_TAG_LEN = strlen(CHECK_KEEPALIVE_TAG);
-const char* END_OF_PACKET = "\r\n\r\n";
+const string CHECK_KEEPALIVE_TAG = string("!1@2#3$4%5^6&7*8");
+const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
+const int CHECK_KEEPALIVE_TAG_LEN = CHECK_KEEPALIVE_TAG.length();
+const string END_OF_PACKET = string("\r\n\r\n");
 const int KEEPALIVE_DELAY_TIME = 3;
 const int KEEPALIVE_PERIOD = 3;
 

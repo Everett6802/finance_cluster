@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <list>
+#include <string>
 #include "msg_dumper_wrapper.h"
 
 
@@ -22,6 +24,7 @@ extern const unsigned short RET_FAILURE_INCORRECT_CONFIG;
 extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_INCORRECT_PATH;
 extern const unsigned short RET_FAILURE_IO_OPERATION;
+extern const unsigned short RET_FAILURE_SYSTEM_API;
 
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT;
@@ -46,10 +49,10 @@ extern const unsigned short STRING_SIZE;
 extern const unsigned short LONG_STRING_SIZE;
 extern const unsigned short EX_LONG_STRING_SIZE;
 
-extern const char* CHECK_KEEPALIVE_TAG;
-extern const char* CHECK_SERVER_CANDIDATE_TAG;
+extern const std::string CHECK_KEEPALIVE_TAG;
+extern const std::string CHECK_SERVER_CANDIDATE_TAG;
 extern const int CHECK_KEEPALIVE_TAG_LEN;
-extern const char* END_OF_PACKET;
+extern const std::string END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
 
@@ -59,17 +62,22 @@ extern const int RECV_BUF_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
+typedef std::list<char*> CHAR_LIST;
+typedef CHAR_LIST* PCHAR_LIST;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Functions
 void sigroutine(int signo);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
-class MsgRecvObserverInf
-{
-public:
-	virtual unsigned short update(const char* ip, const char* message)=0;
-	virtual ~MsgRecvObserverInf();
-};
-typedef MsgRecvObserverInf* PMSG_RECV_OBSERVER_INF;
+//class MsgRecvObserverInf
+//{
+//public:
+//	virtual unsigned short update(const char* ip, const char* message)=0;
+//	virtual ~MsgRecvObserverInf();
+//};
+//typedef MsgRecvObserverInf* PMSG_RECV_OBSERVER_INF;
 
 class MsgTransferInf
 {
@@ -80,13 +88,14 @@ public:
 };
 typedef MsgTransferInf* PMSG_TRANSFER_INF;
 
-class MsgNotifyInf
+class MsgNotifyObserverInf
 {
 public:
-	virtual short nofity(short notify_type)=0;
-	virtual ~MsgNotifyInf();
+	virtual unsigned short update(const char* ip, const char* message)=0;
+	virtual unsigned short notify(short notify_type)=0;
+//	virtual ~MsgNotifyObserverInf();
 };
-typedef MsgNotifyInf* PMSG_NOTIFY_INF;
+typedef MsgNotifyObserverInf* PMSG_NOTIFY_OBSERVER_INF;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Write log through syslog
@@ -134,12 +143,12 @@ WRITE_MSG_DUMPER_END()
 
 #define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
 #define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
-#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARN, message)
+#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARNING, message)
 #define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
 
 #define WRITE_FORMAT_DEBUG(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_DEBUG, message_format, __VA_ARGS__)
 #define WRITE_FORMAT_INFO(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_INFO, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_WARN(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_WARN, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_WARN(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_WARNING, message_format, __VA_ARGS__)
 #define WRITE_FORMAT_ERROR(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_ERR, message_format, __VA_ARGS__)
 
 #else

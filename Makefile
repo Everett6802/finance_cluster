@@ -3,7 +3,7 @@ MAKE := make
 
 CXXFLAGS := -g -Wall
 
-SOURCES := msg_dumper_wrapper.cpp msg_cluster.cpp msg_cluster_common.cpp msg_cluster_node_base.cpp msg_cluster_mgr.cpp
+SOURCES := msg_dumper_wrapper.cpp msg_cluster.cpp msg_cluster_common.cpp msg_cluster_node_base.cpp msg_cluster_leader_node.cpp msg_cluster_follower_node.cpp msg_cluster_mgr.cpp msg_cluster_leader_send_thread.cpp msg_cluster_node_recv_thread.cpp
 OBJS := $(SOURCES:.cpp=.o)
 LIB_MSG_DUMPER := libmsg_dumper.so
 LIB_MSG_DUMPER_HEADER := msg_dumper.h

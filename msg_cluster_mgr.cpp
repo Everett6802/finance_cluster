@@ -9,8 +9,9 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <algorithm>
 #include "msg_cluster_mgr.h"
+#include "msg_cluster_leader_node.h"
+#include "msg_cluster_follower_node.h"
 
 
 using namespace std;
@@ -78,14 +79,9 @@ unsigned short MsgClusterMgr::find_local_ip()
 	fp = NULL;
 
 	list<char*>::iterator iter_show = server_list.begin();
-//	fprintf(stderr, "Server List: ");
 	WRITE_DEBUG("Server IP List:");
 	while (iter_show != server_list.end())
-	{
 		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "%s", *iter_show++);
-//		fprintf(stderr, "%s ", *iter++);
-	}
-//	fprintf(stderr, "\n");
 
 	struct ifaddrs* ifAddrStruct = NULL;
 	void* tmpAddrPtr = NULL;
@@ -139,9 +135,6 @@ unsigned short MsgClusterMgr::find_local_ip()
 // Release the resource
 	if (ifAddrStruct!=NULL)
 		freeifaddrs(ifAddrStruct);
-	list<char*>::iterator iter = server_list.begin();
-	while (iter != server_list.end())
-		delete [] (char*)*iter++;
 
 	if (!found)
 	{
@@ -165,13 +158,24 @@ MsgClusterMgr::MsgClusterMgr() :
 
 MsgClusterMgr::~MsgClusterMgr()
 {
-	RELEASE_MSG_DUMPER()
+	if (msg_cluster_node != NULL)
+	{
+		delete msg_cluster_node;
+		msg_cluster_node = NULL;
+	}
 
 	if (local_ip != NULL)
 	{
 		delete[] local_ip;
 		local_ip = NULL;
 	}
+
+	list<char*>::iterator iter = server_list.begin();
+	while (iter != server_list.end())
+		delete [] (char*)*iter++;
+	server_list.clear();
+
+	RELEASE_MSG_DUMPER()
 }
 
 void MsgClusterMgr::set_keepalive_timer_interval(int delay, int period)
@@ -204,11 +208,17 @@ void MsgClusterMgr::stop_keepalive_timer()
 
 unsigned short MsgClusterMgr::become_leader()
 {
-//	msg_cluster_node = new MsgClusterLeaderNode(local_ip);
-//	unsigned short ret = msg_cluster_node.initialize();
-//	if (CHECK_FAILURE(ret))
-//		return ret;
-//
+	msg_cluster_node = new MsgClusterLeaderNode(local_ip);
+	if (msg_cluster_node == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: msg_cluster_node (Leader)");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	unsigned short ret = msg_cluster_node->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
 	node_type = LEADER;
 	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "This Node[%s] is a Leader !!!", local_ip);
 	return RET_SUCCESS;
@@ -216,13 +226,17 @@ unsigned short MsgClusterMgr::become_leader()
 
 unsigned short MsgClusterMgr::become_follower()
 {
-	unsigned short ret = RET_SUCCESS;
+	msg_cluster_node = new MsgClusterFollowerNode(&server_list, local_ip);
+	if (msg_cluster_node == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: msg_cluster_node (Follower)");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
 
-//	msg_cluster_node = new MsgClusterFollowerNode(server_list, local_ip);
-//	ret = msg_cluster_node.initialize();
-//	if (CHECK_FAILURE(ret))
-//		return ret;
-//
+	unsigned short ret = msg_cluster_node->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
 	node_type = FOLLOWER;
 	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "This Node[%s] is a Follower !!!", local_ip);
 	return ret;
@@ -230,109 +244,109 @@ unsigned short MsgClusterMgr::become_follower()
 
 unsigned short MsgClusterMgr::start_connection()
 {
-	short ret = RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
 
-//	WRITE_FORMAT_DEBUG("Node[%s] Try to become follower...", local_ip);
-//// Try to find the follower node
-//	ret = become_follower();
-//	if (CHECK_FAILURE(ret) || IsTryConnectionTimeout(ret))
-//	{
-//		if (node_type != NONE)
-//		{
-//			WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
-//			return RET_FAILURE_INCORRECT_OPERATION;
-//		}
-//// Fail to connect to any server, be the server
-//		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
-//	// Try to find the leader node
-//		ret = become_leader();
-//	}
+	WRITE_FORMAT_DEBUG(STRING_SIZE, "Node[%s] Try to become follower...", local_ip);
+// Try to find the follower node
+	ret = become_follower();
+	if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
+	{
+		if (node_type != NONE)
+		{
+			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Node[%s] type should be None at this moment", local_ip);
+			return RET_FAILURE_INCORRECT_OPERATION;
+		}
+// Fail to connect to any server, be the server
+		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] Try to become leader...", local_ip);
+	// Try to find the leader node
+		ret = become_leader();
+	}
 
 	return ret;
 }
 
 unsigned short MsgClusterMgr::stop_connection()
 {
-//	if (msg_cluster_node != null)
-//	{
-//		short ret = msg_cluster_node.deinitialize();
-//		if (CHECK_FAILURE(ret))
-//		{
-//			WRITE_FORMAT_ERROR("Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_ip);
-//			return ret;
-//		}
-//		msg_cluster_node = NULL;
-//		node_type = NONE;
-//	}
+	if (msg_cluster_node != NULL)
+	{
+		unsigned short ret = msg_cluster_node->deinitialize();
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR(STRING_SIZE, "Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_ip);
+			return ret;
+		}
+		msg_cluster_node = NULL;
+		node_type = NONE;
+	}
 
 	return RET_SUCCESS;
 }
 
 unsigned short MsgClusterMgr::try_reconnection()
 {
-	short ret = RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
 
-//	int server_candidate_id = 0;
-//	if (msg_cluster_node != NULL)
-//		server_candidate_id = ((MsgClusterFollowerNode)msg_cluster_node).get_server_candidate_id();
-//
-//// Close the old connection
-//	ret = stop_connection();
-//	if (CHECK_FAILURE(ret))
-//		return ret;
-//
-//// The server candidate ID should exist in the Follower
-//	if (server_candidate_id == 0)
-//	{
-//		WRITE_FORMAT_ERROR("The Follower[%s] server candidate ID is NOT correct", local_ip);
-//		return RET_FAILURE_INCORRECT_OPERATION;
-//	}
-//
-//	while (server_candidate_id > 1)
-//	{
-//		for (int i = 1 ; i < TRY_TIMES ; i++)
-//		{
-//			WRITE_FORMAT_DEBUG("Node[%s] try to become a Follower...", local_ip);
-//			ret = become_follower();
-//			if (CheckSuccess(ret))
-//				goto OUT;
-//			else
-//			{
-//// Check the error code, if connection time-out, sleep for a while before trying to connect again
-//				if (IsTryConnectionTimeout(ret))
-//				{
-//					WRITE_FORMAT_WARN("Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME / 1000, local_ip);
-//					Sleep(RETRY_WAIT_CONNECTION_TIME);
-//				}
-//				else
-//					goto OUT;
-//			}
-//			WRITE_FORMAT_DEBUG("Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
-//		}
-//
-//		server_candidate_id--;
-//	}
-//OUT:
-//	WRITE_FORMAT_DEBUG("Determine node[%s] is leader or follower by IP: %s", local_ip, local_ip);
-//	if (server_candidate_id == 1)
-//	{
-//		WRITE_FORMAT_DEBUG("Node[%s] try to become a Leader...", local_ip);
-//		ret = become_leader();
-//	}
+	int server_candidate_id = 0;
+	if (msg_cluster_node != NULL)
+		server_candidate_id = ((PMSG_CLUSTER_FOLLOWER_NODE)msg_cluster_node)->get_server_candidate_id();
+
+// Close the old connection
+	ret = stop_connection();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+// The server candidate ID should exist in the Follower
+	if (server_candidate_id == 0)
+	{
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "The Follower[%s] server candidate ID is NOT correct", local_ip);
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+
+	while (server_candidate_id > 1)
+	{
+		for (int i = 1 ; i < TRY_TIMES ; i++)
+		{
+			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to become a Follower...", local_ip);
+			ret = become_follower();
+			if (CHECK_SUCCESS(ret))
+				goto OUT;
+			else
+			{
+// Check the error code, if connection time-out, sleep for a while before trying to connect again
+				if (IS_TRY_CONNECTION_TIMEOUT(ret))
+				{
+					WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME, local_ip);
+					sleep(RETRY_WAIT_CONNECTION_TIME);
+				}
+				else
+					goto OUT;
+			}
+			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
+		}
+
+		server_candidate_id--;
+	}
+
+OUT:
+	if (server_candidate_id == 1)
+	{
+		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to become a Leader...", local_ip);
+		ret = become_leader();
+	}
 
 	return ret;
 }
 
 void MsgClusterMgr::check_keepalive()
 {
-//	if (msg_cluster_node != null)
+//	if (msg_cluster_node != NULL)
 //	{
-//		short ret = msg_cluster_node.check_keepalive();
+//		short ret = msg_cluster_node->check_keepalive();
 //		if (node_type == FOLLOWER)
 //		{
 //			if (CHECK_FAILURE(ret))
 //			{
-//				if (!IsKeepAliveTimeout(ret))
+//				if (!IS_KEEP_ALIVE_TIMEOUT(ret))
 //				{
 //					info("Error should NOT occur when checking keep-alive on the client side !!!");
 //					notify_exit(ret);
@@ -362,27 +376,21 @@ void MsgClusterMgr::check_keepalive()
 
 unsigned short MsgClusterMgr::initialize()
 {
-	short ret = RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
 // Find local IP
-	fprintf(stderr, "check1\n");
 	if (local_ip == NULL)
 	{
-		fprintf(stderr, "check2\n");
 		ret  = find_local_ip();
-		fprintf(stderr, "check3\n");
 		if (CHECK_FAILURE(ret))
 			return ret;
-		fprintf(stderr, "check4\n");
 		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "The local IP of this Node: %s", local_ip);
 	}
-	fprintf(stderr, "check5\n");
 
-//// Define a leader/follower and establish the connection
-//	ret = start_connection();
+// Define a leader/follower and establish the connection
+	ret = start_connection();
+	if (CHECK_FAILURE(ret))
+		return ret;
 
-//	if (CHECK_FAILURE(ret))
-//		return ret;
-//
 // Start a keep-alive timer
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
@@ -397,10 +405,10 @@ unsigned short MsgClusterMgr::deinitialize()
 	stop_keepalive_timer();
 
 	unsigned short ret = RET_SUCCESS;
-//// Close the connection
-//	ret = stop_connection();
-//	if (CHECK_FAILURE(ret))
-//		return ret;
+// Close the connection
+	ret = stop_connection();
+	if (CHECK_FAILURE(ret))
+		return ret;
 
 	return RET_SUCCESS;
 }
