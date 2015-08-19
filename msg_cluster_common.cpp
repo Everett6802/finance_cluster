@@ -4,8 +4,8 @@
 #include <sys/time.h>
 #include "msg_cluster_common.h"
 
-using namespace std;
 
+using namespace std;
 
 const unsigned short SHORT_STRING_SIZE = 32;
 const unsigned short STRING_SIZE = 64;
