@@ -10,6 +10,11 @@
 #include "msg_dumper_wrapper.h"
 
 
+extern const unsigned short SHORT_STRING_SIZE;
+extern const unsigned short STRING_SIZE;
+extern const unsigned short LONG_STRING_SIZE;
+extern const unsigned short EX_LONG_STRING_SIZE;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Return values
 extern const unsigned short RET_SUCCESS;
@@ -19,11 +24,12 @@ extern const unsigned short RET_FAILURE_INVALID_ARGUMENT;
 extern const unsigned short RET_FAILURE_INVALID_POINTER;
 extern const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY;
 extern const unsigned short RET_FAILURE_INCORRECT_OPERATION;
+extern const unsigned short RET_FAILURE_OPEN_FILE;
 extern const unsigned short RET_FAILURE_NOT_FOUND;
 extern const unsigned short RET_FAILURE_INCORRECT_CONFIG;
-extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_INCORRECT_PATH;
 extern const unsigned short RET_FAILURE_IO_OPERATION;
+extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
 
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
@@ -39,15 +45,7 @@ extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
 #define IS_TRY_CONNECTION_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_TRY_TIMEOUT ? true : false)
 #define IS_KEEP_ALIVE_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT ? true : false)
 
-extern const char *RetDescription[];
-extern const char *ConnectionRetDescription[];
-
-const char* GetErrorDescription(short error_code);
-
-extern const unsigned short SHORT_STRING_SIZE;
-extern const unsigned short STRING_SIZE;
-extern const unsigned short LONG_STRING_SIZE;
-extern const unsigned short EX_LONG_STRING_SIZE;
+const char* GetErrorDescription(unsigned short ret);
 
 extern const std::string CHECK_KEEPALIVE_TAG;
 extern const std::string CHECK_SERVER_CANDIDATE_TAG;

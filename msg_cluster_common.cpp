@@ -7,6 +7,13 @@
 using namespace std;
 
 
+const unsigned short SHORT_STRING_SIZE = 32;
+const unsigned short STRING_SIZE = 64;
+const unsigned short LONG_STRING_SIZE = 256;
+const unsigned short EX_LONG_STRING_SIZE = LONG_STRING_SIZE * 2;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Return values
 const unsigned short RET_SUCCESS = 0;
 
 const unsigned short RET_FAILURE_UNKNOWN = 1;
@@ -14,12 +21,13 @@ const unsigned short RET_FAILURE_INVALID_ARGUMENT = 2;
 const unsigned short RET_FAILURE_INVALID_POINTER = 3;
 const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY = 4;
 const unsigned short RET_FAILURE_INCORRECT_OPERATION = 5;
-const unsigned short RET_FAILURE_NOT_FOUND = 6;
-const unsigned short RET_FAILURE_INCORRECT_CONFIG = 7;
-const unsigned short RET_FAILURE_HANDLE_THREAD = 8;
+const unsigned short RET_FAILURE_OPEN_FILE = 6;
+const unsigned short RET_FAILURE_NOT_FOUND = 7;
+const unsigned short RET_FAILURE_INCORRECT_CONFIG = 8;
 const unsigned short RET_FAILURE_INCORRECT_PATH = 9;
 const unsigned short RET_FAILURE_IO_OPERATION = 10;
-const unsigned short RET_FAILURE_SYSTEM_API = 11;
+const unsigned short RET_FAILURE_HANDLE_THREAD = 11;
+const unsigned short RET_FAILURE_SYSTEM_API = 12;
 
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
 const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 1;
@@ -29,45 +37,55 @@ const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT = RET_FAILURE_CONN
 const unsigned short RET_FAILURE_CONNECTION_NO_SERVER = RET_FAILURE_CONNECTION_BASE + 5;
 const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE = RET_FAILURE_CONNECTION_BASE + 6;
 
-const char *RetDescription[] =
+const char *GetErrorDescription(unsigned short ret)
 {
-	"Success",
-	"Failure Unknown",
-	"Failure Invalid Argument",
-	"Failure Invalid Pointer",
-	"Failure Insufficient Memory",
-	"Failure Incorrect Operation",
-	"Failure Not Found",
-	"Failure Incorrect Config",
-	"Failure Handle Thread",
-	"Failure Incorrect Path",
-	"Failure IO Operation",
-	"Failure System API"
-};
+	static const char *ret_description[] =
+	{
+		"Success",
+		"Failure Unknown",
+		"Failure Invalid Argument",
+		"Failure Invalid Pointer",
+		"Failure Insufficient Memory",
+		"Failure Incorrect Operation",
+		"Failure Open File",
+		"Failure Not Found",
+		"Failure Incorrect Config",
+		"Failure Incorrect Path",
+		"Failure IO Operation",
+		"Failure Handle Thread",
+		"Failure System API"
+	};
+	static const char *connection_ret_description[] =
+	{
+		"ConnectionFailure Base",
+		"ConnectionFailure Try Timeout",
+		"ConnectionFailure Try Fail",
+		"ConnectionFailure Close",
+		"ConnectionFailure Keepalive Timeout",
+		"ConnectionFailure No Server",
+		"ConnectionFailure Already in Use"
+	};
+	static int ret_description_len = sizeof(ret_description) / sizeof(ret_description[0]);
+	static int connection_ret_description_len = sizeof(connection_ret_description) / sizeof(connection_ret_description[0]);
 
-const char *ConnectionRetDescription[] =
-{
-	"ConnectionFailure Base",
-	"ConnectionFailure Try Timeout",
-	"ConnectionFailure Try Fail",
-	"ConnectionFailure Close",
-	"ConnectionFailure Keepalive Timeout",
-	"ConnectionFailure No Server",
-	"ConnectionFailure Already in Use"
-};
-
-const char *GetErrorDescription(short error_code)
-{
-	if (error_code > RET_FAILURE_CONNECTION_BASE)
-		return ConnectionRetDescription[error_code - RET_FAILURE_CONNECTION_BASE];
+	if (ret >= RET_FAILURE_CONNECTION_BASE)
+	{
+		ret -= RET_FAILURE_CONNECTION_BASE;
+		if (ret >= 0 && ret < connection_ret_description_len)
+			return connection_ret_description[ret];
+	}
 	else
-		return RetDescription[error_code];
+	{
+		if (ret >= 0 && ret < ret_description_len)
+			return ret_description[ret];
+	}
+
+	static char buf[STRING_SIZE];
+	snprintf(buf, STRING_SIZE, "Unsupported Error Description: %d", ret);
+	return buf;
 }
 
-const unsigned short SHORT_STRING_SIZE = 32;
-const unsigned short STRING_SIZE = 64;
-const unsigned short LONG_STRING_SIZE = 256;
-const unsigned short EX_LONG_STRING_SIZE = LONG_STRING_SIZE * 2;
+
 
 const string CHECK_KEEPALIVE_TAG = string("!1@2#3$4%5^6&7*8");
 const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
