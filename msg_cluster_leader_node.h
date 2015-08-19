@@ -19,6 +19,8 @@ private:
 	MsgClusterLeaderSendThread* client_send_thread;
 	int leader_socket;
 
+	unsigned short become_leader();
+
 public:
 	MsgClusterLeaderNode(char* ip);
 	virtual ~MsgClusterLeaderNode();

@@ -55,6 +55,7 @@ extern const int CHECK_KEEPALIVE_TAG_LEN;
 extern const std::string END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
+extern const int MAX_CONNECTED_CLIENT;
 
 extern const char* CONF_FODLERNAME;
 extern const int PORT_NO;

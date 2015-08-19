@@ -75,6 +75,7 @@ const int CHECK_KEEPALIVE_TAG_LEN = CHECK_KEEPALIVE_TAG.length();
 const string END_OF_PACKET = string("\r\n\r\n");
 const int KEEPALIVE_DELAY_TIME = 3;
 const int KEEPALIVE_PERIOD = 3;
+const int MAX_CONNECTED_CLIENT = 5;
 
 const char* CONF_FODLERNAME = "conf";
 const int PORT_NO = 6802;
