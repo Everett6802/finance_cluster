@@ -6,6 +6,7 @@
 #include <string>
 #include "msg_cluster_leader_node.h"
 #include "msg_cluster_common.h"
+#include "msg_cluster_leader_send_thread.h"
 
 
 using namespace std;
@@ -75,11 +76,49 @@ unsigned short MsgClusterLeaderNode::become_leader()
 
 unsigned short MsgClusterLeaderNode::initialize()
 {
+	unsigned short ret = become_leader();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+// Initialize a thread to send the message to the remote
+	client_send_thread = new MsgClusterLeaderSendThread();
+	if (client_send_thread == NULL)
+	{
+		WRITE_ERROR("Fail to allocate the memory: client_send_thread");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	ret = client_send_thread->initialize(this);
+	if (CHECK_FAILURE(ret))
+		goto OUT;
+
+//	t = new Thread(this);
+//	t.start();
+
 	return RET_SUCCESS;
+OUT:
+    if (client_send_thread != NULL)
+    {
+    	delete client_send_thread;
+    	client_send_thread = NULL;
+    }
+
+    return ret;
 }
 
 unsigned short MsgClusterLeaderNode::deinitialize()
 {
+	unsigned short ret = RET_SUCCESS;
+    if (client_send_thread != NULL)
+    {
+    	client_send_thread->deinitialize();
+		if (CHECK_FAILURE(ret))
+			return ret;
+
+    	delete client_send_thread;
+    	client_send_thread = NULL;
+    }
+
 	return RET_SUCCESS;
 }
 

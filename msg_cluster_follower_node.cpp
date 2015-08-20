@@ -26,14 +26,15 @@ MsgClusterFollowerNode::MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip)
 	if (alist == NULL || ip == NULL)
 		throw invalid_argument(string("alist/ip == NULL"));
 
-	CHAR_LIST::iterator iter = server_list.begin();
-	while (iter != server_list.end())
+	CHAR_LIST::iterator iter = alist->begin();
+	while (iter != alist->end())
 	{
 		int len = strlen(*iter) + 1;
 		char* new_ip = new char[len];
 		if (new_ip == NULL)
 			throw bad_alloc();
 		memcpy(new_ip, *iter, sizeof(char) * len);
+		server_list.push_back(new_ip);
 		iter++;
 	}
 
@@ -62,6 +63,20 @@ MsgClusterFollowerNode::~MsgClusterFollowerNode()
 
 unsigned short MsgClusterFollowerNode::initialize()
 {
+// Try to find the leader node
+	unsigned short ret = find_leader();
+	if (CHECK_FAILURE(ret))
+	{
+		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while Node[%s]'s trying to connect to server", local_ip);
+		else
+			WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Node[%s] try to search for the leader, buf time-out...", local_ip);
+		return ret;
+	}
+
+// Start a timer to check keep-alive
+//	keepalive_counter.set(CHECK_KEEPALIVE_TIMES);
+
 	return RET_SUCCESS;
 }
 
@@ -73,6 +88,7 @@ unsigned short MsgClusterFollowerNode::deinitialize()
 		ret = msg_recv_thread->deinitialize();
 		if (CHECK_FAILURE(ret))
 			return ret;
+
 		delete msg_recv_thread;
 		msg_recv_thread = NULL;
 	}

@@ -6,9 +6,6 @@
 
 int main()
 {
-//
-//	  getchar();
-
 	MsgClusterMgr msg_cluster_mgr;
 	printf("Start the Node...\n");
 
