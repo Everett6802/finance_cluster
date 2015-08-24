@@ -4,6 +4,8 @@
 #include "msg_cluster_common.h"
 
 
+extern MsgClusterMgr msg_cluster_mgr;
+
 int main()
 {
 	MsgClusterMgr msg_cluster_mgr;

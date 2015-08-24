@@ -3,6 +3,7 @@
 
 #include <list>
 #include "msg_cluster_node_base.h"
+#include "msg_cluster_common.h"
 
 
 class MsgClusterNodeRecvThread;
@@ -31,7 +32,7 @@ public:
 	virtual unsigned short check_keepalive();
 // From MsgNotifyObserverInf
 	virtual unsigned short update(const char* ip, const char* message);
-	virtual unsigned short notify(short notify_type);
+	virtual unsigned short notify(NotifyType notify_type);
 };
 typedef MsgClusterLeaderNode* PMSG_CLUSTER_LEADER_NODE;
 

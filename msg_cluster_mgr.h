@@ -4,12 +4,11 @@
 #include <pthread.h>
 #include <list>
 #include "msg_cluster_common.h"
-#include "msg_dumper_wrapper.h"
 
 
 class MsgClusterNodeBase;
 
-class MsgClusterMgr
+class MsgClusterMgr : public MsgNotifyObserverInf
 {
 	enum NodeType{LEADER, FOLLOWER, NONE};
 	DECLARE_MSG_DUMPER()
@@ -28,8 +27,8 @@ private:
 
 	unsigned short find_local_ip();
 
-	void keepalive_timer_handler(int sig);
-
+//	void keepalive_timer_handler(int sig);
+//
 	void set_keepalive_timer_interval(int delay=0, int period=0);
 	unsigned short start_keepalive_timer();
 	void stop_keepalive_timer();
@@ -45,7 +44,7 @@ protected:
 	NodeType node_type;
 
 	void check_keepalive();
-	void notify_exit(short exit_reason);
+	void notify_exit(unsigned short exit_reason);
 
 public:
 	MsgClusterMgr();
@@ -54,6 +53,9 @@ public:
 	bool is_leader()const{return node_type == LEADER;}
 	unsigned short start();
 	unsigned short wait_to_stop();
+
+	virtual unsigned short update(const char* ip, const char* message){}
+	virtual unsigned short notify(NotifyType notify_type);
 };
 
 #endif

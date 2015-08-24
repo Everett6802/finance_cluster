@@ -12,6 +12,7 @@
 #include "msg_cluster_mgr.h"
 #include "msg_cluster_leader_node.h"
 #include "msg_cluster_follower_node.h"
+#include "msg_cluster_keepalive_timer_task.h"
 
 
 using namespace std;
@@ -19,6 +20,20 @@ using namespace std;
 const char* MsgClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
 const int MsgClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
 const int MsgClusterMgr::TRY_TIMES = 3;
+
+static MsgClusterKeepaliveTimerTask msg_cluster_keepalive_timer_task;
+
+static void timer_sigroutine(int signo)
+{
+	switch (signo)
+	{
+	case SIGALRM:
+        printf("Catch a signal -- SIGALRM \n");
+		msg_cluster_keepalive_timer_task.run();
+		signal(SIGALRM, timer_sigroutine);
+		break;
+	}
+}
 
 unsigned short MsgClusterMgr::find_local_ip()
 {
@@ -192,8 +207,8 @@ void MsgClusterMgr::set_keepalive_timer_interval(int delay, int period)
 unsigned short MsgClusterMgr::start_keepalive_timer()
 {
 	WRITE_DEBUG("Start the keep-alive timer");
-	signal(SIGALRM, sigroutine);
-	signal(SIGVTALRM, sigroutine);
+	msg_cluster_keepalive_timer_task.initialize(this);
+	signal(SIGALRM, timer_sigroutine);
 	set_keepalive_timer_interval(KEEPALIVE_DELAY_TIME, KEEPALIVE_PERIOD);
 
 	return RET_SUCCESS;
@@ -204,6 +219,7 @@ void MsgClusterMgr::stop_keepalive_timer()
 // To stop the keep-alive timer
 	WRITE_DEBUG("Stop the keep-alive timer");
 	set_keepalive_timer_interval();
+	msg_cluster_keepalive_timer_task.deinitialize();
 }
 
 unsigned short MsgClusterMgr::become_leader()
@@ -339,39 +355,33 @@ OUT:
 
 void MsgClusterMgr::check_keepalive()
 {
-//	if (msg_cluster_node != NULL)
-//	{
-//		short ret = msg_cluster_node->check_keepalive();
-//		if (node_type == FOLLOWER)
-//		{
-//			if (CHECK_FAILURE(ret))
-//			{
-//				if (!IS_KEEP_ALIVE_TIMEOUT(ret))
-//				{
-//					info("Error should NOT occur when checking keep-alive on the client side !!!");
-//					notify_exit(ret);
-//					return;
-//				}
-//				else
-//				{
-//// The leader is dead, try to find the new leader
-//					try
-//					{
-//						ret = try_reconnection();
-//					}
-//					catch (Exception e)
-//					{
-//						format_info("Re-Connection fails, due to: %s", e.toString());
-//					}
-//					if (CHECK_FAILURE(ret))
-//					{
-//						notify_exit(ret);
-//						return;
-//					}
-//				}
-//			}
-//		}
-//	}
+	if (msg_cluster_node != NULL)
+	{
+		WRITE_DEBUG("Check Keep-Alive...");
+		unsigned short ret = msg_cluster_node->check_keepalive();
+		if (node_type == FOLLOWER)
+		{
+			if (CHECK_FAILURE(ret))
+			{
+				if (!IS_KEEP_ALIVE_TIMEOUT(ret))
+				{
+					WRITE_ERROR("Error should NOT occur when checking keep-alive on the client side !!!");
+					notify_exit(ret);
+					return;
+				}
+				else
+				{
+// The leader is dead, try to find the new leader
+					ret = try_reconnection();
+					if (CHECK_FAILURE(ret))
+					{
+						notify_exit(ret);
+						return;
+					}
+				}
+			}
+		}
+	}
 }
 
 unsigned short MsgClusterMgr::initialize()
@@ -445,5 +455,29 @@ unsigned short MsgClusterMgr::wait_to_stop()
 //		t = null;
 //	}
 
+	return RET_SUCCESS;
+}
+
+void MsgClusterMgr::notify_exit(unsigned short exit_reason)
+{
+	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
+//	synchronized(runtime_ret)
+//	{
+//		runtime_ret.set(exit_reason);
+//		runtime_ret.notify();
+//	}
+}
+
+unsigned short MsgClusterMgr::notify(NotifyType notify_type)
+{
+	switch (notify_type)
+	{
+	case NOTIFY_CHECK_KEEPALIVE:
+		check_keepalive();
+		break;
+	default:
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Un-supported type: %d", notify_type);
+		return RET_FAILURE_IO_OPERATION;
+	}
 	return RET_SUCCESS;
 }

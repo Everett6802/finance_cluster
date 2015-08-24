@@ -85,8 +85,6 @@ const char *GetErrorDescription(unsigned short ret)
 	return buf;
 }
 
-
-
 const string CHECK_KEEPALIVE_TAG = string("!1@2#3$4%5^6&7*8");
 const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
 const int CHECK_KEEPALIVE_TAG_LEN = CHECK_KEEPALIVE_TAG.length();
@@ -99,17 +97,6 @@ const char* CONF_FODLERNAME = "conf";
 const int PORT_NO = 6802;
 const int RECV_BUF_SIZE = 512;
 
-void sigroutine(int signo)
-{
-  switch (signo)
-  {
-    case SIGALRM:
-      printf("Catch a signal -- SIGALRM \n");
-      signal(SIGALRM, sigroutine);
-      break;
-    case SIGVTALRM:
-      printf("Catch a signal -- SIGVTALRM \n");
-      signal(SIGVTALRM, sigroutine);
-      break;
-  }
-}
+
+//const unsigned short NOTIFY_DEAD_CLIENT = 0;
+//const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;

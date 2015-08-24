@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <string>
 #include "msg_cluster_leader_node.h"
-#include "msg_cluster_common.h"
 #include "msg_cluster_leader_send_thread.h"
 
 
@@ -132,7 +131,7 @@ unsigned short MsgClusterLeaderNode::update(const char* ip, const char* message)
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderNode::notify(short notify_type)
+unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 {
 	return RET_SUCCESS;
 }

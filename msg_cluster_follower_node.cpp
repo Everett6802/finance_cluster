@@ -106,7 +106,7 @@ unsigned short MsgClusterFollowerNode::update(const char* ip, const char* messag
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::notify(short notify_type)
+unsigned short MsgClusterFollowerNode::notify(NotifyType notify_type)
 {
 	return RET_SUCCESS;
 }
