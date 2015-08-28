@@ -243,7 +243,7 @@ unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	return msg_recv_thread->initialize(this, follower_socket);
+	return msg_recv_thread->initialize(this, follower_socket, local_ip);
 }
 
 unsigned short MsgClusterFollowerNode::find_leader()

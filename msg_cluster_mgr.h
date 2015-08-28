@@ -26,9 +26,6 @@ private:
 	unsigned short runtime_ret;
 
 	unsigned short find_local_ip();
-
-//	void keepalive_timer_handler(int sig);
-//
 	void set_keepalive_timer_interval(int delay=0, int period=0);
 	unsigned short start_keepalive_timer();
 	void stop_keepalive_timer();

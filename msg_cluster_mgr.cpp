@@ -17,23 +17,22 @@
 
 using namespace std;
 
-const char* MsgClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
-const int MsgClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
-const int MsgClusterMgr::TRY_TIMES = 3;
-
 static MsgClusterKeepaliveTimerTask msg_cluster_keepalive_timer_task;
-
 static void timer_sigroutine(int signo)
 {
 	switch (signo)
 	{
 	case SIGALRM:
-        printf("Catch a signal -- SIGALRM \n");
+//        printf("Catch a signal -- SIGALRM \n");
 		msg_cluster_keepalive_timer_task.run();
 		signal(SIGALRM, timer_sigroutine);
 		break;
 	}
 }
+
+const char* MsgClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
+const int MsgClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
+const int MsgClusterMgr::TRY_TIMES = 3;
 
 unsigned short MsgClusterMgr::find_local_ip()
 {
@@ -274,7 +273,7 @@ unsigned short MsgClusterMgr::start_connection()
 		}
 // Fail to connect to any server, be the server
 		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] Try to become leader...", local_ip);
-	// Try to find the leader node
+// Try to find the leader node
 		ret = become_leader();
 	}
 
