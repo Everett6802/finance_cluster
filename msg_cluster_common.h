@@ -51,6 +51,7 @@ const char* GetErrorDescription(unsigned short ret);
 extern const std::string CHECK_KEEPALIVE_TAG;
 extern const std::string CHECK_SERVER_CANDIDATE_TAG;
 extern const int CHECK_KEEPALIVE_TAG_LEN;
+extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
 extern const std::string END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
@@ -87,14 +88,14 @@ class MsgTransferInf
 public:
 	virtual short send(unsigned char* buf)=0;
 	virtual short recv(unsigned char** buf)=0;
-	virtual ~MsgTransferInf();
+//	virtual ~MsgTransferInf();
 };
 typedef MsgTransferInf* PMSG_TRANSFER_INF;
 
 class MsgNotifyObserverInf
 {
 public:
-	virtual unsigned short update(const char* ip, const char* message)=0;
+	virtual unsigned short update(const char* ip, const std::string message)=0;
 	virtual unsigned short notify(NotifyType notify_type)=0;
 //	virtual ~MsgNotifyObserverInf();
 };

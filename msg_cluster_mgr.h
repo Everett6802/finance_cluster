@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <list>
+#include <string>
 #include "msg_cluster_common.h"
 
 
@@ -50,8 +51,8 @@ public:
 	bool is_leader()const{return node_type == LEADER;}
 	unsigned short start();
 	unsigned short wait_to_stop();
-
-	virtual unsigned short update(const char* ip, const char* message){}
+// From MsgNotifyObserverInf
+	virtual unsigned short update(const char* ip, const std::string message){}
 	virtual unsigned short notify(NotifyType notify_type);
 };
 

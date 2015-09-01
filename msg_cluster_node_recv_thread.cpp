@@ -157,11 +157,11 @@ unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 					data_buffer += new_data.substr(0, beg_pos);
 				}
 
-				const char* new_message = data_buffer.c_str();
+//				const char* new_message = data_buffer.c_str();
 // Show the data read from the remote site
-				WRITE_FORMAT_DEBUG(EX_LONG_STRING_SIZE, "[%s] Receive message: %s", thread_tag, new_message);
+				WRITE_FORMAT_DEBUG(EX_LONG_STRING_SIZE, "[%s] Receive message: %s", thread_tag, data_buffer.c_str());
 // The data is coming, notify the observer
-				ret = msg_notify_observer->update(node_ip, new_message);
+				ret = msg_notify_observer->update(node_ip, data_buffer);
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Fail to update message to the observer[%s], due to: %d", thread_tag, node_ip, GetErrorDescription(ret));

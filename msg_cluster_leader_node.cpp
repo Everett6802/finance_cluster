@@ -126,7 +126,7 @@ unsigned short MsgClusterLeaderNode::check_keepalive()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderNode::update(const char* ip, const char* message)
+unsigned short MsgClusterLeaderNode::update(const char* ip, const std::string message)
 {
 	return RET_SUCCESS;
 }

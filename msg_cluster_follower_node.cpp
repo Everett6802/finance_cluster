@@ -75,7 +75,7 @@ unsigned short MsgClusterFollowerNode::initialize()
 	}
 
 // Start a timer to check keep-alive
-//	keepalive_counter.set(CHECK_KEEPALIVE_TIMES);
+	keepalive_counter = CHECK_KEEPALIVE_TIMES;
 
 	return RET_SUCCESS;
 }
@@ -87,10 +87,18 @@ unsigned short MsgClusterFollowerNode::deinitialize()
 	{
 		ret = msg_recv_thread->deinitialize();
 		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to de-initialize the receiving message worker thread[Node: %s]", local_ip);
 			return ret;
-
+		}
 		delete msg_recv_thread;
 		msg_recv_thread = NULL;
+	}
+
+	if (follower_socket != 0)
+	{
+		close(follower_socket);
+		follower_socket = 0;
 	}
 
 	return RET_SUCCESS;
@@ -98,16 +106,14 @@ unsigned short MsgClusterFollowerNode::deinitialize()
 
 unsigned short MsgClusterFollowerNode::check_keepalive()
 {
-	return RET_SUCCESS;
-}
+	if (keepalive_counter == 0)
+	{
+		WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
+		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
+	}
+	__sync_fetch_and_sub(&keepalive_counter, 1);
+	WRITE_FORMAT_DEBUG(STRING_SIZE, "Check keep-alive....... %d", keepalive_counter);
 
-unsigned short MsgClusterFollowerNode::update(const char* ip, const char* message)
-{
-	return RET_SUCCESS;
-}
-
-unsigned short MsgClusterFollowerNode::notify(NotifyType notify_type)
-{
 	return RET_SUCCESS;
 }
 
@@ -282,3 +288,43 @@ bool MsgClusterFollowerNode::is_keepalive_packet(const std::string message)const
 {
 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
 }
+
+unsigned short MsgClusterFollowerNode::update(const char* ip, const std::string message)
+{
+	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip, message.c_str(), message.length());
+	if (server_candidate_id == 0)
+	{
+		if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
+		{
+			size_t pos = message.find(":");
+			if (pos == string::npos)
+			{
+				WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
+				return RET_FAILURE_INCORRECT_CONFIG;
+			}
+
+			server_candidate_id = atoi(message.substr(pos + 1).c_str());
+			WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Follower[%s] got server candidate id: %d", ip, server_candidate_id);
+			return RET_SUCCESS;
+		}
+	}
+
+	if (is_keepalive_packet(message))
+	{
+		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] receive a Check-Alive packet......", ip);
+// Reset the keep-alive timer
+		__sync_lock_test_and_set(&keepalive_counter, CHECK_KEEPALIVE_TIMES);
+	}
+	else
+	{
+// TODO: Access the message
+	}
+
+	return RET_SUCCESS;
+}
+
+unsigned short MsgClusterFollowerNode::notify(NotifyType notify_type)
+{
+	return RET_SUCCESS;
+}
+

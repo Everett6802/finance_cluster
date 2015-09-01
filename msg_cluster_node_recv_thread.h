@@ -11,7 +11,7 @@ class MsgClusterNodeRecvThread
 	static const char* thread_tag;
 
 private:
-	int exit;
+	volatile int exit;
     char* node_ip;
 	pthread_t pid;
 	int node_socket;

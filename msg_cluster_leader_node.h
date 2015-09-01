@@ -2,6 +2,7 @@
 #define MSG_CLUSTER_LEADER_NODE_H
 
 #include <list>
+#include <string>
 #include "msg_cluster_node_base.h"
 #include "msg_cluster_common.h"
 
@@ -31,7 +32,7 @@ public:
 	virtual unsigned short deinitialize();
 	virtual unsigned short check_keepalive();
 // From MsgNotifyObserverInf
-	virtual unsigned short update(const char* ip, const char* message);
+	virtual unsigned short update(const char* ip, const std::string message);
 	virtual unsigned short notify(NotifyType notify_type);
 };
 typedef MsgClusterLeaderNode* PMSG_CLUSTER_LEADER_NODE;

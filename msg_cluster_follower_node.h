@@ -19,10 +19,11 @@ private:
 	static const int CHECK_KEEPALIVE_TIMES;
 	static const int TOTAL_KEEPALIVE_PERIOD;
 
-//	class MsgClusterNodeRecvThread; // Caution: Fail to compile
-	MsgClusterNodeRecvThread* msg_recv_thread;
 	CHAR_LIST server_list;
 	int follower_socket;
+//	class MsgClusterNodeRecvThread; // Caution: Fail to compile
+	MsgClusterNodeRecvThread* msg_recv_thread;
+	int keepalive_counter;
 	int server_candidate_id;
 
 	unsigned short connect_leader(const char* server_ip);
@@ -39,10 +40,10 @@ public:
 	virtual unsigned short deinitialize();
 	virtual unsigned short check_keepalive();
 // From MsgNotifyObserverInf
-	virtual unsigned short update(const char* ip, const char* message);
+	virtual unsigned short update(const char* ip, const std::string message);
 	virtual unsigned short notify(NotifyType notify_type);
 
-	int get_server_candidate_id(){return server_candidate_id;}
+	int get_server_candidate_id()const{return server_candidate_id;}
 };
 typedef MsgClusterFollowerNode* PMSG_CLUSTER_FOLLOWER_NODE;
 
