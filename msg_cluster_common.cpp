@@ -7,10 +7,10 @@
 
 using namespace std;
 
-const unsigned short SHORT_STRING_SIZE = 32;
-const unsigned short STRING_SIZE = 64;
-const unsigned short LONG_STRING_SIZE = 256;
-const unsigned short EX_LONG_STRING_SIZE = LONG_STRING_SIZE * 2;
+const unsigned short SHORT_STRING_SIZE = DEF_SHORT_STRING_SIZE;
+const unsigned short STRING_SIZE = DEF_STRING_SIZE;
+const unsigned short LONG_STRING_SIZE = DEF_LONG_STRING_SIZE;
+const unsigned short EX_LONG_STRING_SIZE = DEF_EX_LONG_STRING_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Return values

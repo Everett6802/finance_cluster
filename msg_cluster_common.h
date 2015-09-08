@@ -7,9 +7,15 @@
 #include <syslog.h>
 #include <errno.h>
 #include <list>
+#include <deque>
 #include <string>
 #include "msg_dumper_wrapper.h"
 
+// This constant is used for allocating array size
+#define DEF_SHORT_STRING_SIZE 			32U
+#define DEF_STRING_SIZE 				64U
+#define DEF_LONG_STRING_SIZE			256U
+#define DEF_EX_LONG_STRING_SIZE			LONG_STRING_SIZE * 2
 
 extern const unsigned short SHORT_STRING_SIZE;
 extern const unsigned short STRING_SIZE;
