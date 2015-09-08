@@ -10,6 +10,7 @@
 class MsgClusterLeaderSendThread
 {
 	DECLARE_MSG_DUMPER()
+	static const char* thread_tag;
 
 private:
 	class MsgCfg;

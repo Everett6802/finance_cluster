@@ -4,10 +4,13 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <string>
+#include <stdexcept>
 #include "msg_cluster_leader_send_thread.h"
 
 
 using namespace std;
+
+const char* MsgClusterLeaderSendThread::thread_tag = "Send Thread";
 
 class MsgClusterLeaderSendThread::MsgCfg
 {
@@ -261,16 +264,40 @@ OUT:
 
 void* MsgClusterLeaderSendThread::thread_handler(void* pvoid)
 {
-	if (pvoid != NULL)
-	{
-		MsgClusterLeaderSendThread* pthis = (MsgClusterLeaderSendThread*)pvoid;
-		unsigned short ret = pthis->thread_handler_internal();
-	}
+	MsgClusterLeaderSendThread* pthis = (MsgClusterLeaderSendThread*)pvoid;
+	if (pthis != NULL)
+		pthis->thread_ret = pthis->thread_handler_internal();
+	else
+		throw std::invalid_argument("pvoid should NOT be NULL");
 
-	pthread_exit((void*)"pvoid should NOT be NULL");
+	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
 }
 
 unsigned short MsgClusterLeaderSendThread::thread_handler_internal()
 {
-	return RET_SUCCESS;
+	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is running", thread_tag);
+	unsigned short ret = RET_SUCCESS;
+
+	while(!exit)
+	{
+		pthread_mutex_lock(&mtx_buffer);
+		if (!new_data_trigger)
+			pthread_cond_wait(&cond_buffer, &mtx_buffer);
+		list<MsgCfg*>::iterator iter = buffer_list.begin();
+		while (iter != buffer_list.end())
+		{
+			MsgCfg* msg = (MsgCfg*)*buffer_list.erase(iter++);
+			access_list.push_back(msg);
+		}
+		new_data_trigger = false;
+		pthread_mutex_unlock(&mtx_buffer);
+
+// Send the data to the remote
+		ret = send_msg_to_remote();
+		if (CHECK_FAILURE(ret))
+			break;
+	}
+
+	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is dead", thread_tag);
+	return ret;
 }
