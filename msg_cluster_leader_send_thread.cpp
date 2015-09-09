@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <string>
 #include <stdexcept>
@@ -66,7 +67,73 @@ unsigned short MsgClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF o
 
 unsigned short MsgClusterLeaderSendThread::deinitialize()
 {
-	return RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
+	void* status;
+	int kill_ret;
+	if (pid == 0)
+		goto OUT;
+
+	kill_ret = pthread_kill(pid, 0);
+	if(kill_ret == ESRCH)
+	{
+		WRITE_WARN("The worker thread of sending message did NOT exist......");
+		ret = RET_SUCCESS;
+		goto OUT;
+	}
+	else if(kill_ret == EINVAL)
+	{
+		WRITE_ERROR("The signal to the worker thread of sending message is invalid");
+		ret = RET_FAILURE_HANDLE_THREAD;
+		goto OUT;
+	}
+
+	WRITE_DEBUG("The signal to the worker thread of sending message is STILL alive");
+// Notify the worker thread it's time to exit
+	notify_exit();
+
+	pthread_mutex_lock(&mtx_buffer);
+	pthread_cond_signal(&cond_buffer);
+	pthread_mutex_unlock(&mtx_buffer);
+
+	WRITE_DEBUG("Wait for the worker thread of sending message's death...");
+	pthread_join(pid, &status);
+	if (status == NULL)
+		WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
+		ret = thread_ret;
+		goto OUT;
+	}
+OUT:
+	clearall();
+
+	return ret;
+}
+
+void MsgClusterLeaderSendThread::clearall()
+{
+	client_deque.clear();
+	dead_client_index_deque.clear();
+	client_socket_deque.clear();
+
+	list<MsgCfg*>::iterator iter_buffer = buffer_list.begin();
+	while (iter_buffer != buffer_list.end())
+	{
+		MsgCfg* msg_cfg = (MsgCfg*)*iter_buffer++;
+		delete msg_cfg;
+	}
+	buffer_list.clear();
+
+	list<MsgCfg*>::iterator iter_access = access_list.begin();
+	while (iter_access != access_list.end())
+	{
+		MsgCfg* msg_cfg = (MsgCfg*)*iter_access++;
+		delete msg_cfg;
+	}
+	access_list.clear();
+
+	msg_notify_observer = NULL;
 }
 
 void MsgClusterLeaderSendThread::notify_exit()

@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <string>
@@ -56,27 +57,48 @@ unsigned short MsgClusterNodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF obs
 
 unsigned short MsgClusterNodeRecvThread::deinitialize()
 {
-	if (exit != 0)
-		notify_exit();
-
 	unsigned short ret = RET_SUCCESS;
-	WRITE_ERROR("Wait for the worker thread of receiving message's death...");
-	if (pid != 0)
+	void* status;
+	int kill_ret;
+	if (pid == 0)
+		goto OUT;
+
+	kill_ret = pthread_kill(pid, 0);
+	if(kill_ret == ESRCH)
 	{
-		void* status;
-		pthread_join(pid, &status);
-		if (status == NULL)
-			WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
-		else
-		{
-			WRITE_FORMAT_ERROR(EX_LONG_STRING_SIZE, "Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)status);
-			ret = thread_ret;
-		}
-
-		pid = 0;
+		WRITE_WARN("The worker thread of receiving message did NOT exist......");
+		ret = RET_SUCCESS;
+		goto OUT;
 	}
-	WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+	else if(kill_ret == EINVAL)
+	{
+		WRITE_ERROR("The signal to the worker thread of receiving message is invalid");
+		ret = RET_FAILURE_HANDLE_THREAD;
+		goto OUT;
+	}
 
+	WRITE_DEBUG("The signal to the worker thread of receiving message is STILL alive");
+// Notify the worker thread it's time to exit
+	notify_exit();
+
+	WRITE_DEBUG("Wait for the worker thread of receiving message's death...");
+	pthread_join(pid, &status);
+	if (status == NULL)
+		WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)status);
+		ret = thread_ret;
+		goto OUT;
+	}
+OUT:
+	clearall();
+
+	return ret;
+}
+
+void MsgClusterNodeRecvThread::clearall()
+{
 	node_socket = NULL;
 	if (node_ip != NULL)
 	{
@@ -84,8 +106,6 @@ unsigned short MsgClusterNodeRecvThread::deinitialize()
 		node_ip = NULL;
 	}
 	msg_notify_observer = NULL;
-
-	return ret;
 }
 
 void MsgClusterNodeRecvThread::notify_exit()

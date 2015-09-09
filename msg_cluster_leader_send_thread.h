@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <list>
+#include <pthread.h>
 #include <string>
 #include "msg_cluster_common.h"
 
@@ -33,6 +34,7 @@ private:
 
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
+	void clearall();
 
 public:
 	MsgClusterLeaderSendThread();

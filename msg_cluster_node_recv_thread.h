@@ -20,6 +20,7 @@ private:
 
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
+	void clearall();
 
 public:
 	MsgClusterNodeRecvThread();
