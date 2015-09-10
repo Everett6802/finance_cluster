@@ -11,18 +11,28 @@
 #include <string>
 #include "msg_dumper_wrapper.h"
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Macro
+
 // This constant is used for allocating array size
 #define DEF_SHORT_STRING_SIZE 			32U
 #define DEF_STRING_SIZE 				64U
 #define DEF_LONG_STRING_SIZE			256U
 #define DEF_EX_LONG_STRING_SIZE			LONG_STRING_SIZE * 2
 
+#define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
+#define CHECK_FAILURE(X) !CHECK_SUCCESS(X)
+#define IS_TRY_CONNECTION_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_TRY_TIMEOUT ? true : false)
+#define IS_KEEP_ALIVE_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT ? true : false)
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Constants
 extern const unsigned short SHORT_STRING_SIZE;
 extern const unsigned short STRING_SIZE;
 extern const unsigned short LONG_STRING_SIZE;
 extern const unsigned short EX_LONG_STRING_SIZE;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Return values
 extern const unsigned short RET_SUCCESS;
 
@@ -46,11 +56,6 @@ extern const unsigned short RET_FAILURE_CONNECTION_CLOSE;
 extern const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_NO_SERVER;
 extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
-
-#define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
-#define CHECK_FAILURE(X) !CHECK_SUCCESS(X)
-#define IS_TRY_CONNECTION_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_TRY_TIMEOUT ? true : false)
-#define IS_KEEP_ALIVE_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT ? true : false)
 
 const char* GetErrorDescription(unsigned short ret);
 
