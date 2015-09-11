@@ -246,7 +246,7 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 	list<MsgCfg*>::iterator iter = access_list.begin();
 	while (iter != access_list.end())
 	{
-		bool follower_dead = false;
+//		bool follower_dead = false;
 		MsgCfg* msg_cfg = (MsgCfg*)*iter++;
 		assert(msg_cfg != NULL && "msg_cfg should NOT be NULL");
 
@@ -303,8 +303,8 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 //				String node_ip = client_deque.remove(i);
 				deque<std::string>::iterator iter = client_deque.erase(client_deque.begin() + index);
 				string node_ip = (string)*iter;
-				WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Follower[%s] is DEAD !!!", node_ip);
-				printf("Follower[%s] disconnects from the Leader\n", node_ip);
+				WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Follower[%s] is DEAD !!!", node_ip.c_str());
+				printf("Follower[%s] disconnects from the Leader\n", node_ip.c_str());
 
 				client_socket_deque.erase(client_socket_deque.begin() + index);
 			}

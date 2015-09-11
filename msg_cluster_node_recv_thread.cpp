@@ -132,9 +132,9 @@ unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 	static const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
 
 	char buf[RECV_BUF_SIZE];
-	int read_bytes = RECV_BUF_SIZE;
-	int read_to_bytes = 0;
-	unsigned short ret = RET_SUCCESS;
+//	int read_bytes = RECV_BUF_SIZE;
+//	int read_to_bytes = 0;
+//	unsigned short ret = RET_SUCCESS;
 	string data_buffer = "";
 
 	while(!exit)
@@ -184,7 +184,7 @@ unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 				ret = msg_notify_observer->update(node_ip, data_buffer);
 				if (CHECK_FAILURE(ret))
 				{
-					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Fail to update message to the observer[%s], due to: %d", thread_tag, node_ip, GetErrorDescription(ret));
+					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip, GetErrorDescription(ret));
 					break;
 				}
 // Clean the message sent to the observer

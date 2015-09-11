@@ -21,10 +21,21 @@
 #define DEF_LONG_STRING_SIZE			256U
 #define DEF_EX_LONG_STRING_SIZE			LONG_STRING_SIZE * 2
 
+#ifndef CHECK_SUCCESS
 #define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
+#endif
+
+#ifndef CHECK_FAILURE
 #define CHECK_FAILURE(X) !CHECK_SUCCESS(X)
+#endif
+
+#ifndef IS_TRY_CONNECTION_TIMEOUT
 #define IS_TRY_CONNECTION_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_TRY_TIMEOUT ? true : false)
+#endif
+
+#ifndef IS_KEEP_ALIVE_TIMEOUT
 #define IS_KEEP_ALIVE_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT ? true : false)
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -132,8 +143,8 @@ if (msg_dumper != NULL)\
 
 #define WRITE_MSG_DUMPER_BEGIN()\
 do{\
-char title[64];\
-snprintf(title, 64, "%s:%d", __FILE__, __LINE__);\
+char title[DEF_STRING_SIZE];\
+snprintf(title, DEF_STRING_SIZE, "%s:%d", __FILE__, __LINE__);\
 openlog(title, LOG_PID | LOG_CONS, LOG_USER);
 
 #define WRITE_MSG_DUMPER_END()\
@@ -142,16 +153,14 @@ closelog();\
 
 #define WRITE_MSG_DUMPER(priority, message)\
 WRITE_MSG_DUMPER_BEGIN()\
-syslog(priority, message);\
-if (msg_dumper != NULL) msg_dumper->write(priority, message);\
+msg_dumper->write(priority, message);\
 WRITE_MSG_DUMPER_END()
 
 #define WRITE_FORMAT_MSG_DUMPER(buf_size, priority, message_format, ...)\
 WRITE_MSG_DUMPER_BEGIN()\
 char buf[buf_size];\
 snprintf(buf, buf_size, message_format, __VA_ARGS__);\
-syslog(priority, buf);\
-if (msg_dumper != NULL) msg_dumper->write(priority, buf);\
+msg_dumper->write(priority, buf);\
 WRITE_MSG_DUMPER_END()
 
 #if defined SHOW_MSG_DUMPER

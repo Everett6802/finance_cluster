@@ -52,7 +52,7 @@ public:
 	unsigned short start();
 	unsigned short wait_to_stop();
 // From MsgNotifyObserverInf
-	virtual unsigned short update(const char* ip, const std::string message){}
+	virtual unsigned short update(const char* ip, const std::string message){return RET_FAILURE_INCORRECT_OPERATION;}
 	virtual unsigned short notify(NotifyType notify_type);
 };
 

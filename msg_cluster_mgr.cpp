@@ -454,7 +454,7 @@ unsigned short MsgClusterMgr::wait_to_stop()
 //		t = null;
 //	}
 
-	return RET_SUCCESS;
+	return ret;
 }
 
 void MsgClusterMgr::notify_exit(unsigned short exit_reason)

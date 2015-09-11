@@ -17,9 +17,9 @@ const int MsgClusterFollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int MsgClusterFollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
 
 MsgClusterFollowerNode::MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip) :
+	follower_socket(0),
 	msg_recv_thread(NULL),
-	server_candidate_id(0),
-	follower_socket(0)
+	server_candidate_id(0)
 {
 	IMPLEMENT_MSG_DUMPER()
 
@@ -291,7 +291,7 @@ bool MsgClusterFollowerNode::is_keepalive_packet(const std::string message)const
 
 unsigned short MsgClusterFollowerNode::update(const char* ip, const std::string message)
 {
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip, message.c_str(), message.length());
+	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip, message.c_str(), (int)message.length());
 	if (server_candidate_id == 0)
 	{
 		if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)

@@ -9,10 +9,10 @@ class MsgDumperWrapper
 {
 private:
 	static MsgDumperWrapper* instance;
-	static char* MSG_DUMPER_ERROR_COLOR;
+	static const char* MSG_DUMPER_ERROR_COLOR;
 	static unsigned short SEVERITY_ARR[];
 	static unsigned short FACILITY;
-	static char* FACILITY_NAME[];
+	static const char* FACILITY_NAME[];
 
 	int ref_count;
 	void* api_handle;

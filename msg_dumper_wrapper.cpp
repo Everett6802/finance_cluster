@@ -7,10 +7,11 @@
 
 
 MsgDumperWrapper* MsgDumperWrapper::instance = NULL;
-char* MsgDumperWrapper::MSG_DUMPER_ERROR_COLOR = "\x1B[31m";
-unsigned short MsgDumperWrapper::SEVERITY_ARR[] = {MSG_DUMPER_SEVIRITY_DEBUG};
-unsigned short MsgDumperWrapper::FACILITY = MSG_DUMPER_FACILITY_LOG;
-char* MsgDumperWrapper::FACILITY_NAME[] = {"Log", "Com", "Sql", "Remote", "Syslog"};
+const char* MsgDumperWrapper::MSG_DUMPER_ERROR_COLOR = "\x1B[31m";
+unsigned short MsgDumperWrapper::SEVERITY_ARR[] = {MSG_DUMPER_SEVIRITY_ERROR, MSG_DUMPER_SEVIRITY_DEBUG};
+unsigned short MsgDumperWrapper::FACILITY = MSG_DUMPER_FACILITY_LOG | MSG_DUMPER_FACILITY_SYSLOG;
+
+const char* MsgDumperWrapper::FACILITY_NAME[] = {"Log", "Com", "Sql", "Remote", "Syslog"};
 
 MsgDumperWrapper::MsgDumperWrapper() :
 	ref_count(0),
