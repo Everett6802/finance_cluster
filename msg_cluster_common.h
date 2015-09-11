@@ -97,13 +97,6 @@ typedef CHAR_LIST* PCHAR_LIST;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
-//class MsgRecvObserverInf
-//{
-//public:
-//	virtual unsigned short update(const char* ip, const char* message)=0;
-//	virtual ~MsgRecvObserverInf();
-//};
-//typedef MsgRecvObserverInf* PMSG_RECV_OBSERVER_INF;
 
 class MsgTransferInf
 {
