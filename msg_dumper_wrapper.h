@@ -2,7 +2,6 @@
 #define MSG_DUMPER_WRAPPER_H
 
 #include "msg_dumper.h"
-#include "msg_cluster_common.h"
 
 
 class MsgDumperWrapper
