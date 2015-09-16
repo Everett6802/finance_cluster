@@ -17,8 +17,6 @@ static const unsigned short MSG_DUMPER_FAILURE_COM_PORT = 9;
 static const unsigned short MSG_DUMPER_FAILURE_MYSQL = 10;
 static const unsigned short MSG_DUMPER_FAILURE_SOCKET = 11;
 
-#define CHECK_FAILURE(x) (x != MSG_DUMPER_SUCCESS ? true : false)
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 

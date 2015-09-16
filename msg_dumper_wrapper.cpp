@@ -3,15 +3,25 @@
 #include <assert.h>
 #include <dlfcn.h>
 #include <syslog.h>
+#include <errno.h>
+#include <string.h>
+#include <string>
 #include "msg_dumper_wrapper.h"
 
 
+using namespace std;
+
+#define CHECK_FAILURE(x) ((x != MSG_DUMPER_SUCCESS) ? true : false)
+
 MsgDumperWrapper* MsgDumperWrapper::instance = NULL;
 const char* MsgDumperWrapper::MSG_DUMPER_ERROR_COLOR = "\x1B[31m";
-unsigned short MsgDumperWrapper::SEVERITY_ARR[] = {MSG_DUMPER_SEVIRITY_ERROR, MSG_DUMPER_SEVIRITY_DEBUG};
-unsigned short MsgDumperWrapper::FACILITY = MSG_DUMPER_FACILITY_LOG | MSG_DUMPER_FACILITY_SYSLOG;
-
 const char* MsgDumperWrapper::FACILITY_NAME[] = {"Log", "Com", "Sql", "Remote", "Syslog"};
+const int MsgDumperWrapper::FACILITY_NAME_SIZE = sizeof(FACILITY_NAME) / sizeof(FACILITY_NAME[0]);
+const unsigned short MsgDumperWrapper::FACILITY_FLAG[] = {MSG_DUMPER_FACILITY_LOG, MSG_DUMPER_FACILITY_COM, MSG_DUMPER_FACILITY_SQL, MSG_DUMPER_FACILITY_REMOTE, MSG_DUMPER_FACILITY_SYSLOG};
+const char* MsgDumperWrapper::SEVERITY_NAME[] = {"ERROR", "WARN", "INFO", "DEBUG"};
+const int MsgDumperWrapper::SEVERITY_NAME_SIZE = sizeof(SEVERITY_NAME) / sizeof(SEVERITY_NAME[0]);
+const char* MsgDumperWrapper::CONF_FOLDER = "conf";
+const char* MsgDumperWrapper::CONF_FILENAME = "dumper_param.conf";
 
 MsgDumperWrapper::MsgDumperWrapper() :
 	ref_count(0),
@@ -97,38 +107,12 @@ unsigned short MsgDumperWrapper::initialize()
 	fp_msg_dumper_get_version(major_version, minor_version);
 	printf("API version: (%d.%d)\n", major_version, minor_version);
 
-// Count the amount of device type
-	int device_type_amount = 0;
-	unsigned short flag = 0x1;
-	while (MSG_DUMPER_FACILITY_ALL & flag)
-	{
-		device_type_amount++;
-		flag <<= 1;
-	}
-
-// Set severity
-	flag = 0x1;
-	for (int i = 0, severity_cnt = 0 ; i < device_type_amount ; i++)
-	{
-		if (flag & FACILITY)
-		{
-			printf("Set severity of facility[%s] to %d\n", FACILITY_NAME[i], SEVERITY_ARR[severity_cnt]);
-			ret = fp_msg_dumper_set_severity(SEVERITY_ARR[severity_cnt], flag);
-			if (CHECK_FAILURE(ret))
-			{
-				fprintf(stderr, "%sfp_msg_dumper_set_severity() fails, due to %d, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, ret, fp_msg_dumper_get_error_description());
-				exit(EXIT_FAILURE);
-			}
-			severity_cnt++;
-		}
-		flag <<= 1;
-	}
-// Set facility
-	printf("Set facility to :%d\n", FACILITY);
-	ret = fp_msg_dumper_set_facility(FACILITY);
+// Parse the parameters from the config file
+	printf("Parse the config file\n");
+	ret = parse_config();
 	if (CHECK_FAILURE(ret))
 	{
-		fprintf(stderr, "%sfp_msg_dumper_set_facility() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
+		fprintf(stderr, "%sfparse_config() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
 		exit(EXIT_FAILURE);
 	}
 
@@ -237,9 +221,129 @@ unsigned short MsgDumperWrapper::write(unsigned short syslog_priority, const cha
 	unsigned short ret = fp_msg_dumper_write_msg(msg_severity, msg);
 	if (CHECK_FAILURE(ret))
 	{
-		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
+		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
 		exit(EXIT_FAILURE);
 	}
+
+	return ret;
+}
+
+unsigned short MsgDumperWrapper::parse_config()
+{
+	static const int BUF_SIZE = 256;
+	char current_working_directory[BUF_SIZE];
+	getcwd(current_working_directory, sizeof(current_working_directory));
+	char config_filename[BUF_SIZE];
+	snprintf(config_filename, BUF_SIZE, "%s/%s/%s", current_working_directory, CONF_FOLDER, CONF_FILENAME);
+	printf("Parse the config file: %s", config_filename);
+
+	FILE *fp = fopen(config_filename, "r");
+	if (fp == NULL)
+	{
+		fprintf(stderr, "%sfopen() fails, reason: %s\n", MSG_DUMPER_ERROR_COLOR, strerror(errno));
+		return MSG_DUMPER_FAILURE_OPEN_FILE;
+	}
+
+	unsigned short total_facility_flag = 0x0;
+	unsigned short ret = MSG_DUMPER_SUCCESS;
+// Parse the config file
+	const char* stop_flag = "[";
+	int stop_flag_len = strlen(stop_flag);
+	char buf[BUF_SIZE];
+
+	while (fgets(buf, BUF_SIZE, fp) != NULL)
+	{
+		if (strncmp(buf, stop_flag, stop_flag_len) == 0)
+			break;
+
+		if (buf[0] == '\n')
+			break;
+		int end_pos = -1;
+		int split_pos = -1;
+// Check the format of config entry is correct
+		for (int i = 0 ; i < BUF_SIZE ; i++)
+		{
+			if (buf[i] == '=')
+				split_pos = i;
+			else if (buf[i] == '\n')
+			{
+				end_pos = i;
+				buf[i] = '\0';
+				break;
+			}
+		}
+		if (end_pos == -1 || split_pos == -1)
+		{
+			fprintf(stderr, "%sIncorrect config format, split pos: %d, end pos: %d", MSG_DUMPER_ERROR_COLOR, split_pos, end_pos);
+			ret = MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+
+		string config(buf);
+//		WRITE_DEBUG_FORMAT_LOGGING(STRING_SIZE, "***Config*** content: %s, split pos: %d", config.c_str(), split_pos);
+		const char* facility = config.substr(0, split_pos).c_str();
+		const char* severity = config.substr(split_pos + 1).c_str();
+//		WRITE_DEBUG_FORMAT_LOGGING(STRING_SIZE, "***Config*** title: %s, value: %s", title, value);
+
+		unsigned short facility_flag;
+		int facility_index = -1;
+// Set facility
+		for (int i = 0 ; i < FACILITY_NAME_SIZE ; i++)
+		{
+			if (strcmp(facility, FACILITY_NAME[i]) == 0)
+				facility_index = i;
+		}
+		if (facility_index == -1)
+		{
+			fprintf(stderr, "%sUnknown facility: %s\n", MSG_DUMPER_ERROR_COLOR, facility);
+			ret = MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
+			goto OUT;
+		}
+		total_facility_flag |= FACILITY_FLAG[facility_index];
+// Set severity
+		for (int i = 0 ; i < SEVERITY_NAME_SIZE ; i++)
+		{
+			if (strcmp(severity, SEVERITY_NAME[i]) == 0)
+			{
+// Assign the value in the config to the member variable
+				switch(i)
+				{
+					case MSG_DUMPER_SEVIRITY_ERROR:
+					case MSG_DUMPER_SEVIRITY_WARN:
+					case MSG_DUMPER_SEVIRITY_INFO:
+					case MSG_DUMPER_SEVIRITY_DEBUG:
+					{
+						printf("Set severity of facility[%s] to %s\n", FACILITY_NAME[facility_index], SEVERITY_NAME[i]);
+						ret = fp_msg_dumper_set_severity(i, FACILITY_FLAG[facility_index]);
+						if (CHECK_FAILURE(ret))
+						{
+							fprintf(stderr, "%sfp_msg_dumper_set_severity() fails, reason: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
+							goto OUT;
+						}
+					}
+					break;
+					default:
+					{
+						fprintf(stderr, "%sUnknown severity: %s\n", MSG_DUMPER_ERROR_COLOR, severity);
+						ret = MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
+						goto OUT;
+					}
+					break;
+				}
+			}
+		}
+	}
+	printf("Set facility to %d\n", total_facility_flag);
+	ret = fp_msg_dumper_set_facility(total_facility_flag);
+	if (CHECK_FAILURE(ret))
+	{
+		fprintf(stderr, "%sfp_msg_dumper_set_facility() fails, reason: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
+		exit(EXIT_FAILURE);
+	}
+
+OUT:
+	fclose(fp);
+	fp = NULL;
 
 	return ret;
 }

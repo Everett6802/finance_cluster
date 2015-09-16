@@ -9,9 +9,15 @@ class MsgDumperWrapper
 private:
 	static MsgDumperWrapper* instance;
 	static const char* MSG_DUMPER_ERROR_COLOR;
-	static unsigned short SEVERITY_ARR[];
-	static unsigned short FACILITY;
+//	static unsigned short SEVERITY_ARR[];
+//	static unsigned short FACILITY;
 	static const char* FACILITY_NAME[];
+	static const int FACILITY_NAME_SIZE;
+	static const unsigned short FACILITY_FLAG[];
+	static const char* SEVERITY_NAME[];
+	static const int SEVERITY_NAME_SIZE;
+	static const char* CONF_FOLDER;
+	static const char* CONF_FILENAME;
 
 	int ref_count;
 	void* api_handle;
@@ -23,11 +29,20 @@ private:
 	FP_msg_dumper_deinitialize fp_msg_dumper_deinitialize;
 	FP_msg_dumper_get_error_description fp_msg_dumper_get_error_description;
 
+
+	unsigned short facility_flag;
+
 	MsgDumperWrapper();
+	MsgDumperWrapper(const MsgDumperWrapper&);
+	MsgDumperWrapper& operator=(const MsgDumperWrapper&);
 
 	unsigned short initialize();
 	void deinitialize();
 	bool export_api();
+//	int get_device_type_amount()const;
+	unsigned short parse_config();
+//	unsigned short set_severity(const unsigned short severity_arr[]);
+//	unsigned short set_facility(unsigned short facility);
 
 public:
 	~MsgDumperWrapper(){deinitialize();}
