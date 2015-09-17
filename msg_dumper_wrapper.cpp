@@ -274,24 +274,29 @@ unsigned short MsgDumperWrapper::parse_config()
 		}
 		if (end_pos == -1 || split_pos == -1)
 		{
-			fprintf(stderr, "%sIncorrect config format, split pos: %d, end pos: %d", MSG_DUMPER_ERROR_COLOR, split_pos, end_pos);
+			fprintf(stderr, "%sIncorrect config format, split pos: %d, end pos: %d\n", MSG_DUMPER_ERROR_COLOR, split_pos, end_pos);
 			ret = MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
 			break;
 		}
 
 		string config(buf);
 //		WRITE_DEBUG_FORMAT_LOGGING(STRING_SIZE, "***Config*** content: %s, split pos: %d", config.c_str(), split_pos);
-		const char* facility = config.substr(0, split_pos).c_str();
-		const char* severity = config.substr(split_pos + 1).c_str();
-//		WRITE_DEBUG_FORMAT_LOGGING(STRING_SIZE, "***Config*** title: %s, value: %s", title, value);
+		char facility[16];
+		snprintf(facility, 16, "%s", config.substr(0, split_pos).c_str());
+		char severity[16];
+		snprintf(severity, 16, "%s", config.substr(split_pos + 1).c_str());
+		printf("***Config*** facility: %s, severity: %s\n", facility, severity);
 
-		unsigned short facility_flag;
+//		unsigned short facility_flag;
 		int facility_index = -1;
 // Set facility
 		for (int i = 0 ; i < FACILITY_NAME_SIZE ; i++)
 		{
 			if (strcmp(facility, FACILITY_NAME[i]) == 0)
+			{
 				facility_index = i;
+				break;
+			}
 		}
 		if (facility_index == -1)
 		{
