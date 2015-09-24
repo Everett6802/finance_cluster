@@ -5,8 +5,14 @@
 #include "msg_cluster_common.h"
 
 
+class MsgClusterLeaderNode;
+class MsgClusterFollowerNode;
+
 class MsgClusterNodeRecvThread
 {
+	friend class MsgClusterLeaderNode;
+	friend class MsgClusterFollowerNode;
+
 	DECLARE_MSG_DUMPER()
 	static const char* thread_tag;
 
@@ -22,7 +28,6 @@ private:
 	unsigned short thread_handler_internal();
 	void clearall();
 
-public:
 	MsgClusterNodeRecvThread();
 	~MsgClusterNodeRecvThread();
 

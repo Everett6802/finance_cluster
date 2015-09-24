@@ -3,3 +3,6 @@ msg_cluster
 .project
 log/
 libmsg_dumper.so
+msg_dumper.h
+msg_dumper_wrapper.h
+msg_dumper_wrapper.cpp

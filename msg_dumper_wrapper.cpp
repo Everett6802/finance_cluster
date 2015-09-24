@@ -92,14 +92,14 @@ unsigned short MsgDumperWrapper::initialize()
 	if (api_handle == NULL)
 	{
 		fprintf(stderr, "%sdlopen() fails, due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
-		exit(EXIT_FAILURE);
+		return MSG_DUMPER_FAILURE_UNKNOWN;
 	}
 
 // Export the APIs
 	if (!export_api())
 	{
 		fprintf(stderr, "%sFail to export the APIs\n", MSG_DUMPER_ERROR_COLOR);
-		exit(EXIT_FAILURE);
+		return MSG_DUMPER_FAILURE_UNKNOWN;
 	}
 
 	unsigned char major_version;
@@ -113,7 +113,7 @@ unsigned short MsgDumperWrapper::initialize()
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "%sfparse_config() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
-		exit(EXIT_FAILURE);
+		return ret;
 	}
 
 // Initialize the library
@@ -122,7 +122,7 @@ unsigned short MsgDumperWrapper::initialize()
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "%sfp_msg_dumper_initialize() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
-		exit(EXIT_FAILURE);
+		return ret;
 	}
 
 	return ret;
@@ -140,92 +140,6 @@ void MsgDumperWrapper::deinitialize()
 		dlclose(api_handle);
 		api_handle = NULL;
 	}
-}
-
-MsgDumperWrapper* MsgDumperWrapper::get_instance()
-{
-	if (instance == NULL)
-	{
-// If the instance is NOT created...
-		instance = new MsgDumperWrapper();
-		if (instance == NULL)
-		{
-			assert(0 || "Fail to get the instance of MsgDumperWrapper");
-			return NULL;
-		}
-
-// Initialize the instance
-		unsigned short ret = instance->initialize();
-		if(CHECK_FAILURE(ret))
-		{
-			assert(0 || "Fail to get the instance of MsgDumperWrapper");
-			return NULL;
-		}
-	}
-
-// Add the reference count
-	instance->addref();
-	return instance;
-}
-
-int MsgDumperWrapper::addref()
-{
-	__sync_fetch_and_add(&ref_count, 1);
-	return ref_count;
-}
-
-int MsgDumperWrapper::release()
-{
-	__sync_fetch_and_sub(&ref_count, 1);
-	if (ref_count == 0)
-	{
-		delete this;
-		return 0;
-	}
-
-	return ref_count;
-}
-
-
-unsigned short MsgDumperWrapper::write(unsigned short syslog_priority, const char* msg)
-{
-#if 0
-#define LOG_EMERG       0       /* system is unusable */
-#define LOG_ALERT       1       /* action must be taken immediately */
-#define LOG_CRIT        2       /* critical conditions */
-#define LOG_ERR         3       /* error conditions */
-#define LOG_WARNING     4       /* warning conditions */
-#define LOG_NOTICE      5       /* normal but significant condition */
-#define LOG_INFO        6       /* informational */
-#define LOG_DEBUG       7       /* debug-level messages */
-#endif
-
-	unsigned short msg_severity;
-	switch(syslog_priority)
-	{
-	case LOG_DEBUG:
-		msg_severity = MSG_DUMPER_SEVIRITY_DEBUG;
-		break;
-	case LOG_INFO:
-		msg_severity = MSG_DUMPER_SEVIRITY_INFO;
-		break;
-	case LOG_WARNING:
-	case LOG_NOTICE:
-		msg_severity = MSG_DUMPER_SEVIRITY_WARN;
-		break;
-	default:
-		msg_severity = MSG_DUMPER_SEVIRITY_ERROR;
-		break;
-	}
-
-	unsigned short ret = fp_msg_dumper_write_msg(msg_severity, msg);
-	if (CHECK_FAILURE(ret))
-	{
-		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
-		exit(EXIT_FAILURE);
-	}
-
-	return ret;
 }
 
 unsigned short MsgDumperWrapper::parse_config()
@@ -343,7 +257,7 @@ unsigned short MsgDumperWrapper::parse_config()
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "%sfp_msg_dumper_set_facility() fails, reason: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
-		exit(EXIT_FAILURE);
+		return ret;
 	}
 
 OUT:
@@ -351,4 +265,92 @@ OUT:
 	fp = NULL;
 
 	return ret;
+}
+
+MsgDumperWrapper* MsgDumperWrapper::get_instance()
+{
+	if (instance == NULL)
+	{
+// If the instance is NOT created...
+		instance = new MsgDumperWrapper();
+		if (instance == NULL)
+		{
+			assert(0 || "Fail to get the instance of MsgDumperWrapper");
+			return NULL;
+		}
+
+// Initialize the instance
+		unsigned short ret = instance->initialize();
+		if(CHECK_FAILURE(ret))
+		{
+			assert(0 || "Fail to get the instance of MsgDumperWrapper");
+			return NULL;
+		}
+	}
+
+// Add the reference count
+	instance->addref();
+	return instance;
+}
+
+int MsgDumperWrapper::addref()
+{
+	__sync_fetch_and_add(&ref_count, 1);
+	return ref_count;
+}
+
+int MsgDumperWrapper::release()
+{
+	__sync_fetch_and_sub(&ref_count, 1);
+	if (ref_count == 0)
+	{
+		delete this;
+		return 0;
+	}
+
+	return ref_count;
+}
+
+
+unsigned short MsgDumperWrapper::write(unsigned short syslog_priority, const char* msg)
+{
+#if 0
+#define LOG_EMERG       0       /* system is unusable */
+#define LOG_ALERT       1       /* action must be taken immediately */
+#define LOG_CRIT        2       /* critical conditions */
+#define LOG_ERR         3       /* error conditions */
+#define LOG_WARNING     4       /* warning conditions */
+#define LOG_NOTICE      5       /* normal but significant condition */
+#define LOG_INFO        6       /* informational */
+#define LOG_DEBUG       7       /* debug-level messages */
+#endif
+
+	unsigned short msg_severity;
+	switch(syslog_priority)
+	{
+	case LOG_DEBUG:
+		msg_severity = MSG_DUMPER_SEVIRITY_DEBUG;
+		break;
+	case LOG_INFO:
+		msg_severity = MSG_DUMPER_SEVIRITY_INFO;
+		break;
+	case LOG_WARNING:
+	case LOG_NOTICE:
+		msg_severity = MSG_DUMPER_SEVIRITY_WARN;
+		break;
+	default:
+		msg_severity = MSG_DUMPER_SEVIRITY_ERROR;
+		break;
+	}
+
+	unsigned short ret = fp_msg_dumper_write_msg(msg_severity, msg);
+	if (CHECK_FAILURE(ret))
+		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
+
+	return ret;
+}
+
+const char* MsgDumperWrapper::get_error_description()const
+{
+	return fp_msg_dumper_get_error_description();
 }

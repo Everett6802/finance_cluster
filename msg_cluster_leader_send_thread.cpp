@@ -329,6 +329,36 @@ OUT:
 	return RET_SUCCESS;
 }
 
+unsigned short MsgClusterLeaderSendThread::check_keepalive()
+{
+	pthread_mutex_lock(&mtx_buffer);
+	MsgCfg* msg_cfg = new MsgCfg("", CHECK_KEEPALIVE_TAG);
+	if (msg_cfg == NULL)
+	{
+		WRITE_ERROR("Insufficient memory: msg_cfg");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+	buffer_list.push_front(msg_cfg);
+	if (!new_data_trigger)
+	{
+		pthread_cond_signal(&cond_buffer);
+		new_data_trigger = true;
+	}
+	pthread_mutex_unlock(&mtx_buffer);
+
+	return RET_SUCCESS;
+}
+
+bool MsgClusterLeaderSendThread::follower_connected()const
+{
+	return is_follower_connected;
+}
+
+const deque<int> MsgClusterLeaderSendThread::get_dead_client_index_deque()const
+{
+	return dead_client_index_deque;
+}
+
 void* MsgClusterLeaderSendThread::thread_handler(void* pvoid)
 {
 	MsgClusterLeaderSendThread* pthis = (MsgClusterLeaderSendThread*)pvoid;

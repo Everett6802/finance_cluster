@@ -14,14 +14,22 @@ class MsgClusterLeaderNode : public MsgClusterNodeBase
 {
 	DECLARE_MSG_DUMPER()
 
+	static const char* thread_tag;
 private:
+	volatile bool exit;
+	pthread_t pid;
+	int leader_socket;
 	//	class MsgClusterNodeRecvThread; // Caution: Fail to compile
 	//	class MsgClusterLeaderSendThread; // Caution: Fail to compile
-	std::list<MsgClusterNodeRecvThread*> client_recv_thread_list;
+	std::list<MsgClusterNodeRecvThread*>* client_recv_thread_list;
 	MsgClusterLeaderSendThread* client_send_thread;
-	int leader_socket;
+	volatile unsigned short thread_ret;
+	pthread_mutex_t mtx_thread_list;
 
 	unsigned short become_leader();
+
+	static void* thread_handler(void* pvoid);
+	unsigned short thread_handler_internal();
 
 public:
 	MsgClusterLeaderNode(char* ip);

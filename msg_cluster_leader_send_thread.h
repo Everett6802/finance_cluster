@@ -8,8 +8,12 @@
 #include "msg_cluster_common.h"
 
 
+class MsgClusterLeaderNode;
+
 class MsgClusterLeaderSendThread
 {
+	friend class MsgClusterLeaderNode;
+
 	DECLARE_MSG_DUMPER()
 	static const char* thread_tag;
 
@@ -36,7 +40,6 @@ private:
 	unsigned short thread_handler_internal();
 	void clearall();
 
-public:
 	MsgClusterLeaderSendThread();
 	~MsgClusterLeaderSendThread();
 
@@ -47,6 +50,10 @@ public:
 	unsigned short send_msg(std::string src_ip, std::string data);
 	unsigned short try_to_transmit_msg(int index, std::string data);
 	unsigned short send_msg_to_remote();
+	unsigned short check_keepalive();
+	bool follower_connected()const;
+	const std::deque<int> get_dead_client_index_deque()const;
+
 };
 typedef MsgClusterLeaderSendThread* PMSG_CLUSTER_LEADER_SEND_THREAD;
 
