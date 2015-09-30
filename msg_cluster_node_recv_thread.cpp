@@ -12,7 +12,7 @@ const char* MsgClusterNodeRecvThread::thread_tag = "Recv Thread";
 
 MsgClusterNodeRecvThread::MsgClusterNodeRecvThread() :
 	exit(0),
-	node_ip(NULL),
+//	node_ip(NULL),
 	pid(0),
 	node_socket(0),
 	msg_notify_observer(NULL),
@@ -36,14 +36,7 @@ unsigned short MsgClusterNodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF obs
 	}
 
 	node_socket = recv_socket;
-	node_ip = new char[SHORT_STRING_SIZE];
-	if (node_ip == NULL)
-	{
-		WRITE_ERROR("Fail to allocate memory: node_ip");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
-    memset(node_ip, 0x0, sizeof(char) * SHORT_STRING_SIZE);
-    memcpy(node_ip, ip, strlen(ip));
+	node_ip = string(ip);
 
 // Create a worker thread to access data...
     if (pthread_create(&pid, NULL, thread_handler, this))
@@ -99,12 +92,12 @@ OUT:
 
 void MsgClusterNodeRecvThread::clearall()
 {
-	node_socket = NULL;
-	if (node_ip != NULL)
-	{
-		delete[] node_ip;
-		node_ip = NULL;
-	}
+	node_socket = 0;
+//	if (node_ip != NULL)
+//	{
+//		delete[] node_ip;
+//		node_ip = NULL;
+//	}
 	msg_notify_observer = NULL;
 }
 
@@ -126,7 +119,7 @@ void* MsgClusterNodeRecvThread::thread_handler(void* pvoid)
 
 unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 {
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip);
+	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
 
 	static const string END_OF_MESSAGE = "\r\n\r\n";
 	static const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
@@ -184,7 +177,7 @@ unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 				ret = msg_notify_observer->update(node_ip, data_buffer);
 				if (CHECK_FAILURE(ret))
 				{
-					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip, GetErrorDescription(ret));
+					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
 					break;
 				}
 // Clean the message sent to the observer
@@ -201,7 +194,7 @@ unsigned short MsgClusterNodeRecvThread::thread_handler_internal()
 		}
 	}
 
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip);
+	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
 
 	return RET_SUCCESS;
 }

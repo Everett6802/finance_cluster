@@ -289,9 +289,9 @@ bool MsgClusterFollowerNode::is_keepalive_packet(const std::string message)const
 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
 }
 
-unsigned short MsgClusterFollowerNode::update(const char* ip, const std::string message)
+unsigned short MsgClusterFollowerNode::update(const std::string ip, const std::string message)
 {
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip, message.c_str(), (int)message.length());
+	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	if (server_candidate_id == 0)
 	{
 		if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
@@ -304,14 +304,14 @@ unsigned short MsgClusterFollowerNode::update(const char* ip, const std::string 
 			}
 
 			server_candidate_id = atoi(message.substr(pos + 1).c_str());
-			WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Follower[%s] got server candidate id: %d", ip, server_candidate_id);
+			WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
 			return RET_SUCCESS;
 		}
 	}
 
 	if (is_keepalive_packet(message))
 	{
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] receive a Check-Alive packet......", ip);
+		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] receive a Check-Alive packet......", ip.c_str());
 // Reset the keep-alive timer
 		__sync_lock_test_and_set(&keepalive_counter, CHECK_KEEPALIVE_TIMES);
 	}

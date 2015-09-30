@@ -40,7 +40,7 @@ public:
 	virtual unsigned short deinitialize();
 	virtual unsigned short check_keepalive();
 // From MsgNotifyObserverInf
-	virtual unsigned short update(const char* ip, const std::string message);
+	virtual unsigned short update(const std::string ip, const std::string message);
 	virtual unsigned short notify(NotifyType notify_type);
 
 	int get_server_candidate_id()const{return server_candidate_id;}

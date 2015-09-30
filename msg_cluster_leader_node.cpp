@@ -157,9 +157,13 @@ unsigned short MsgClusterLeaderNode::check_keepalive()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderNode::update(const char* ip, const std::string message)
+unsigned short MsgClusterLeaderNode::update(const std::string ip, const std::string message)
 {
-	return RET_SUCCESS;
+	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
+	unsigned short ret = client_send_thread->send_msg(ip, message);
+
+	return ret;
 }
 
 unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)

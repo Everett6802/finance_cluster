@@ -18,7 +18,7 @@ class MsgClusterNodeRecvThread
 
 private:
 	volatile int exit;
-    char* node_ip;
+    std::string node_ip;
 	pthread_t pid;
 	int node_socket;
 	PMSG_NOTIFY_OBSERVER_INF msg_notify_observer;
@@ -34,7 +34,7 @@ private:
 	unsigned short initialize(PMSG_NOTIFY_OBSERVER_INF observer, int recv_socket, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
-	const char* get_ip()const{return node_ip;}
+	const std::string get_ip()const{return node_ip;}
 };
 typedef MsgClusterNodeRecvThread* PMSG_CLUSTER_NODE_RECV_THREAD;
 

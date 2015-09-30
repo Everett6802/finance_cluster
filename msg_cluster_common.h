@@ -110,7 +110,7 @@ typedef MsgTransferInf* PMSG_TRANSFER_INF;
 class MsgNotifyObserverInf
 {
 public:
-	virtual unsigned short update(const char* ip, const std::string message)=0;
+	virtual unsigned short update(const std::string ip, const std::string message)=0;
 	virtual unsigned short notify(NotifyType notify_type)=0;
 //	virtual ~MsgNotifyObserverInf();
 };
