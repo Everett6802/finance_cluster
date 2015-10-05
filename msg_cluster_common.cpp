@@ -98,6 +98,5 @@ const char* CONF_FODLERNAME = "conf";
 const int PORT_NO = 6802;
 const int RECV_BUF_SIZE = 512;
 
-
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;

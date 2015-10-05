@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -164,7 +165,7 @@ MsgClusterMgr::MsgClusterMgr() :
 	msg_trasnfer(NULL),
 	msg_cluster_node(NULL),
 	t(0),
-	runtime_ret(RET_SUCCESS),
+	thread_ret(RET_SUCCESS),
 	node_type(NONE)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -480,3 +481,18 @@ unsigned short MsgClusterMgr::notify(NotifyType notify_type)
 	}
 	return RET_SUCCESS;
 }
+
+void* MsgClusterMgr::thread_handler(void* pvoid)
+{
+	MsgClusterMgr* pthis = (MsgClusterMgr*)pvoid;
+	assert(pthis != NULL && "pvoid should NOT be NULL");
+	pthis->thread_ret = pthis->thread_handler_internal();
+
+	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
+}
+
+unsigned short MsgClusterMgr::thread_handler_internal()
+{
+	return RET_SUCCESS;
+}
+

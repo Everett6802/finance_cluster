@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <stdexcept>
 #include <string>
+#include <deque>
 #include "msg_cluster_leader_node.h"
 #include "msg_cluster_leader_send_thread.h"
 #include "msg_cluster_node_recv_thread.h"
@@ -18,7 +19,7 @@ MsgClusterLeaderNode::MsgClusterLeaderNode(char* ip) :
 	exit(false),
 	pid(0),
 	leader_socket(0),
-	client_recv_thread_list(NULL),
+	client_recv_thread_deque(NULL),
 	client_send_thread(NULL),
 	thread_ret(RET_SUCCESS)
 {
@@ -87,10 +88,10 @@ unsigned short MsgClusterLeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-	client_recv_thread_list = new list<MsgClusterNodeRecvThread*>();
-	if (client_recv_thread_list == NULL)
+	client_recv_thread_deque = new deque<MsgClusterNodeRecvThread*>();
+	if (client_recv_thread_deque == NULL)
 	{
-		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_list");
+		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_deque");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 // Initialize a thread to send the message to the remote
@@ -120,10 +121,10 @@ OUT:
     	delete client_send_thread;
     	client_send_thread = NULL;
     }
-	if (client_recv_thread_list != NULL)
+	if (client_recv_thread_deque != NULL)
 	{
-		delete client_recv_thread_list;
-		client_recv_thread_list = NULL;
+		delete client_recv_thread_deque;
+		client_recv_thread_deque = NULL;
 	}
 
     return ret;
@@ -168,6 +169,41 @@ unsigned short MsgClusterLeaderNode::update(const std::string ip, const std::str
 
 unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 {
+	switch (notify_type)
+	{
+	case NOTIFY_DEAD_CLIENT:
+	{
+		assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
+		assert(client_recv_thread_deque != NULL && "client_recv_thread_deque should NOT be NULL");
+
+		const std::deque<int>& dead_client_index_deque = client_send_thread->get_dead_client_index_deque();
+		pthread_mutex_lock(&mtx_thread_list);
+		int client_recv_thread_deque_size = (int)client_recv_thread_deque->size();
+		std::deque<int>::const_iterator iter = dead_client_index_deque.begin();
+		while (iter != dead_client_index_deque.end())
+		{
+			int index = (int)*iter++;
+			assert ((index >= 0 && index < client_recv_thread_deque_size) && "index is out of range");
+
+			MsgClusterNodeRecvThread* thread = (MsgClusterNodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
+			assert (thread != NULL && "thread should NOT be NULL");
+			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
+			unsigned short ret = thread->deinitialize();
+			if (CHECK_FAILURE(ret))
+				WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
+			delete thread;
+		}
+		pthread_mutex_unlock(&mtx_thread_list);
+	}
+	break;
+	default:
+	{
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Unknown Notify Type: %d", notify_type);
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	break;
+	}
+
 	return RET_SUCCESS;
 }
 
@@ -221,7 +257,7 @@ unsigned short MsgClusterLeaderNode::thread_handler_internal()
 		if (CHECK_FAILURE(ret))
 			break;
 		pthread_mutex_lock(&mtx_thread_list);
-		client_recv_thread_list->push_back(msg_cluster_node_recv_thread);
+		client_recv_thread_deque->push_back(msg_cluster_node_recv_thread);
 		pthread_mutex_unlock(&mtx_thread_list);
 
 // Add into the list of sending message

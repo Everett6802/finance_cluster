@@ -1,7 +1,8 @@
 #ifndef MSG_CLUSTER_LEADER_NODE_H
 #define MSG_CLUSTER_LEADER_NODE_H
 
-#include <list>
+//#include <list>
+#include <deque>
 #include <string>
 #include "msg_cluster_node_base.h"
 #include "msg_cluster_common.h"
@@ -21,7 +22,7 @@ private:
 	int leader_socket;
 	//	class MsgClusterNodeRecvThread; // Caution: Fail to compile
 	//	class MsgClusterLeaderSendThread; // Caution: Fail to compile
-	std::list<MsgClusterNodeRecvThread*>* client_recv_thread_list;
+	std::deque<MsgClusterNodeRecvThread*>* client_recv_thread_deque;
 	MsgClusterLeaderSendThread* client_send_thread;
 	volatile unsigned short thread_ret;
 	pthread_mutex_t mtx_thread_list;

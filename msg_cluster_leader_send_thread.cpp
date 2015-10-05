@@ -354,7 +354,7 @@ bool MsgClusterLeaderSendThread::follower_connected()const
 	return is_follower_connected;
 }
 
-const deque<int> MsgClusterLeaderSendThread::get_dead_client_index_deque()const
+const deque<int>& MsgClusterLeaderSendThread::get_dead_client_index_deque()const
 {
 	return dead_client_index_deque;
 }

@@ -52,7 +52,7 @@ private:
 	unsigned short send_msg_to_remote();
 	unsigned short check_keepalive();
 	bool follower_connected()const;
-	const std::deque<int> get_dead_client_index_deque()const;
+	const std::deque<int>& get_dead_client_index_deque()const;
 
 };
 typedef MsgClusterLeaderSendThread* PMSG_CLUSTER_LEADER_SEND_THREAD;

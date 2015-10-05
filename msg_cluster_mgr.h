@@ -24,7 +24,7 @@ private:
 	PMSG_TRANSFER_INF msg_trasnfer;
 	MsgClusterNodeBase* msg_cluster_node;
 	pthread_t t;
-	unsigned short runtime_ret;
+	unsigned short thread_ret;
 
 	unsigned short find_local_ip();
 	void set_keepalive_timer_interval(int delay=0, int period=0);
@@ -37,6 +37,9 @@ private:
 	unsigned short try_reconnection();
 	unsigned short initialize();
 	unsigned short deinitialize();
+
+	static void* thread_handler(void* pvoid);
+	unsigned short thread_handler_internal();
 
 protected:
 	NodeType node_type;
