@@ -23,8 +23,10 @@ private:
 	char* local_ip;
 	PMSG_TRANSFER_INF msg_trasnfer;
 	MsgClusterNodeBase* msg_cluster_node;
-	pthread_t t;
-	unsigned short thread_ret;
+	pthread_t pid;
+	unsigned short runtime_ret;
+	pthread_mutex_t mtx_runtime_ret;
+	pthread_cond_t cond_runtime_ret;
 
 	unsigned short find_local_ip();
 	void set_keepalive_timer_interval(int delay=0, int period=0);

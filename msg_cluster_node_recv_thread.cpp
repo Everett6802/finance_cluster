@@ -39,7 +39,7 @@ unsigned short MsgClusterNodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF obs
 	node_ip = string(ip);
 
 // Create a worker thread to access data...
-    if (pthread_create(&pid, NULL, thread_handler, this))
+    if (pthread_create(&pid, NULL, thread_handler, this) != 0)
     {
     	WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of receiving message, due to: %s",strerror(errno));
     	return RET_FAILURE_HANDLE_THREAD;

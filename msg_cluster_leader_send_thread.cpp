@@ -56,7 +56,7 @@ unsigned short MsgClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF o
 	mtx_buffer = PTHREAD_MUTEX_INITIALIZER;
 	cond_buffer = PTHREAD_COND_INITIALIZER;
 // Create a worker thread to access data...
-	if (pthread_create(&pid, NULL, thread_handler, this))
+	if (pthread_create(&pid, NULL, thread_handler, this) != 0)
 	{
 		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of sending message, due to: %s",strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;

@@ -164,8 +164,8 @@ MsgClusterMgr::MsgClusterMgr() :
 	local_ip(NULL),
 	msg_trasnfer(NULL),
 	msg_cluster_node(NULL),
-	t(0),
-	thread_ret(RET_SUCCESS),
+	pid(0),
+	runtime_ret(RET_SUCCESS),
 	node_type(NONE)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -427,33 +427,51 @@ unsigned short MsgClusterMgr::start()
 {
 // Initialize
 	unsigned short ret = initialize();
-// Start the thread of listening the events
-//	if (CheckSuccess(ret))
-//	{
-//		t = new Thread(this);
-//		t.start();
-//	}
+// Start the thread of listening the connection requests
+	if (CHECK_SUCCESS(ret))
+	{
+		mtx_runtime_ret = PTHREAD_MUTEX_INITIALIZER;
+		cond_runtime_ret = PTHREAD_COND_INITIALIZER;
+		if (pthread_create(&pid, NULL, thread_handler, this) != 0)
+		{
+			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of listening the connection requests, due to: %s",strerror(errno));
+			return RET_FAILURE_HANDLE_THREAD;
+		}
+	}
 
 	return ret;
 }
 
 unsigned short MsgClusterMgr::wait_to_stop()
 {
-	unsigned short ret = deinitialize();
-// Wait for the death of the working thread
-//	if (t != null)
+	unsigned short ret = RET_SUCCESS;
+	void* status;
+//	if (pid == 0)
+//		goto OUT;
+//
+//	int kill_ret = pthread_kill(pid, 0);
+//	if(kill_ret == ESRCH)
 //	{
-//		try
-//		{
-//			debug("Wait for terminating the worker threads......");
-//			t.join();
-//		}
-//		catch (InterruptedException ex)
-//		{
-//			error("Receive an interrupted exception while Waiting for terminating the worker threads......");
-//		}
-//		t = null;
+//		WRITE_WARN("The worker thread of waiting to stop did NOT exist......");
+//		ret = RET_SUCCESS;
+//		goto OUT;
 //	}
+//	else if(kill_ret == EINVAL)
+//	{
+//		WRITE_ERROR("The signal to the worker thread of waiting to stop is invalid");
+//		ret = RET_FAILURE_HANDLE_THREAD;
+//		goto OUT;
+//	}
+
+	WRITE_DEBUG("Wait for the worker thread of waiting to stop's death...");
+	pthread_join(pid, &status);
+	if (status == NULL)
+		WRITE_DEBUG("Wait for the worker thread of waiting to stop's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while waiting for the worker thread of waiting to stop's death, due to: %s", (char*)status);
+		ret = runtime_ret;
+	}
 
 	return ret;
 }
@@ -461,11 +479,11 @@ unsigned short MsgClusterMgr::wait_to_stop()
 void MsgClusterMgr::notify_exit(unsigned short exit_reason)
 {
 	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
-//	synchronized(runtime_ret)
-//	{
-//		runtime_ret.set(exit_reason);
-//		runtime_ret.notify();
-//	}
+
+	pthread_mutex_lock(&mtx_runtime_ret);
+	runtime_ret = exit_reason;
+	pthread_cond_signal(&cond_runtime_ret);
+	pthread_mutex_unlock(&mtx_runtime_ret);
 }
 
 unsigned short MsgClusterMgr::notify(NotifyType notify_type)
@@ -486,13 +504,21 @@ void* MsgClusterMgr::thread_handler(void* pvoid)
 {
 	MsgClusterMgr* pthis = (MsgClusterMgr*)pvoid;
 	assert(pthis != NULL && "pvoid should NOT be NULL");
-	pthis->thread_ret = pthis->thread_handler_internal();
+	pthis->runtime_ret = pthis->thread_handler_internal();
 
-	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
+	pthread_exit((CHECK_SUCCESS(pthis->runtime_ret) ? NULL : (void*)GetErrorDescription(pthis->runtime_ret)));
 }
 
 unsigned short MsgClusterMgr::thread_handler_internal()
 {
-	return RET_SUCCESS;
+	short ret = RET_SUCCESS;
+
+	pthread_mutex_lock(&mtx_runtime_ret);
+	pthread_cond_wait(&cond_runtime_ret, &mtx_runtime_ret);
+	WRITE_DEBUG("Notify the parent it's time to leave......");
+	ret = deinitialize();
+	pthread_mutex_unlock(&mtx_runtime_ret);
+
+	return ret;
 }
 
