@@ -511,7 +511,7 @@ void* MsgClusterMgr::thread_handler(void* pvoid)
 
 unsigned short MsgClusterMgr::thread_handler_internal()
 {
-	short ret = RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
 
 	pthread_mutex_lock(&mtx_runtime_ret);
 	pthread_cond_wait(&cond_runtime_ret, &mtx_runtime_ret);
