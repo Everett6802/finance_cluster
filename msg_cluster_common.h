@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <assert.h>
 #include <errno.h>
 #include <list>
 #include <deque>
@@ -19,7 +20,7 @@
 #define DEF_SHORT_STRING_SIZE 			32U
 #define DEF_STRING_SIZE 				64U
 #define DEF_LONG_STRING_SIZE			256U
-#define DEF_EX_LONG_STRING_SIZE			LONG_STRING_SIZE * 2
+#define DEF_EX_LONG_STRING_SIZE		LONG_STRING_SIZE * 2
 
 #ifndef CHECK_SUCCESS
 #define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
@@ -115,71 +116,5 @@ public:
 //	virtual ~MsgNotifyObserverInf();
 };
 typedef MsgNotifyObserverInf* PMSG_NOTIFY_OBSERVER_INF;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Write log through syslog
-
-#define DECLARE_MSG_DUMPER()\
-MsgDumperWrapper* msg_dumper;
-
-#define IMPLEMENT_MSG_DUMPER()\
-msg_dumper = MsgDumperWrapper::get_instance();
-
-#define RELEASE_MSG_DUMPER()\
-if (msg_dumper != NULL)\
-{\
-	msg_dumper->release();\
-	msg_dumper = NULL;\
-}
-
-#define SHOW_MSG_DUMPER
-
-#define WRITE_MSG_DUMPER_BEGIN()\
-do{\
-char title[DEF_STRING_SIZE];\
-snprintf(title, DEF_STRING_SIZE, "%s:%d", __FILE__, __LINE__);\
-openlog(title, LOG_PID | LOG_CONS, LOG_USER);
-
-#define WRITE_MSG_DUMPER_END()\
-closelog();\
-}while(0)
-
-#define WRITE_MSG_DUMPER(priority, message)\
-WRITE_MSG_DUMPER_BEGIN()\
-msg_dumper->write(priority, message);\
-WRITE_MSG_DUMPER_END()
-
-#define WRITE_FORMAT_MSG_DUMPER(buf_size, priority, message_format, ...)\
-WRITE_MSG_DUMPER_BEGIN()\
-char buf[buf_size];\
-snprintf(buf, buf_size, message_format, __VA_ARGS__);\
-msg_dumper->write(priority, buf);\
-WRITE_MSG_DUMPER_END()
-
-#if defined SHOW_MSG_DUMPER
-
-#define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
-#define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
-#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARNING, message)
-#define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
-
-#define WRITE_FORMAT_DEBUG(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_DEBUG, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_INFO(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_INFO, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_WARN(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_WARNING, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_ERROR(buf_size, message_format, ...) WRITE_FORMAT_MSG_DUMPER(buf_size, LOG_ERR, message_format, __VA_ARGS__)
-
-#else
-
-#define WRITE_DEBUG(message)
-#define WRITE_INFO(message)
-#define WRITE_WARN(message)
-#define WRITE_ERROR(message)
-
-#define WRITE_FORMAT_DEBUG(buf_size, message_format, ...)
-#define WRITE_FORMAT_INFO(buf_size, message_format, ...)
-#define WRITE_FORMAT_WARN(buf_size, message_format, ...)
-#define WRITE_FORMAT_ERROR(buf_size, message_format, ...)
-
-#endif
 
 #endif

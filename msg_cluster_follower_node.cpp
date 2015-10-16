@@ -68,9 +68,9 @@ unsigned short MsgClusterFollowerNode::initialize()
 	if (CHECK_FAILURE(ret))
 	{
 		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while Node[%s]'s trying to connect to server", local_ip);
+			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to server", local_ip);
 		else
-			WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Node[%s] try to search for the leader, buf time-out...", local_ip);
+			WRITE_FORMAT_WARN("Node[%s] try to search for the leader, buf time-out...", local_ip);
 		return ret;
 	}
 
@@ -88,7 +88,7 @@ unsigned short MsgClusterFollowerNode::deinitialize()
 		ret = msg_recv_thread->deinitialize();
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to de-initialize the receiving message worker thread[Node: %s]", local_ip);
+			WRITE_FORMAT_ERROR("Fail to de-initialize the receiving message worker thread[Node: %s]", local_ip);
 			return ret;
 		}
 		delete msg_recv_thread;
@@ -108,11 +108,11 @@ unsigned short MsgClusterFollowerNode::check_keepalive()
 {
 	if (keepalive_counter == 0)
 	{
-		WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
+		WRITE_FORMAT_WARN("Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 	}
 	__sync_fetch_and_sub(&keepalive_counter, 1);
-	WRITE_FORMAT_DEBUG(STRING_SIZE, "Check keep-alive....... %d", keepalive_counter);
+	WRITE_FORMAT_DEBUG("Check keep-alive....... %d", keepalive_counter);
 
 	return RET_SUCCESS;
 }
@@ -125,13 +125,13 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Try to connect to %s......", server_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......", server_ip);
 
 // Create socket
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock_fd < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "socket() fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 
@@ -139,13 +139,13 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 	long sock_arg;
 	if((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 	sock_arg |= O_NONBLOCK;
 	if(fcntl(sock_fd, F_SETFL, sock_arg) < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 
@@ -171,7 +171,7 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 			res = select(sock_fd + 1, NULL, &sock_set, NULL, &tv);
 			if (res < 0 && errno != EINTR)
 			{
-				WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "select() fails, due to: %s", strerror(errno));
+				WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
 				return RET_FAILURE_SYSTEM_API;
 			}
 			else if (res > 0)
@@ -181,13 +181,13 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 				socklen_t error_len = sizeof(error);
 				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, (void*)&error, &error_len) < 0)
 				{
-					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "getsockopt() fails, due to: %s", strerror(errno));
+					WRITE_FORMAT_ERROR("getsockopt() fails, due to: %s", strerror(errno));
 					return RET_FAILURE_SYSTEM_API;
 				}
 // Check the value returned...
 				if (error)
 				{
-					WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error in delayed connection(), due to: %s", strerror(error));
+					WRITE_FORMAT_ERROR("Error in delayed connection(), due to: %s", strerror(error));
 					return RET_FAILURE_SYSTEM_API;
 				}
 			}
@@ -199,7 +199,7 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 		}
 		else
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "connect() fails, due to: %s", strerror(errno));
+			WRITE_FORMAT_ERROR("connect() fails, due to: %s", strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 	}
@@ -207,17 +207,17 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 // Set to blocking mode again...
 	if ((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 	sock_arg &= (~O_NONBLOCK);
 	if (fcntl(sock_fd, F_SETFL, sock_arg) < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Try to connect to %s......Successfully", server_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", server_ip);
 	follower_socket = sock_fd;
 
 	return RET_SUCCESS;
@@ -229,7 +229,7 @@ unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
 	unsigned short ret = connect_leader(server_ip);
 	if (IS_TRY_CONNECTION_TIMEOUT(ret))
 	{
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] is NOT a server", server_ip);
+		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", server_ip);
 		return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
 	}
 	else
@@ -238,7 +238,7 @@ unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
 			return ret;
 	}
 
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Node[%s] is a Follower", local_ip);
+	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_ip);
 	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, server_ip);
 
 // Create a thread to receive the remote data
@@ -291,7 +291,7 @@ bool MsgClusterFollowerNode::is_keepalive_packet(const std::string message)const
 
 unsigned short MsgClusterFollowerNode::update(const std::string ip, const std::string message)
 {
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	WRITE_FORMAT_DEBUG("Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	if (server_candidate_id == 0)
 	{
 		if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
@@ -299,19 +299,19 @@ unsigned short MsgClusterFollowerNode::update(const std::string ip, const std::s
 			size_t pos = message.find(":");
 			if (pos == string::npos)
 			{
-				WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
+				WRITE_FORMAT_ERROR("Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
 				return RET_FAILURE_INCORRECT_CONFIG;
 			}
 
 			server_candidate_id = atoi(message.substr(pos + 1).c_str());
-			WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
+			WRITE_FORMAT_INFO("Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
 			return RET_SUCCESS;
 		}
 	}
 
 	if (is_keepalive_packet(message))
 	{
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Follower[%s] receive a Check-Alive packet......", ip.c_str());
+		WRITE_FORMAT_DEBUG("Follower[%s] receive a Check-Alive packet......", ip.c_str());
 // Reset the keep-alive timer
 		__sync_lock_test_and_set(&keepalive_counter, CHECK_KEEPALIVE_TIMES);
 	}

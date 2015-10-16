@@ -104,11 +104,12 @@ unsigned short MsgDumperWrapper::initialize()
 
 	unsigned char major_version;
 	unsigned char minor_version;
-	fp_msg_dumper_get_version(major_version, minor_version);
-	printf("API version: (%d.%d)\n", major_version, minor_version);
+	unsigned char build_version;
+	fp_msg_dumper_get_version(major_version, minor_version, build_version);
+	printf("API version: (%d.%d.%d)\n", major_version, minor_version, build_version);
 
 // Parse the parameters from the config file
-	printf("Parse the config file\n");
+//	printf("Parse the config file\n");
 	ret = parse_config();
 	if (CHECK_FAILURE(ret))
 	{
@@ -149,7 +150,7 @@ unsigned short MsgDumperWrapper::parse_config()
 	getcwd(current_working_directory, sizeof(current_working_directory));
 	char config_filename[BUF_SIZE];
 	snprintf(config_filename, BUF_SIZE, "%s/%s/%s", current_working_directory, CONF_FOLDER, CONF_FILENAME);
-	printf("Parse the config file: %s", config_filename);
+	printf("Parse the config file: %s\n", config_filename);
 
 	FILE *fp = fopen(config_filename, "r");
 	if (fp == NULL)
@@ -199,7 +200,7 @@ unsigned short MsgDumperWrapper::parse_config()
 		snprintf(facility, 16, "%s", config.substr(0, split_pos).c_str());
 		char severity[16];
 		snprintf(severity, 16, "%s", config.substr(split_pos + 1).c_str());
-		printf("***Config*** facility: %s, severity: %s\n", facility, severity);
+		printf("***Config***\nfacility: %s, severity: %s\n", facility, severity);
 
 //		unsigned short facility_flag;
 		int facility_index = -1;

@@ -58,7 +58,7 @@ unsigned short MsgClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF o
 // Create a worker thread to access data...
 	if (pthread_create(&pid, NULL, thread_handler, this) != 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of sending message, due to: %s",strerror(errno));
+		WRITE_FORMAT_ERROR("Fail to create a worker thread of sending message, due to: %s",strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
 
@@ -101,7 +101,7 @@ unsigned short MsgClusterLeaderSendThread::deinitialize()
 		WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
 	else
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
 		ret = thread_ret;
 		goto OUT;
 	}
@@ -150,17 +150,17 @@ unsigned short MsgClusterLeaderSendThread::add_client(const char* ip, int socket
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Add Node[%s] into the send list", ip);
+	WRITE_FORMAT_DEBUG("Add Node[%s] into the send list", ip);
 	pthread_mutex_lock(&mtx_client_socket);
 	client_deque.push_back(string(ip));
 	client_socket_deque.push_back(socket);
 	client_size = client_socket_deque.size();
 	is_follower_connected = (client_size > 0 ? true : false);
 	pthread_mutex_unlock(&mtx_client_socket);
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "There are %d Follower(s) connected to Leader", client_size);
+	WRITE_FORMAT_INFO("There are %d Follower(s) connected to Leader", client_size);
 
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Send server candidate ID[%d] to Node[%s]", client_size, ip);
-	snprintf(server_candiate_msg_buf, LONG_STRING_SIZE, "%s:%d", CHECK_SERVER_CANDIDATE_TAG.c_str(), client_size);
+	WRITE_FORMAT_DEBUG("Send server candidate ID[%d] to Node[%s]", client_size, ip);
+	snprintf(server_candiate_msg_buf, DEF_LONG_STRING_SIZE, "%s:%d", CHECK_SERVER_CANDIDATE_TAG.c_str(), client_size);
 	MsgCfg* msg_cfg = new MsgCfg(ip, string(server_candiate_msg_buf));
 	if (msg_cfg == NULL)
 	{
@@ -204,7 +204,7 @@ unsigned short MsgClusterLeaderSendThread::try_to_transmit_msg(int index, std::s
 {
 	if (index < 0 || index >= client_size)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "The index[%d] of client_writer_list is out of range", index);
+		WRITE_FORMAT_ERROR("The index[%d] of client_writer_list is out of range", index);
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 // Send the data to each socket
@@ -218,7 +218,7 @@ unsigned short MsgClusterLeaderSendThread::try_to_transmit_msg(int index, std::s
 		int write_bytes = send(socket, &data_ptr[start_pos], write_to_byte, 0);
 		if (write_bytes == -1)
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while writing message to the Node[%s], due to: %s", src_ip.c_str(), strerror(errno));
+			WRITE_FORMAT_ERROR("Error occur while writing message to the Node[%s], due to: %s", src_ip.c_str(), strerror(errno));
 			fprintf(stderr, "Error occur while writing message to the Node[%s], due to: %s", src_ip.c_str(), strerror(errno));
 			dead_client_index_deque.push_front(index);
 //			return RET_FAILURE_SYSTEM_API;
@@ -269,7 +269,7 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 
 			if (!found)
 			{
-				WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "IP[%s] is NOT in the list", msg_cfg->src_ip.c_str());
+				WRITE_FORMAT_ERROR("IP[%s] is NOT in the list", msg_cfg->src_ip.c_str());
 				ret = RET_FAILURE_INCORRECT_CONFIG;
 				goto OUT;
 			}
@@ -277,7 +277,7 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 // Start to send message
 		if (!found)
 		{
-			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Broadcast message[%s] to the each Node", msg_cfg->src_data.c_str());
+			WRITE_FORMAT_DEBUG("Broadcast message[%s] to the each Node", msg_cfg->src_data.c_str());
 			for(int i = 0 ; i < client_size ; i++)
 			{
 //				string node_ip = client_deque[i];
@@ -288,7 +288,7 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 		}
 		else
 		{
-			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Send message[%s] to the Node[%s]", msg_cfg->src_data.c_str(), msg_cfg->src_ip.c_str());
+			WRITE_FORMAT_DEBUG("Send message[%s] to the Node[%s]", msg_cfg->src_data.c_str(), msg_cfg->src_ip.c_str());
 			ret = try_to_transmit_msg(index, msg_cfg->src_data);
 			if (CHECK_FAILURE(ret))
 				goto OUT;
@@ -303,19 +303,19 @@ unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
 //				String node_ip = client_deque.remove(i);
 				deque<std::string>::iterator iter = client_deque.erase(client_deque.begin() + index);
 				string node_ip = (string)*iter;
-				WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Follower[%s] is DEAD !!!", node_ip.c_str());
+				WRITE_FORMAT_WARN("Follower[%s] is DEAD !!!", node_ip.c_str());
 				printf("Follower[%s] disconnects from the Leader\n", node_ip.c_str());
 
 				client_socket_deque.erase(client_socket_deque.begin() + index);
 			}
 			client_size = client_socket_deque.size();
 			is_follower_connected = (client_size > 0 ? true : false);
-			WRITE_FORMAT_INFO(LONG_STRING_SIZE, "There are %d Follower(s) connected to Leader", client_size);
+			WRITE_FORMAT_INFO("There are %d Follower(s) connected to Leader", client_size);
 
 			if (msg_notify_observer != NULL)
 			{
 // Notify the parent to remove the dead client
-				WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Notify the parent to remove %d worker thread of receiving data", dead_client_index_deque_size);
+				WRITE_FORMAT_INFO("Notify the parent to remove %d worker thread of receiving data", dead_client_index_deque_size);
 				msg_notify_observer->notify(NOTIFY_DEAD_CLIENT);
 			}
 			dead_client_index_deque.clear();
@@ -372,7 +372,7 @@ void* MsgClusterLeaderSendThread::thread_handler(void* pvoid)
 
 unsigned short MsgClusterLeaderSendThread::thread_handler_internal()
 {
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is running", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", thread_tag);
 	unsigned short ret = RET_SUCCESS;
 
 	while(!exit)
@@ -395,6 +395,6 @@ unsigned short MsgClusterLeaderSendThread::thread_handler_internal()
 			break;
 	}
 
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is dead", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is dead", thread_tag);
 	return ret;
 }

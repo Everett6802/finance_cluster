@@ -44,12 +44,12 @@ unsigned short MsgClusterMgr::find_local_ip()
 	char server_list_conf_filepath[EX_LONG_STRING_SIZE];
 	snprintf(server_list_conf_filepath, EX_LONG_STRING_SIZE, "%s/%s/%s", current_path, CONF_FODLERNAME, SERVER_LIST_CONF_FILENAME);
 
-	WRITE_FORMAT_DEBUG(EX_LONG_STRING_SIZE, "Check the file[%s] exist", server_list_conf_filepath);
+	WRITE_FORMAT_DEBUG("Check the file[%s] exist", server_list_conf_filepath);
 
 	FILE* fp = fopen(server_list_conf_filepath, "r");
 	if (fp == NULL)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "The server list configuration file[%s] does NOT exist", server_list_conf_filepath);
+		WRITE_FORMAT_ERROR("The server list configuration file[%s] does NOT exist", server_list_conf_filepath);
 		return RET_FAILURE_NOT_FOUND;
 	}
 // Parse the server IP list
@@ -76,7 +76,7 @@ unsigned short MsgClusterMgr::find_local_ip()
 
 		if (index == 0)
 			continue;
-//		WRITE_FORMAT_DEBUG(STRING_SIZE, "Param content: %s", buf);
+//		WRITE_FORMAT_DEBUG("Param content: %s", buf);
 //		fprintf(stderr, "Param content: %s\n", buf);
 
 		int str_len = strlen(buf);
@@ -96,7 +96,7 @@ unsigned short MsgClusterMgr::find_local_ip()
 	list<char*>::iterator iter_show = server_list.begin();
 	WRITE_DEBUG("Server IP List:");
 	while (iter_show != server_list.end())
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "%s", *iter_show++);
+		WRITE_FORMAT_ERROR("%s", *iter_show++);
 
 	struct ifaddrs* ifAddrStruct = NULL;
 	void* tmpAddrPtr = NULL;
@@ -116,7 +116,7 @@ unsigned short MsgClusterMgr::find_local_ip()
 			tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
 			char addressBuffer[INET_ADDRSTRLEN];
 			inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-			WRITE_FORMAT_DEBUG(STRING_SIZE, "%s IPv4 Address %s", ifa->ifa_name, addressBuffer);
+			WRITE_FORMAT_DEBUG("%s IPv4 Address %s", ifa->ifa_name, addressBuffer);
 
 // Check if the IP found in the server list
 			list<char*>::iterator iter = server_list.begin();
@@ -125,7 +125,7 @@ unsigned short MsgClusterMgr::find_local_ip()
 				if (strcmp(*iter++, addressBuffer) == 0)
 				{
 					found = true;
-					WRITE_FORMAT_DEBUG(STRING_SIZE, "Find Address %s", addressBuffer);
+					WRITE_FORMAT_DEBUG("Find Address %s", addressBuffer);
 					int len = strlen(addressBuffer) + 1;
 					local_ip = new char[len];
 					if (local_ip == NULL)
@@ -143,7 +143,7 @@ unsigned short MsgClusterMgr::find_local_ip()
 			tmpAddrPtr = &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
 			char addressBuffer[INET6_ADDRSTRLEN];
 			inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
-			WRITE_FORMAT_DEBUG(STRING_SIZE, "%s IPv6 Address %s", ifa->ifa_name, addressBuffer);
+			WRITE_FORMAT_DEBUG("%s IPv6 Address %s", ifa->ifa_name, addressBuffer);
 		}
 	}
 
@@ -236,7 +236,7 @@ unsigned short MsgClusterMgr::become_leader()
 		return ret;
 
 	node_type = LEADER;
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "This Node[%s] is a Leader !!!", local_ip);
+	WRITE_FORMAT_DEBUG("This Node[%s] is a Leader !!!", local_ip);
 	return RET_SUCCESS;
 }
 
@@ -254,7 +254,7 @@ unsigned short MsgClusterMgr::become_follower()
 		return ret;
 
 	node_type = FOLLOWER;
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "This Node[%s] is a Follower !!!", local_ip);
+	WRITE_FORMAT_DEBUG("This Node[%s] is a Follower !!!", local_ip);
 	return ret;
 }
 
@@ -262,18 +262,18 @@ unsigned short MsgClusterMgr::start_connection()
 {
 	unsigned short ret = RET_SUCCESS;
 
-	WRITE_FORMAT_DEBUG(STRING_SIZE, "Node[%s] Try to become follower...", local_ip);
+	WRITE_FORMAT_DEBUG("Node[%s] Try to become follower...", local_ip);
 // Try to find the follower node
 	ret = become_follower();
 	if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
 	{
 		if (node_type != NONE)
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Node[%s] type should be None at this moment", local_ip);
+			WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
 			return RET_FAILURE_INCORRECT_OPERATION;
 		}
 // Fail to connect to any server, be the server
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] Try to become leader...", local_ip);
+		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
 // Try to find the leader node
 		ret = become_leader();
 	}
@@ -288,7 +288,7 @@ unsigned short MsgClusterMgr::stop_connection()
 		unsigned short ret = msg_cluster_node->deinitialize();
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR(STRING_SIZE, "Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_ip);
+			WRITE_FORMAT_ERROR("Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_ip);
 			return ret;
 		}
 		msg_cluster_node = NULL;
@@ -314,7 +314,7 @@ unsigned short MsgClusterMgr::try_reconnection()
 // The server candidate ID should exist in the Follower
 	if (server_candidate_id == 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "The Follower[%s] server candidate ID is NOT correct", local_ip);
+		WRITE_FORMAT_ERROR("The Follower[%s] server candidate ID is NOT correct", local_ip);
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
 
@@ -322,7 +322,7 @@ unsigned short MsgClusterMgr::try_reconnection()
 	{
 		for (int i = 1 ; i < TRY_TIMES ; i++)
 		{
-			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to become a Follower...", local_ip);
+			WRITE_FORMAT_DEBUG("Node[%s] try to become a Follower...", local_ip);
 			ret = become_follower();
 			if (CHECK_SUCCESS(ret))
 				goto OUT;
@@ -331,13 +331,13 @@ unsigned short MsgClusterMgr::try_reconnection()
 // Check the error code, if connection time-out, sleep for a while before trying to connect again
 				if (IS_TRY_CONNECTION_TIMEOUT(ret))
 				{
-					WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME, local_ip);
+					WRITE_FORMAT_WARN("Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME, local_ip);
 					sleep(RETRY_WAIT_CONNECTION_TIME);
 				}
 				else
 					goto OUT;
 			}
-			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
+			WRITE_FORMAT_DEBUG("Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
 		}
 
 		server_candidate_id--;
@@ -346,7 +346,7 @@ unsigned short MsgClusterMgr::try_reconnection()
 OUT:
 	if (server_candidate_id == 1)
 	{
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Node[%s] try to become a Leader...", local_ip);
+		WRITE_FORMAT_DEBUG("Node[%s] try to become a Leader...", local_ip);
 		ret = become_leader();
 	}
 
@@ -393,7 +393,7 @@ unsigned short MsgClusterMgr::initialize()
 		ret  = find_local_ip();
 		if (CHECK_FAILURE(ret))
 			return ret;
-		WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "The local IP of this Node: %s", local_ip);
+		WRITE_FORMAT_DEBUG("The local IP of this Node: %s", local_ip);
 	}
 
 // Define a leader/follower and establish the connection
@@ -434,7 +434,7 @@ unsigned short MsgClusterMgr::start()
 		cond_runtime_ret = PTHREAD_COND_INITIALIZER;
 		if (pthread_create(&pid, NULL, thread_handler, this) != 0)
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of listening the connection requests, due to: %s",strerror(errno));
+			WRITE_FORMAT_ERROR("Fail to create a worker thread of listening the connection requests, due to: %s",strerror(errno));
 			return RET_FAILURE_HANDLE_THREAD;
 		}
 	}
@@ -469,7 +469,7 @@ unsigned short MsgClusterMgr::wait_to_stop()
 		WRITE_DEBUG("Wait for the worker thread of waiting to stop's death Successfully !!!");
 	else
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Error occur while waiting for the worker thread of waiting to stop's death, due to: %s", (char*)status);
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of waiting to stop's death, due to: %s", (char*)status);
 		ret = runtime_ret;
 	}
 
@@ -478,7 +478,7 @@ unsigned short MsgClusterMgr::wait_to_stop()
 
 void MsgClusterMgr::notify_exit(unsigned short exit_reason)
 {
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
+	WRITE_FORMAT_DEBUG("Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
 
 	pthread_mutex_lock(&mtx_runtime_ret);
 	runtime_ret = exit_reason;
@@ -494,7 +494,7 @@ unsigned short MsgClusterMgr::notify(NotifyType notify_type)
 		check_keepalive();
 		break;
 	default:
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Un-supported type: %d", notify_type);
+		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
 		return RET_FAILURE_IO_OPERATION;
 	}
 	return RET_SUCCESS;

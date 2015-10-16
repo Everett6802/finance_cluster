@@ -4,6 +4,79 @@
 #include "msg_dumper.h"
 
 
+#define DECLARE_MSG_DUMPER()\
+MsgDumperWrapper* msg_dumper;\
+int __msg_dumper_title_len__;\
+char* __msg_dumper_message__;\
+int __msg_dumper_message_len__;
+
+#define IMPLEMENT_MSG_DUMPER()\
+msg_dumper = MsgDumperWrapper::get_instance();\
+__msg_dumper_message__ = new char[DEF_EX_LONG_STRING_SIZE];\
+assert(__msg_dumper_message__ != NULL && "Fail to allocate memory: __msg_dumper_message__ ");
+
+#define RELEASE_MSG_DUMPER()\
+if (msg_dumper != NULL)\
+{\
+	msg_dumper->release();\
+	msg_dumper = NULL;\
+}\
+if (__msg_dumper_message__ != NULL)\
+{\
+	delete[] __msg_dumper_message__;\
+	__msg_dumper_message__ = NULL;\
+}
+
+#define SHOW_MSG_DUMPER
+
+#define WRITE_MSG_DUMPER_BEGIN()\
+do{\
+snprintf(__msg_dumper_message__, DEF_EX_LONG_STRING_SIZE, "(%s:%d) ", __FILE__, __LINE__);\
+__msg_dumper_title_len__ = strlen(__msg_dumper_message__);\
+__msg_dumper_message_len__ = DEF_EX_LONG_STRING_SIZE - __msg_dumper_title_len__;
+
+#define WRITE_MSG_DUMPER_END()\
+}while(0)
+
+#define WRITE_MSG_DUMPER(priority, message)\
+WRITE_MSG_DUMPER_BEGIN()\
+snprintf(&__msg_dumper_message__[__msg_dumper_title_len__], __msg_dumper_message_len__, "%s", message);\
+msg_dumper->write(priority, __msg_dumper_message__);\
+WRITE_MSG_DUMPER_END()
+
+#define WRITE_FORMAT_MSG_DUMPER(priority, message_format, ...)\
+WRITE_MSG_DUMPER_BEGIN()\
+snprintf(&__msg_dumper_message__[__msg_dumper_title_len__], __msg_dumper_message_len__, message_format, __VA_ARGS__);\
+msg_dumper->write(priority, __msg_dumper_message__);\
+WRITE_MSG_DUMPER_END()
+
+#if defined SHOW_MSG_DUMPER
+
+#define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
+#define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
+#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARNING, message)
+#define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
+
+#define WRITE_FORMAT_DEBUG(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_DEBUG, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_INFO(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_INFO, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_WARN(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_WARNING, message_format, __VA_ARGS__)
+#define WRITE_FORMAT_ERROR(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
+
+#else
+
+#define WRITE_DEBUG(message)
+#define WRITE_INFO(message)
+#define WRITE_WARN(message)
+#define WRITE_ERROR(message)
+
+#define WRITE_FORMAT_DEBUG(message_format, ...)
+#define WRITE_FORMAT_INFO(message_format, ...)
+#define WRITE_FORMAT_WARN(message_format, ...)
+#define WRITE_FORMAT_ERROR(message_format, ...)
+
+#endif
+
+
 class MsgDumperWrapper
 {
 private:

@@ -39,7 +39,7 @@ static const unsigned short MSG_DUMPER_FACILITY_ALL = (MSG_DUMPER_FACILITY_LOG |
 extern "C"
 {
 
-unsigned short msg_dumper_get_version(unsigned char& major_version, unsigned char& minor_version);
+unsigned short msg_dumper_get_version(unsigned char& major_version, unsigned char& minor_version, unsigned char& build_version);
 unsigned short msg_dumper_initialize();
 unsigned short msg_dumper_set_severity(unsigned short severity, unsigned short single_facility);
 unsigned short msg_dumper_set_severity_all(unsigned short severity);
@@ -53,7 +53,7 @@ const char* msg_dumper_get_error_description();
 
 }
 
-typedef unsigned short (*FP_msg_dumper_get_version)(unsigned char& major_version, unsigned char& minor_version);
+typedef unsigned short (*FP_msg_dumper_get_version)(unsigned char& major_version, unsigned char& minor_version, unsigned char& build_version);
 typedef unsigned short (*FP_msg_dumper_initialize)();
 typedef unsigned short (*FP_msg_dumper_set_severity)(unsigned short severity, unsigned short single_facility);
 typedef unsigned short (*FP_msg_dumper_set_severity_all)(unsigned short severity);

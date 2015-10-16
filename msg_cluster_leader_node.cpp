@@ -52,7 +52,7 @@ unsigned short MsgClusterLeaderNode::become_leader()
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock_fd < 0)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "socket() fails, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 // Bind
@@ -65,18 +65,18 @@ unsigned short MsgClusterLeaderNode::become_leader()
 	server_len = sizeof(server_address);
 	if (bind(sock_fd, (struct sockaddr*)&server_address, server_len) == -1)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "bind() fail, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("bind() fail, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 // Listen
 	if (listen(sock_fd, MAX_CONNECTED_CLIENT) == -1)
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "listen() fail, due to: %s", strerror(errno));
+		WRITE_FORMAT_ERROR("listen() fail, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 	leader_socket = sock_fd;
 
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "Node[%s] is a Leader", local_ip);
+	WRITE_FORMAT_INFO("Node[%s] is a Leader", local_ip);
 	printf("Node[%s] is a leader !!!\n", local_ip);
 
 	return ret;
@@ -110,7 +110,7 @@ unsigned short MsgClusterLeaderNode::initialize()
 // Create a worker thread to access data...
 	if (pthread_create(&pid, NULL, thread_handler, this))
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Fail to create a worker thread of accepting client, due to: %s",strerror(errno));
+		WRITE_FORMAT_ERROR("Fail to create a worker thread of accepting client, due to: %s",strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
 
@@ -160,7 +160,7 @@ unsigned short MsgClusterLeaderNode::check_keepalive()
 
 unsigned short MsgClusterLeaderNode::update(const std::string ip, const std::string message)
 {
-	WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
 	unsigned short ret = client_send_thread->send_msg(ip, message);
 
@@ -187,10 +187,10 @@ unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 
 			MsgClusterNodeRecvThread* thread = (MsgClusterNodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
 			assert (thread != NULL && "thread should NOT be NULL");
-			WRITE_FORMAT_DEBUG(LONG_STRING_SIZE, "Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
+			WRITE_FORMAT_DEBUG("Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
 			unsigned short ret = thread->deinitialize();
 			if (CHECK_FAILURE(ret))
-				WRITE_FORMAT_WARN(LONG_STRING_SIZE, "Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
+				WRITE_FORMAT_WARN("Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
 			delete thread;
 		}
 		pthread_mutex_unlock(&mtx_thread_list);
@@ -198,7 +198,7 @@ unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 	break;
 	default:
 	{
-		WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "Unknown Notify Type: %d", notify_type);
+		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", notify_type);
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 	break;
@@ -221,7 +221,7 @@ void* MsgClusterLeaderNode::thread_handler(void* pvoid)
 
 unsigned short MsgClusterLeaderNode::thread_handler_internal()
 {
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is running", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", thread_tag);
 	unsigned short ret = RET_SUCCESS;
 
 	struct sockaddr client_address;
@@ -234,7 +234,7 @@ unsigned short MsgClusterLeaderNode::thread_handler_internal()
 //			struct sockaddr_in6 *s = (struct sockaddr_in6 *)&client_address;
 //			port = ntohs(s->sin6_port);
 //			inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s] Unsupported socket type: %d", thread_tag, client_address.sa_family);
+			WRITE_FORMAT_ERROR("[%s] Unsupported socket type: %d", thread_tag, client_address.sa_family);
 			return RET_FAILURE_INCORRECT_OPERATION;
 		}
 
@@ -243,14 +243,14 @@ unsigned short MsgClusterLeaderNode::thread_handler_internal()
 //		port = ntohs(s->sin_port);
 		char ip[INET_ADDRSTRLEN + 1];
 		inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
-		WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] Follower[%s] request connecting to the Leader", thread_tag, ip);
+		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", thread_tag, ip);
 		printf("Follower[%s] connects to the Leader\n", ip);
 
 // Initialize a new thread to receive the message
 		MsgClusterNodeRecvThread* msg_cluster_node_recv_thread = new MsgClusterNodeRecvThread();
 		if (msg_cluster_node_recv_thread == NULL)
 		{
-			WRITE_FORMAT_ERROR(LONG_STRING_SIZE, "[%s]Fail to allocate memory: msg_cluster_node_recv_thread", thread_tag);
+			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: msg_cluster_node_recv_thread", thread_tag);
 			return RET_FAILURE_INCORRECT_OPERATION;
 		}
 		ret = msg_cluster_node_recv_thread->initialize(this, sockfd, ip);
@@ -265,9 +265,9 @@ unsigned short MsgClusterLeaderNode::thread_handler_internal()
 		if (CHECK_FAILURE(ret))
 			break;
 
-		WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] Follower[%s] connects to the Leader...... successfully !!!", thread_tag, ip);
+		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", thread_tag, ip);
 	}
 
-	WRITE_FORMAT_INFO(LONG_STRING_SIZE, "[%s] The worker thread of listening socket is dead", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is dead", thread_tag);
 	return ret;
 }
