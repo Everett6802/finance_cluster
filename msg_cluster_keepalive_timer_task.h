@@ -6,7 +6,7 @@
 
 class MsgClusterKeepaliveTimerTask
 {
-	DECLARE_MSG_DUMPER()
+//	DECLARE_MSG_DUMPER()
 private:
 	PMSG_NOTIFY_OBSERVER_INF msg_notify_observer;
 

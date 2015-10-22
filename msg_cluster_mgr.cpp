@@ -34,6 +34,7 @@ static void timer_sigroutine(int signo)
 const char* MsgClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
 const int MsgClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
 const int MsgClusterMgr::TRY_TIMES = 3;
+DECLARE_MSG_DUMPER_PARAM();
 
 unsigned short MsgClusterMgr::find_local_ip()
 {

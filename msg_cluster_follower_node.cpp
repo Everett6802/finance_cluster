@@ -15,6 +15,7 @@ const int MsgClusterFollowerNode::WAIT_CONNECTION_TIMEOUT = 5; // 5 seconds
 const int MsgClusterFollowerNode::TRY_TIMES = 3;
 const int MsgClusterFollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int MsgClusterFollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
+DECLARE_MSG_DUMPER_PARAM();
 
 MsgClusterFollowerNode::MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip) :
 	follower_socket(0),

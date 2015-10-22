@@ -1,14 +1,16 @@
 #include "msg_cluster_keepalive_timer_task.h"
 
 
+//DECLARE_MSG_DUMPER_PARAM();
+
 MsgClusterKeepaliveTimerTask::MsgClusterKeepaliveTimerTask()
 {
-	IMPLEMENT_MSG_DUMPER()
+//	IMPLEMENT_MSG_DUMPER()
 }
 
 MsgClusterKeepaliveTimerTask::~MsgClusterKeepaliveTimerTask()
 {
-	RELEASE_MSG_DUMPER()
+//	RELEASE_MSG_DUMPER()
 }
 
 unsigned short MsgClusterKeepaliveTimerTask::initialize(PMSG_NOTIFY_OBSERVER_INF observer)

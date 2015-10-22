@@ -6,7 +6,7 @@
 
 class MsgClusterNodeBase : public MsgNotifyObserverInf
 {
-	DECLARE_MSG_DUMPER()
+//	DECLARE_MSG_DUMPER()
 
 protected:
 	char* local_ip;

@@ -9,6 +9,7 @@
 using namespace std;
 
 const char* MsgClusterNodeRecvThread::thread_tag = "Recv Thread";
+DECLARE_MSG_DUMPER_PARAM();
 
 MsgClusterNodeRecvThread::MsgClusterNodeRecvThread() :
 	exit(0),

@@ -14,6 +14,7 @@
 using namespace std;
 
 const char* MsgClusterLeaderNode::thread_tag = "Listen Thread";
+DECLARE_MSG_DUMPER_PARAM();
 
 MsgClusterLeaderNode::MsgClusterLeaderNode(char* ip) :
 	exit(false),

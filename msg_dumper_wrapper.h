@@ -4,36 +4,33 @@
 #include "msg_dumper.h"
 
 
+#define MSG_DUMPER_BUF_SIZE 512
+
 #define DECLARE_MSG_DUMPER()\
-MsgDumperWrapper* msg_dumper;\
-int __msg_dumper_title_len__;\
-char* __msg_dumper_message__;\
-int __msg_dumper_message_len__;
+MsgDumperWrapper* msg_dumper;
+
+#define DECLARE_MSG_DUMPER_PARAM()\
+static int __msg_dumper_title_len__;\
+static int __msg_dumper_message_len__;\
+static char __msg_dumper_message__[MSG_DUMPER_BUF_SIZE];
 
 #define IMPLEMENT_MSG_DUMPER()\
 msg_dumper = MsgDumperWrapper::get_instance();\
-__msg_dumper_message__ = new char[DEF_EX_LONG_STRING_SIZE];\
-assert(__msg_dumper_message__ != NULL && "Fail to allocate memory: __msg_dumper_message__ ");
 
 #define RELEASE_MSG_DUMPER()\
 if (msg_dumper != NULL)\
 {\
 	msg_dumper->release();\
 	msg_dumper = NULL;\
-}\
-if (__msg_dumper_message__ != NULL)\
-{\
-	delete[] __msg_dumper_message__;\
-	__msg_dumper_message__ = NULL;\
 }
 
 #define SHOW_MSG_DUMPER
 
 #define WRITE_MSG_DUMPER_BEGIN()\
 do{\
-snprintf(__msg_dumper_message__, DEF_EX_LONG_STRING_SIZE, "(%s:%d) ", __FILE__, __LINE__);\
+snprintf(__msg_dumper_message__, MSG_DUMPER_BUF_SIZE, "(%s:%d) ", __FILE__, __LINE__);\
 __msg_dumper_title_len__ = strlen(__msg_dumper_message__);\
-__msg_dumper_message_len__ = DEF_EX_LONG_STRING_SIZE - __msg_dumper_title_len__;
+__msg_dumper_message_len__ = MSG_DUMPER_BUF_SIZE - __msg_dumper_title_len__;
 
 #define WRITE_MSG_DUMPER_END()\
 }while(0)
@@ -112,6 +109,7 @@ private:
 	unsigned short parse_config();
 
 public:
+	static const int STRING_BUF_SIZE;
 	~MsgDumperWrapper(){deinitialize();}
 
 	static MsgDumperWrapper* get_instance();

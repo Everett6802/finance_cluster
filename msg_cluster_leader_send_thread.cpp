@@ -12,6 +12,7 @@
 using namespace std;
 
 const char* MsgClusterLeaderSendThread::thread_tag = "Send Thread";
+DECLARE_MSG_DUMPER_PARAM();
 
 class MsgClusterLeaderSendThread::MsgCfg
 {
