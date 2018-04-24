@@ -1,15 +1,15 @@
-#ifndef MSG_CLUSTER_MGR_H
-#define MSG_CLUSTER_MGR_H
+#ifndef FINANCE_CLUSTER_MGR_H
+#define FINANCE_CLUSTER_MGR_H
 
 #include <pthread.h>
 #include <list>
 #include <string>
-#include "msg_cluster_common.h"
+#include "finance_cluster_common.h"
 
 
-class MsgClusterNodeBase;
+class FinanceClusterNodeBase;
 
-class MsgClusterMgr : public MsgNotifyObserverInf
+class FinanceClusterMgr : public MsgNotifyObserverInf
 {
 	enum NodeType{LEADER, FOLLOWER, NONE};
 	DECLARE_MSG_DUMPER()
@@ -22,7 +22,7 @@ private:
 	std::list<char*> server_list;
 	char* local_ip;
 	PMSG_TRANSFER_INF msg_trasnfer;
-	MsgClusterNodeBase* msg_cluster_node;
+	FinanceClusterNodeBase* finance_cluster_node;
 	pthread_t pid;
 	unsigned short runtime_ret;
 	pthread_mutex_t mtx_runtime_ret;
@@ -50,8 +50,8 @@ protected:
 	void notify_exit(unsigned short exit_reason);
 
 public:
-	MsgClusterMgr();
-	~MsgClusterMgr();
+	FinanceClusterMgr();
+	~FinanceClusterMgr();
 
 	bool is_leader()const{return node_type == LEADER;}
 	unsigned short start();

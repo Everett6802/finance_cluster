@@ -3,7 +3,7 @@ MAKE := make
 
 CXXFLAGS := -g -Wall -std=c++0x
 
-SOURCES := msg_dumper_wrapper.cpp msg_cluster.cpp msg_cluster_common.cpp msg_cluster_node_base.cpp msg_cluster_leader_node.cpp msg_cluster_follower_node.cpp msg_cluster_mgr.cpp  msg_cluster_leader_send_thread.cpp msg_cluster_node_recv_thread.cpp msg_cluster_keepalive_timer_task.cpp
+SOURCES := msg_dumper_wrapper.cpp finance_cluster.cpp finance_cluster_common.cpp finance_cluster_node_base.cpp finance_cluster_leader_node.cpp finance_cluster_follower_node.cpp finance_cluster_mgr.cpp  finance_cluster_leader_send_thread.cpp finance_cluster_node_recv_thread.cpp finance_cluster_keepalive_timer_task.cpp
 OBJS := $(SOURCES:.cpp=.o)
 LIB_MSG_DUMPER := libmsg_dumper.so
 LIB_MSG_DUMPER_HEADER := msg_dumper.h
@@ -12,7 +12,7 @@ LIB_MSG_DUMPER_WRAPPER_FOLDER := wrapper
 LIB_MSG_DUMPER_WRAPPER_HEADER := msg_dumper_wrapper.h
 LIB_MSG_DUMPER_WRAPPER_SOURCE := msg_dumper_wrapper.cpp
 
-OUTPUT := msg_cluster
+OUTPUT := finance_cluster
 
 build: $(LIB_MSG_DUMPER_HEADER) $(LIB_MSG_DUMPER_WRAPPER_HEADER) $(LIB_MSG_DUMPER_WRAPPER_SOURCE) $(LIB_MSG_DUMPER) $(OUTPUT)
 

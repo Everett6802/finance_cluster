@@ -6,17 +6,17 @@
 #include <stdexcept>
 #include <string>
 #include <deque>
-#include "msg_cluster_leader_node.h"
-#include "msg_cluster_leader_send_thread.h"
-#include "msg_cluster_node_recv_thread.h"
+#include "finance_cluster_leader_node.h"
+#include "finance_cluster_leader_send_thread.h"
+#include "finance_cluster_node_recv_thread.h"
 
 
 using namespace std;
 
-const char* MsgClusterLeaderNode::thread_tag = "Listen Thread";
-DECLARE_MSG_DUMPER_PARAM();
+const char* FinanceClusterLeaderNode::thread_tag = "Listen Thread";
+// DECLARE_MSG_DUMPER_PARAM();
 
-MsgClusterLeaderNode::MsgClusterLeaderNode(char* ip) :
+FinanceClusterLeaderNode::FinanceClusterLeaderNode(char* ip) :
 	exit(false),
 	pid(0),
 	leader_socket(0),
@@ -35,7 +35,7 @@ MsgClusterLeaderNode::MsgClusterLeaderNode(char* ip) :
 	memcpy(local_ip, ip, sizeof(char) * ip_len);
 }
 
-MsgClusterLeaderNode::~MsgClusterLeaderNode()
+FinanceClusterLeaderNode::~FinanceClusterLeaderNode()
 {
 	if (leader_socket != 0)
 	{
@@ -46,7 +46,7 @@ MsgClusterLeaderNode::~MsgClusterLeaderNode()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short MsgClusterLeaderNode::become_leader()
+unsigned short FinanceClusterLeaderNode::become_leader()
 {
 	unsigned short ret = RET_SUCCESS;
 // Create socket
@@ -83,20 +83,20 @@ unsigned short MsgClusterLeaderNode::become_leader()
 	return ret;
 }
 
-unsigned short MsgClusterLeaderNode::initialize()
+unsigned short FinanceClusterLeaderNode::initialize()
 {
 	unsigned short ret = become_leader();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-	client_recv_thread_deque = new deque<MsgClusterNodeRecvThread*>();
+	client_recv_thread_deque = new deque<FinanceClusterNodeRecvThread*>();
 	if (client_recv_thread_deque == NULL)
 	{
 		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_deque");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 // Initialize a thread to send the message to the remote
-	client_send_thread = new MsgClusterLeaderSendThread();
+	client_send_thread = new FinanceClusterLeaderSendThread();
 	if (client_send_thread == NULL)
 	{
 		WRITE_ERROR("Fail to allocate the memory: client_send_thread");
@@ -131,7 +131,7 @@ OUT:
     return ret;
 }
 
-unsigned short MsgClusterLeaderNode::deinitialize()
+unsigned short FinanceClusterLeaderNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
     if (client_send_thread != NULL)
@@ -147,7 +147,7 @@ unsigned short MsgClusterLeaderNode::deinitialize()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderNode::check_keepalive()
+unsigned short FinanceClusterLeaderNode::check_keepalive()
 {
 	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
 	if (client_send_thread->follower_connected())
@@ -159,7 +159,7 @@ unsigned short MsgClusterLeaderNode::check_keepalive()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderNode::update(const std::string ip, const std::string message)
+unsigned short FinanceClusterLeaderNode::update(const std::string ip, const std::string message)
 {
 	WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
@@ -168,7 +168,7 @@ unsigned short MsgClusterLeaderNode::update(const std::string ip, const std::str
 	return ret;
 }
 
-unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
+unsigned short FinanceClusterLeaderNode::notify(NotifyType notify_type)
 {
 	switch (notify_type)
 	{
@@ -186,7 +186,7 @@ unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 			int index = (int)*iter++;
 			assert ((index >= 0 && index < client_recv_thread_deque_size) && "index is out of range");
 
-			MsgClusterNodeRecvThread* thread = (MsgClusterNodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
+			FinanceClusterNodeRecvThread* thread = (FinanceClusterNodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
 			assert (thread != NULL && "thread should NOT be NULL");
 			WRITE_FORMAT_DEBUG("Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
 			unsigned short ret = thread->deinitialize();
@@ -208,9 +208,9 @@ unsigned short MsgClusterLeaderNode::notify(NotifyType notify_type)
 	return RET_SUCCESS;
 }
 
-void* MsgClusterLeaderNode::thread_handler(void* pvoid)
+void* FinanceClusterLeaderNode::thread_handler(void* pvoid)
 {
-	MsgClusterLeaderNode* pthis = (MsgClusterLeaderNode*)pvoid;
+	FinanceClusterLeaderNode* pthis = (FinanceClusterLeaderNode*)pvoid;
 	if (pthis != NULL)
 		pthis->thread_ret = pthis->thread_handler_internal();
 	else
@@ -220,7 +220,7 @@ void* MsgClusterLeaderNode::thread_handler(void* pvoid)
 
 }
 
-unsigned short MsgClusterLeaderNode::thread_handler_internal()
+unsigned short FinanceClusterLeaderNode::thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", thread_tag);
 	unsigned short ret = RET_SUCCESS;
@@ -248,17 +248,17 @@ unsigned short MsgClusterLeaderNode::thread_handler_internal()
 		printf("Follower[%s] connects to the Leader\n", ip);
 
 // Initialize a new thread to receive the message
-		MsgClusterNodeRecvThread* msg_cluster_node_recv_thread = new MsgClusterNodeRecvThread();
-		if (msg_cluster_node_recv_thread == NULL)
+		FinanceClusterNodeRecvThread* finance_cluster_node_recv_thread = new FinanceClusterNodeRecvThread();
+		if (finance_cluster_node_recv_thread == NULL)
 		{
-			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: msg_cluster_node_recv_thread", thread_tag);
+			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: finance_cluster_node_recv_thread", thread_tag);
 			return RET_FAILURE_INCORRECT_OPERATION;
 		}
-		ret = msg_cluster_node_recv_thread->initialize(this, sockfd, ip);
+		ret = finance_cluster_node_recv_thread->initialize(this, sockfd, ip);
 		if (CHECK_FAILURE(ret))
 			break;
 		pthread_mutex_lock(&mtx_thread_list);
-		client_recv_thread_deque->push_back(msg_cluster_node_recv_thread);
+		client_recv_thread_deque->push_back(finance_cluster_node_recv_thread);
 		pthread_mutex_unlock(&mtx_thread_list);
 
 // Add into the list of sending message

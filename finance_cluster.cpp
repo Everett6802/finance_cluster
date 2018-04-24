@@ -1,17 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "msg_cluster_mgr.h"
-#include "msg_cluster_common.h"
+#include "finance_cluster_mgr.h"
+#include "finance_cluster_common.h"
 
 
-extern MsgClusterMgr msg_cluster_mgr;
+extern FinanceClusterMgr finance_cluster_mgr;
 
 int main()
 {
-	MsgClusterMgr msg_cluster_mgr;
+	FinanceClusterMgr finance_cluster_mgr;
 	printf("Start the Node...\n");
 
-	unsigned short ret = msg_cluster_mgr.start();
+	unsigned short ret = finance_cluster_mgr.start();
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "Fail to initialize...\n");
@@ -19,7 +19,7 @@ int main()
 	}
 
 	getchar();
-	ret = msg_cluster_mgr.wait_to_stop();
+	ret = finance_cluster_mgr.wait_to_stop();
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "Fail to waiting for stop...\n");

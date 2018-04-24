@@ -5,19 +5,19 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdexcept>
-#include "msg_cluster_follower_node.h"
-#include "msg_cluster_node_recv_thread.h"
+#include "finance_cluster_follower_node.h"
+#include "finance_cluster_node_recv_thread.h"
 
 
 using namespace std;
 
-const int MsgClusterFollowerNode::WAIT_CONNECTION_TIMEOUT = 5; // 5 seconds
-const int MsgClusterFollowerNode::TRY_TIMES = 3;
-const int MsgClusterFollowerNode::CHECK_KEEPALIVE_TIMES = 4;
-const int MsgClusterFollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
-DECLARE_MSG_DUMPER_PARAM();
+const int FinanceClusterFollowerNode::WAIT_CONNECTION_TIMEOUT = 5; // 5 seconds
+const int FinanceClusterFollowerNode::TRY_TIMES = 3;
+const int FinanceClusterFollowerNode::CHECK_KEEPALIVE_TIMES = 4;
+const int FinanceClusterFollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
+// DECLARE_MSG_DUMPER_PARAM();
 
-MsgClusterFollowerNode::MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip) :
+FinanceClusterFollowerNode::FinanceClusterFollowerNode(const PCHAR_LIST alist, char* ip) :
 	follower_socket(0),
 	msg_recv_thread(NULL),
 	server_candidate_id(0)
@@ -46,7 +46,7 @@ MsgClusterFollowerNode::MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip)
 	memcpy(local_ip, ip, sizeof(char) * ip_len);
 }
 
-MsgClusterFollowerNode::~MsgClusterFollowerNode()
+FinanceClusterFollowerNode::~FinanceClusterFollowerNode()
 {
 	if (follower_socket != 0)
 	{
@@ -62,7 +62,7 @@ MsgClusterFollowerNode::~MsgClusterFollowerNode()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short MsgClusterFollowerNode::initialize()
+unsigned short FinanceClusterFollowerNode::initialize()
 {
 // Try to find the leader node
 	unsigned short ret = find_leader();
@@ -81,7 +81,7 @@ unsigned short MsgClusterFollowerNode::initialize()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::deinitialize()
+unsigned short FinanceClusterFollowerNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
 	if (msg_recv_thread != NULL)
@@ -105,7 +105,7 @@ unsigned short MsgClusterFollowerNode::deinitialize()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::check_keepalive()
+unsigned short FinanceClusterFollowerNode::check_keepalive()
 {
 	if (keepalive_counter == 0)
 	{
@@ -118,7 +118,7 @@ unsigned short MsgClusterFollowerNode::check_keepalive()
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
+unsigned short FinanceClusterFollowerNode::connect_leader(const char* server_ip)
 {
 	if (server_ip == NULL)
 	{
@@ -224,7 +224,7 @@ unsigned short MsgClusterFollowerNode::connect_leader(const char* server_ip)
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
+unsigned short FinanceClusterFollowerNode::become_follower(const char* server_ip)
 {
 // Try to connect to the designated server
 	unsigned short ret = connect_leader(server_ip);
@@ -243,7 +243,7 @@ unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
 	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, server_ip);
 
 // Create a thread to receive the remote data
-	msg_recv_thread = new MsgClusterNodeRecvThread();
+	msg_recv_thread = new FinanceClusterNodeRecvThread();
 	if (msg_recv_thread == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: msg_recv_thread");
@@ -253,7 +253,7 @@ unsigned short MsgClusterFollowerNode::become_follower(const char* server_ip)
 	return msg_recv_thread->initialize(this, follower_socket, local_ip);
 }
 
-unsigned short MsgClusterFollowerNode::find_leader()
+unsigned short FinanceClusterFollowerNode::find_leader()
 {
 	unsigned short ret = RET_SUCCESS;
 	for (int i = 0 ; i < TRY_TIMES ; i++)
@@ -285,12 +285,12 @@ OUT:
 	return ret;
 }
 
-bool MsgClusterFollowerNode::is_keepalive_packet(const std::string message)const
+bool FinanceClusterFollowerNode::is_keepalive_packet(const std::string message)const
 {
 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
 }
 
-unsigned short MsgClusterFollowerNode::update(const std::string ip, const std::string message)
+unsigned short FinanceClusterFollowerNode::update(const std::string ip, const std::string message)
 {
 	WRITE_FORMAT_DEBUG("Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	if (server_candidate_id == 0)
@@ -324,7 +324,7 @@ unsigned short MsgClusterFollowerNode::update(const std::string ip, const std::s
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterFollowerNode::notify(NotifyType notify_type)
+unsigned short FinanceClusterFollowerNode::notify(NotifyType notify_type)
 {
 	return RET_SUCCESS;
 }

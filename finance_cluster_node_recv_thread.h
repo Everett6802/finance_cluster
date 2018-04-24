@@ -1,17 +1,17 @@
-#ifndef MSG_CLUSTER_NODE_RECV_THREAD
-#define MSG_CLUSTER_NODE_RECV_THREAD
+#ifndef FINANCE_CLUSTER_NODE_RECV_THREAD
+#define FINANCE_CLUSTER_NODE_RECV_THREAD
 
 #include <pthread.h>
-#include "msg_cluster_common.h"
+#include "finance_cluster_common.h"
 
 
-class MsgClusterLeaderNode;
-class MsgClusterFollowerNode;
+class FinanceClusterLeaderNode;
+class FinanceClusterFollowerNode;
 
-class MsgClusterNodeRecvThread
+class FinanceClusterNodeRecvThread
 {
-	friend class MsgClusterLeaderNode;
-	friend class MsgClusterFollowerNode;
+	friend class FinanceClusterLeaderNode;
+	friend class FinanceClusterFollowerNode;
 
 	DECLARE_MSG_DUMPER()
 	static const char* thread_tag;
@@ -28,14 +28,14 @@ private:
 	unsigned short thread_handler_internal();
 	void clearall();
 
-	MsgClusterNodeRecvThread();
-	~MsgClusterNodeRecvThread();
+	FinanceClusterNodeRecvThread();
+	~FinanceClusterNodeRecvThread();
 
 	unsigned short initialize(PMSG_NOTIFY_OBSERVER_INF observer, int recv_socket, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
 	const std::string get_ip()const{return node_ip;}
 };
-typedef MsgClusterNodeRecvThread* PMSG_CLUSTER_NODE_RECV_THREAD;
+typedef FinanceClusterNodeRecvThread* PFINANCE_CLUSTER_NODE_RECV_THREAD;
 
 #endif

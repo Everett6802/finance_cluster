@@ -1,15 +1,15 @@
-#ifndef MSG_CLUSTER_FOLLOWER_NODE_H
-#define MSG_CLUSTER_FOLLOWER_NODE_H
+#ifndef FINANCE_CLUSTER_FOLLOWER_NODE_H
+#define FINANCE_CLUSTER_FOLLOWER_NODE_H
 
 #include <pthread.h>
 #include <string>
-#include "msg_cluster_node_base.h"
-#include "msg_cluster_common.h"
+#include "finance_cluster_node_base.h"
+#include "finance_cluster_common.h"
 
 
-class MsgClusterNodeRecvThread;
+class FinanceClusterNodeRecvThread;
 
-class MsgClusterFollowerNode : public MsgClusterNodeBase
+class FinanceClusterFollowerNode : public FinanceClusterNodeBase
 {
 	DECLARE_MSG_DUMPER()
 
@@ -21,8 +21,8 @@ private:
 
 	CHAR_LIST server_list;
 	int follower_socket;
-//	class MsgClusterNodeRecvThread; // Caution: Fail to compile
-	MsgClusterNodeRecvThread* msg_recv_thread;
+//	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
+	FinanceClusterNodeRecvThread* msg_recv_thread;
 	int keepalive_counter;
 	int server_candidate_id;
 
@@ -32,10 +32,10 @@ private:
 	bool is_keepalive_packet(const std::string message)const;
 
 public:
-	MsgClusterFollowerNode(const PCHAR_LIST alist, char* ip);
-	virtual ~MsgClusterFollowerNode();
+	FinanceClusterFollowerNode(const PCHAR_LIST alist, char* ip);
+	virtual ~FinanceClusterFollowerNode();
 
-// From MsgClusterNodeBase
+// From FinanceClusterNodeBase
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
 	virtual unsigned short check_keepalive();
@@ -45,6 +45,6 @@ public:
 
 	int get_server_candidate_id()const{return server_candidate_id;}
 };
-typedef MsgClusterFollowerNode* PMSG_CLUSTER_FOLLOWER_NODE;
+typedef FinanceClusterFollowerNode* PFINANCE_CLUSTER_FOLLOWER_NODE;
 
 #endif

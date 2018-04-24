@@ -1,5 +1,5 @@
 *.o
-msg_cluster
+finance_cluster
 .project
 log/
 libmsg_dumper.so

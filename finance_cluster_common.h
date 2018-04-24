@@ -1,5 +1,5 @@
-#ifndef MSG_CLUSTER_COMMON_H
-#define MSG_CLUSTER_COMMON_H
+#ifndef FINANCE_CLUSTER_COMMON_H
+#define FINANCE_CLUSTER_COMMON_H
 
 #include <stdio.h>
 #include <stdlib.h>

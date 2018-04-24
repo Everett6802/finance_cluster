@@ -6,15 +6,15 @@
 #include <sys/socket.h>
 #include <string>
 #include <stdexcept>
-#include "msg_cluster_leader_send_thread.h"
+#include "finance_cluster_leader_send_thread.h"
 
 
 using namespace std;
 
-const char* MsgClusterLeaderSendThread::thread_tag = "Send Thread";
-DECLARE_MSG_DUMPER_PARAM();
+const char* FinanceClusterLeaderSendThread::thread_tag = "Send Thread";
+// DECLARE_MSG_DUMPER_PARAM();
 
-class MsgClusterLeaderSendThread::MsgCfg
+class FinanceClusterLeaderSendThread::MsgCfg
 {
 public:
 	string src_ip;
@@ -27,7 +27,7 @@ public:
 	}
 };
 
-MsgClusterLeaderSendThread::MsgClusterLeaderSendThread() :
+FinanceClusterLeaderSendThread::FinanceClusterLeaderSendThread() :
 	exit(0),
 	pid(0),
 	client_size(0),
@@ -39,12 +39,12 @@ MsgClusterLeaderSendThread::MsgClusterLeaderSendThread() :
 	IMPLEMENT_MSG_DUMPER()
 }
 
-MsgClusterLeaderSendThread::~MsgClusterLeaderSendThread()
+FinanceClusterLeaderSendThread::~FinanceClusterLeaderSendThread()
 {
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short MsgClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF observer)
+unsigned short FinanceClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF observer)
 {
 	msg_notify_observer = observer;
 	if (msg_notify_observer == NULL)
@@ -66,7 +66,7 @@ unsigned short MsgClusterLeaderSendThread::initialize(PMSG_NOTIFY_OBSERVER_INF o
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderSendThread::deinitialize()
+unsigned short FinanceClusterLeaderSendThread::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
 	void* status;
@@ -112,7 +112,7 @@ OUT:
 	return ret;
 }
 
-void MsgClusterLeaderSendThread::clearall()
+void FinanceClusterLeaderSendThread::clearall()
 {
 	client_deque.clear();
 	dead_client_index_deque.clear();
@@ -137,12 +137,12 @@ void MsgClusterLeaderSendThread::clearall()
 	msg_notify_observer = NULL;
 }
 
-void MsgClusterLeaderSendThread::notify_exit()
+void FinanceClusterLeaderSendThread::notify_exit()
 {
 	__sync_fetch_and_add(&exit, 1);
 }
 
-unsigned short MsgClusterLeaderSendThread::add_client(const char* ip, int socket)
+unsigned short FinanceClusterLeaderSendThread::add_client(const char* ip, int socket)
 {
 	static char server_candiate_msg_buf[DEF_LONG_STRING_SIZE];
 	if (ip == NULL)
@@ -180,7 +180,7 @@ unsigned short MsgClusterLeaderSendThread::add_client(const char* ip, int socket
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderSendThread::send_msg(std::string src_ip, std::string data)
+unsigned short FinanceClusterLeaderSendThread::send_msg(std::string src_ip, std::string data)
 {
 // Put the new incoming message to the buffer first
 	pthread_mutex_lock(&mtx_buffer);
@@ -201,7 +201,7 @@ unsigned short MsgClusterLeaderSendThread::send_msg(std::string src_ip, std::str
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderSendThread::try_to_transmit_msg(int index, std::string data)
+unsigned short FinanceClusterLeaderSendThread::try_to_transmit_msg(int index, std::string data)
 {
 	if (index < 0 || index >= client_size)
 	{
@@ -230,8 +230,8 @@ unsigned short MsgClusterLeaderSendThread::try_to_transmit_msg(int index, std::s
 //		}
 //		else
 //		{
-//			MsgClusterCmnDef.format_error("Error occur while writing message to the Node[%s], due to: %s", client_list.get(index), e.toString());
-//			return MsgClusterCmnDef.RET_FAILURE_IO_OPERATION;
+//			FinanceClusterCmnDef.format_error("Error occur while writing message to the Node[%s], due to: %s", client_list.get(index), e.toString());
+//			return FinanceClusterCmnDef.RET_FAILURE_IO_OPERATION;
 //		}
 		start_pos += write_bytes;
 		write_to_byte -= write_bytes;
@@ -240,7 +240,7 @@ unsigned short MsgClusterLeaderSendThread::try_to_transmit_msg(int index, std::s
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderSendThread::send_msg_to_remote()
+unsigned short FinanceClusterLeaderSendThread::send_msg_to_remote()
 {
 	unsigned short ret = RET_SUCCESS;
 
@@ -330,7 +330,7 @@ OUT:
 	return RET_SUCCESS;
 }
 
-unsigned short MsgClusterLeaderSendThread::check_keepalive()
+unsigned short FinanceClusterLeaderSendThread::check_keepalive()
 {
 	pthread_mutex_lock(&mtx_buffer);
 	MsgCfg* msg_cfg = new MsgCfg("", CHECK_KEEPALIVE_TAG);
@@ -350,19 +350,19 @@ unsigned short MsgClusterLeaderSendThread::check_keepalive()
 	return RET_SUCCESS;
 }
 
-bool MsgClusterLeaderSendThread::follower_connected()const
+bool FinanceClusterLeaderSendThread::follower_connected()const
 {
 	return is_follower_connected;
 }
 
-const deque<int>& MsgClusterLeaderSendThread::get_dead_client_index_deque()const
+const deque<int>& FinanceClusterLeaderSendThread::get_dead_client_index_deque()const
 {
 	return dead_client_index_deque;
 }
 
-void* MsgClusterLeaderSendThread::thread_handler(void* pvoid)
+void* FinanceClusterLeaderSendThread::thread_handler(void* pvoid)
 {
-	MsgClusterLeaderSendThread* pthis = (MsgClusterLeaderSendThread*)pvoid;
+	FinanceClusterLeaderSendThread* pthis = (FinanceClusterLeaderSendThread*)pvoid;
 	if (pthis != NULL)
 		pthis->thread_ret = pthis->thread_handler_internal();
 	else
@@ -371,7 +371,7 @@ void* MsgClusterLeaderSendThread::thread_handler(void* pvoid)
 	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
 }
 
-unsigned short MsgClusterLeaderSendThread::thread_handler_internal()
+unsigned short FinanceClusterLeaderSendThread::thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", thread_tag);
 	unsigned short ret = RET_SUCCESS;
