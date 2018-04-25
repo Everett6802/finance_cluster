@@ -1,5 +1,5 @@
-#ifndef FINANCE_CLUSTER_COMMON_H
-#define FINANCE_CLUSTER_COMMON_H
+#ifndef COMMON_DEFINITION_H
+#define COMMON_DEFINITION_H
 
 #include <stdio.h>
 #include <stdlib.h>

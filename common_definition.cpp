@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include "finance_cluster_common.h"
+#include "common_definition.h"
 
 
 using namespace std;

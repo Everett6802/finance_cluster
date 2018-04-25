@@ -3,15 +3,15 @@
 #include <sys/socket.h>
 #include <string>
 #include <stdexcept>
-#include "finance_cluster_node_recv_thread.h"
+#include "node_recv_thread.h"
 
 
 using namespace std;
 
-const char* FinanceClusterNodeRecvThread::thread_tag = "Recv Thread";
+const char* NodeRecvThread::thread_tag = "Recv Thread";
 // DECLARE_MSG_DUMPER_PARAM();
 
-FinanceClusterNodeRecvThread::FinanceClusterNodeRecvThread() :
+NodeRecvThread::NodeRecvThread() :
 	exit(0),
 //	node_ip(NULL),
 	pid(0),
@@ -22,12 +22,12 @@ FinanceClusterNodeRecvThread::FinanceClusterNodeRecvThread() :
 	IMPLEMENT_MSG_DUMPER()
 }
 
-FinanceClusterNodeRecvThread::~FinanceClusterNodeRecvThread()
+NodeRecvThread::~NodeRecvThread()
 {
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short FinanceClusterNodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF observer, int recv_socket, const char* ip)
+unsigned short NodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF observer, int recv_socket, const char* ip)
 {
 	msg_notify_observer = observer;
 	if (msg_notify_observer == NULL || ip == NULL)
@@ -49,7 +49,7 @@ unsigned short FinanceClusterNodeRecvThread::initialize(PMSG_NOTIFY_OBSERVER_INF
 	return RET_SUCCESS;
 }
 
-unsigned short FinanceClusterNodeRecvThread::deinitialize()
+unsigned short NodeRecvThread::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
 	void* status;
@@ -91,7 +91,7 @@ OUT:
 	return ret;
 }
 
-void FinanceClusterNodeRecvThread::clearall()
+void NodeRecvThread::clearall()
 {
 	node_socket = 0;
 //	if (node_ip != NULL)
@@ -102,14 +102,14 @@ void FinanceClusterNodeRecvThread::clearall()
 	msg_notify_observer = NULL;
 }
 
-void FinanceClusterNodeRecvThread::notify_exit()
+void NodeRecvThread::notify_exit()
 {
 	__sync_fetch_and_add(&exit, 1);
 }
 
-void* FinanceClusterNodeRecvThread::thread_handler(void* pvoid)
+void* NodeRecvThread::thread_handler(void* pvoid)
 {
-	FinanceClusterNodeRecvThread* pthis = (FinanceClusterNodeRecvThread*)pvoid;
+	NodeRecvThread* pthis = (NodeRecvThread*)pvoid;
 	if (pthis != NULL)
 		pthis->thread_ret = pthis->thread_handler_internal();
 	else
@@ -118,7 +118,7 @@ void* FinanceClusterNodeRecvThread::thread_handler(void* pvoid)
 	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
 }
 
-unsigned short FinanceClusterNodeRecvThread::thread_handler_internal()
+unsigned short NodeRecvThread::thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
 

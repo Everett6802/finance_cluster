@@ -1,18 +1,18 @@
-#ifndef FINANCE_CLUSTER_LEADER_SEND_THREAD
-#define FINANCE_CLUSTER_LEADER_SEND_THREAD
+#ifndef LEADER_SEND_THREAD
+#define LEADER_SEND_THREAD
 
 #include <pthread.h>
 #include <list>
 #include <pthread.h>
 #include <string>
-#include "finance_cluster_common.h"
+#include "common_definition.h"
 
 
-class FinanceClusterLeaderNode;
+class LeaderNode;
 
-class FinanceClusterLeaderSendThread
+class LeaderSendThread
 {
-	friend class FinanceClusterLeaderNode;
+	friend class LeaderNode;
 
 	DECLARE_MSG_DUMPER()
 	static const char* thread_tag;
@@ -40,8 +40,8 @@ private:
 	unsigned short thread_handler_internal();
 	void clearall();
 
-	FinanceClusterLeaderSendThread();
-	~FinanceClusterLeaderSendThread();
+	LeaderSendThread();
+	~LeaderSendThread();
 
 	unsigned short initialize(PMSG_NOTIFY_OBSERVER_INF observer);
 	unsigned short deinitialize();
@@ -55,6 +55,6 @@ private:
 	const std::deque<int>& get_dead_client_index_deque()const;
 
 };
-typedef FinanceClusterLeaderSendThread* PFINANCE_CLUSTER_LEADER_SEND_THREAD;
+typedef LeaderSendThread* PFINANCE_CLUSTER_LEADER_SEND_THREAD;
 
 #endif

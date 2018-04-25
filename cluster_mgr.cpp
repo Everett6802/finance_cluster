@@ -10,33 +10,33 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include "finance_cluster_mgr.h"
-#include "finance_cluster_leader_node.h"
-#include "finance_cluster_follower_node.h"
-#include "finance_cluster_keepalive_timer_task.h"
+#include "cluster_mgr.h"
+#include "leader_node.h"
+#include "follower_node.h"
+#include "keepalive_timer_task.h"
 
 
 using namespace std;
 
-static FinanceClusterKeepaliveTimerTask finance_cluster_keepalive_timer_task;
+static KeepaliveTimerTask keepalive_timer_task;
 static void timer_sigroutine(int signo)
 {
 	switch (signo)
 	{
 	case SIGALRM:
 //        printf("Catch a signal -- SIGALRM \n");
-		finance_cluster_keepalive_timer_task.run();
+		keepalive_timer_task.run();
 		signal(SIGALRM, timer_sigroutine);
 		break;
 	}
 }
 
-const char* FinanceClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
-const int FinanceClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
-const int FinanceClusterMgr::TRY_TIMES = 3;
+const char* ClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
+const int ClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
+const int ClusterMgr::TRY_TIMES = 3;
 // DECLARE_MSG_DUMPER_PARAM();
 
-unsigned short FinanceClusterMgr::find_local_ip()
+unsigned short ClusterMgr::find_local_ip()
 {
 	unsigned short ret = RET_SUCCESS;
 	char current_path[LONG_STRING_SIZE];
@@ -161,10 +161,10 @@ unsigned short FinanceClusterMgr::find_local_ip()
 	return ret;
 }
 
-FinanceClusterMgr::FinanceClusterMgr() :
+ClusterMgr::ClusterMgr() :
 	local_ip(NULL),
 	msg_trasnfer(NULL),
-	finance_cluster_node(NULL),
+	cluster_node(NULL),
 	pid(0),
 	runtime_ret(RET_SUCCESS),
 	node_type(NONE)
@@ -172,12 +172,12 @@ FinanceClusterMgr::FinanceClusterMgr() :
 	IMPLEMENT_MSG_DUMPER()
 }
 
-FinanceClusterMgr::~FinanceClusterMgr()
+ClusterMgr::~ClusterMgr()
 {
-	if (finance_cluster_node != NULL)
+	if (cluster_node != NULL)
 	{
-		delete finance_cluster_node;
-		finance_cluster_node = NULL;
+		delete cluster_node;
+		cluster_node = NULL;
 	}
 
 	if (local_ip != NULL)
@@ -194,7 +194,7 @@ FinanceClusterMgr::~FinanceClusterMgr()
 	RELEASE_MSG_DUMPER()
 }
 
-void FinanceClusterMgr::set_keepalive_timer_interval(int delay, int period)
+void ClusterMgr::set_keepalive_timer_interval(int delay, int period)
 {
 	struct itimerval value, ovalue;
 
@@ -205,34 +205,34 @@ void FinanceClusterMgr::set_keepalive_timer_interval(int delay, int period)
 	setitimer(ITIMER_REAL, &value, &ovalue);
 }
 
-unsigned short FinanceClusterMgr::start_keepalive_timer()
+unsigned short ClusterMgr::start_keepalive_timer()
 {
 	WRITE_DEBUG("Start the keep-alive timer");
-	finance_cluster_keepalive_timer_task.initialize(this);
+	keepalive_timer_task.initialize(this);
 	signal(SIGALRM, timer_sigroutine);
 	set_keepalive_timer_interval(KEEPALIVE_DELAY_TIME, KEEPALIVE_PERIOD);
 
 	return RET_SUCCESS;
 }
 
-void FinanceClusterMgr::stop_keepalive_timer()
+void ClusterMgr::stop_keepalive_timer()
 {
 // To stop the keep-alive timer
 	WRITE_DEBUG("Stop the keep-alive timer");
 	set_keepalive_timer_interval();
-	finance_cluster_keepalive_timer_task.deinitialize();
+	keepalive_timer_task.deinitialize();
 }
 
-unsigned short FinanceClusterMgr::become_leader()
+unsigned short ClusterMgr::become_leader()
 {
-	finance_cluster_node = new FinanceClusterLeaderNode(local_ip);
-	if (finance_cluster_node == NULL)
+	cluster_node = new LeaderNode(local_ip);
+	if (cluster_node == NULL)
 	{
-		WRITE_ERROR("Fail to allocate memory: finance_cluster_node (Leader)");
+		WRITE_ERROR("Fail to allocate memory: cluster_node (Leader)");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	unsigned short ret = finance_cluster_node->initialize();
+	unsigned short ret = cluster_node->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -241,16 +241,16 @@ unsigned short FinanceClusterMgr::become_leader()
 	return RET_SUCCESS;
 }
 
-unsigned short FinanceClusterMgr::become_follower()
+unsigned short ClusterMgr::become_follower()
 {
-	finance_cluster_node = new FinanceClusterFollowerNode(&server_list, local_ip);
-	if (finance_cluster_node == NULL)
+	cluster_node = new FollowerNode(&server_list, local_ip);
+	if (cluster_node == NULL)
 	{
-		WRITE_ERROR("Fail to allocate memory: finance_cluster_node (Follower)");
+		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	unsigned short ret = finance_cluster_node->initialize();
+	unsigned short ret = cluster_node->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -259,7 +259,7 @@ unsigned short FinanceClusterMgr::become_follower()
 	return ret;
 }
 
-unsigned short FinanceClusterMgr::start_connection()
+unsigned short ClusterMgr::start_connection()
 {
 	unsigned short ret = RET_SUCCESS;
 
@@ -282,30 +282,30 @@ unsigned short FinanceClusterMgr::start_connection()
 	return ret;
 }
 
-unsigned short FinanceClusterMgr::stop_connection()
+unsigned short ClusterMgr::stop_connection()
 {
-	if (finance_cluster_node != NULL)
+	if (cluster_node != NULL)
 	{
-		unsigned short ret = finance_cluster_node->deinitialize();
+		unsigned short ret = cluster_node->deinitialize();
 		if (CHECK_FAILURE(ret))
 		{
 			WRITE_FORMAT_ERROR("Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_ip);
 			return ret;
 		}
-		finance_cluster_node = NULL;
+		cluster_node = NULL;
 		node_type = NONE;
 	}
 
 	return RET_SUCCESS;
 }
 
-unsigned short FinanceClusterMgr::try_reconnection()
+unsigned short ClusterMgr::try_reconnection()
 {
 	unsigned short ret = RET_SUCCESS;
 
 	int server_candidate_id = 0;
-	if (finance_cluster_node != NULL)
-		server_candidate_id = ((PFINANCE_CLUSTER_FOLLOWER_NODE)finance_cluster_node)->get_server_candidate_id();
+	if (cluster_node != NULL)
+		server_candidate_id = ((PFOLLOWER_NODE)cluster_node)->get_server_candidate_id();
 
 // Close the old connection
 	ret = stop_connection();
@@ -354,12 +354,12 @@ OUT:
 	return ret;
 }
 
-void FinanceClusterMgr::check_keepalive()
+void ClusterMgr::check_keepalive()
 {
-	if (finance_cluster_node != NULL)
+	if (cluster_node != NULL)
 	{
 		WRITE_DEBUG("Check Keep-Alive...");
-		unsigned short ret = finance_cluster_node->check_keepalive();
+		unsigned short ret = cluster_node->check_keepalive();
 		if (node_type == FOLLOWER)
 		{
 			if (CHECK_FAILURE(ret))
@@ -385,7 +385,7 @@ void FinanceClusterMgr::check_keepalive()
 	}
 }
 
-unsigned short FinanceClusterMgr::initialize()
+unsigned short ClusterMgr::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
 // Find local IP
@@ -410,7 +410,7 @@ unsigned short FinanceClusterMgr::initialize()
 	return RET_SUCCESS;
 }
 
-unsigned short FinanceClusterMgr::deinitialize()
+unsigned short ClusterMgr::deinitialize()
 {
 // Stop a keep-alive timer
 	stop_keepalive_timer();
@@ -424,7 +424,7 @@ unsigned short FinanceClusterMgr::deinitialize()
 	return RET_SUCCESS;
 }
 
-unsigned short FinanceClusterMgr::start()
+unsigned short ClusterMgr::start()
 {
 // Initialize
 	unsigned short ret = initialize();
@@ -443,7 +443,7 @@ unsigned short FinanceClusterMgr::start()
 	return ret;
 }
 
-unsigned short FinanceClusterMgr::wait_to_stop()
+unsigned short ClusterMgr::wait_to_stop()
 {
 	unsigned short ret = RET_SUCCESS;
 	void* status;
@@ -477,7 +477,7 @@ unsigned short FinanceClusterMgr::wait_to_stop()
 	return ret;
 }
 
-void FinanceClusterMgr::notify_exit(unsigned short exit_reason)
+void ClusterMgr::notify_exit(unsigned short exit_reason)
 {
 	WRITE_FORMAT_DEBUG("Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
 
@@ -487,7 +487,7 @@ void FinanceClusterMgr::notify_exit(unsigned short exit_reason)
 	pthread_mutex_unlock(&mtx_runtime_ret);
 }
 
-unsigned short FinanceClusterMgr::notify(NotifyType notify_type)
+unsigned short ClusterMgr::notify(NotifyType notify_type)
 {
 	switch (notify_type)
 	{
@@ -501,16 +501,16 @@ unsigned short FinanceClusterMgr::notify(NotifyType notify_type)
 	return RET_SUCCESS;
 }
 
-void* FinanceClusterMgr::thread_handler(void* pvoid)
+void* ClusterMgr::thread_handler(void* pvoid)
 {
-	FinanceClusterMgr* pthis = (FinanceClusterMgr*)pvoid;
+	ClusterMgr* pthis = (ClusterMgr*)pvoid;
 	assert(pthis != NULL && "pvoid should NOT be NULL");
 	pthis->runtime_ret = pthis->thread_handler_internal();
 
 	pthread_exit((CHECK_SUCCESS(pthis->runtime_ret) ? NULL : (void*)GetErrorDescription(pthis->runtime_ret)));
 }
 
-unsigned short FinanceClusterMgr::thread_handler_internal()
+unsigned short ClusterMgr::thread_handler_internal()
 {
 	unsigned short ret = RET_SUCCESS;
 

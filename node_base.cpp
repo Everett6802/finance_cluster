@@ -1,15 +1,15 @@
-#include "finance_cluster_node_base.h"
+#include "node_base.h"
 
 
 //DECLARE_MSG_DUMPER_PARAM();
 
-FinanceClusterNodeBase::FinanceClusterNodeBase() :
+NodeBase::NodeBase() :
 	local_ip(NULL)
 {
 //	IMPLEMENT_MSG_DUMPER()
 }
 
-FinanceClusterNodeBase::~FinanceClusterNodeBase()
+NodeBase::~NodeBase()
 {
 	if (local_ip != NULL)
 	{

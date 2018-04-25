@@ -1,17 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "finance_cluster_mgr.h"
-#include "finance_cluster_common.h"
+#include "cluster_mgr.h"
+#include "common_definition.h"
 
 
-extern FinanceClusterMgr finance_cluster_mgr;
+extern ClusterMgr cluster_mgr;
 
 int main()
 {
-	FinanceClusterMgr finance_cluster_mgr;
+	ClusterMgr cluster_mgr;
 	printf("Start the Node...\n");
 
-	unsigned short ret = finance_cluster_mgr.start();
+	unsigned short ret = cluster_mgr.start();
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "Fail to initialize...\n");
@@ -19,7 +19,7 @@ int main()
 	}
 
 	getchar();
-	ret = finance_cluster_mgr.wait_to_stop();
+	ret = cluster_mgr.wait_to_stop();
 	if (CHECK_FAILURE(ret))
 	{
 		fprintf(stderr, "Fail to waiting for stop...\n");
