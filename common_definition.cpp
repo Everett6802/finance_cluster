@@ -85,6 +85,7 @@ const char *GetErrorDescription(unsigned short ret)
 	return buf;
 }
 
+bool SHOW_CONSOLE = true;
 const string CHECK_KEEPALIVE_TAG = string("!1@2#3$4%5^6&7*8");
 const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
 const int CHECK_KEEPALIVE_TAG_LEN = CHECK_KEEPALIVE_TAG.length();

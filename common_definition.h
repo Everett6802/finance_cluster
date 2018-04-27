@@ -38,6 +38,20 @@
 #define IS_KEEP_ALIVE_TIMEOUT(X) (X == RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT ? true : false)
 #endif
 
+#ifndef PRINT
+#define PRINT(...)\
+do{\
+	if (SHOW_CONSOLE) printf(__VA_ARGS__);\
+}while(0)
+#endif
+
+#ifndef FPRINT
+#define FPRINT(stream, ...)\
+do{\
+    if (SHOW_CONSOLE) fprintf(stream, __VA_ARGS__);\
+}while(0)
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 extern const unsigned short SHORT_STRING_SIZE;
@@ -70,6 +84,8 @@ extern const unsigned short RET_FAILURE_CONNECTION_NO_SERVER;
 extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
 
 const char* GetErrorDescription(unsigned short ret);
+
+extern bool SHOW_CONSOLE;
 
 extern const std::string CHECK_KEEPALIVE_TAG;
 extern const std::string CHECK_SERVER_CANDIDATE_TAG;

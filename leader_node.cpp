@@ -217,7 +217,6 @@ void* LeaderNode::thread_handler(void* pvoid)
 		throw std::invalid_argument("pvoid should NOT be NULL");
 
 	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
-
 }
 
 unsigned short LeaderNode::thread_handler_internal()
