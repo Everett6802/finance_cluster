@@ -5,7 +5,7 @@
 #include <deque>
 #include <string>
 #include "node_base.h"
-#include "common_definition.h"
+#include "common.h"
 
 
 class NodeRecvThread;

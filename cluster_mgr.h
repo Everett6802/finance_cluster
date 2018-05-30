@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <list>
 #include <string>
-#include "common_definition.h"
+#include "common.h"
 
 
 class NodeBase;

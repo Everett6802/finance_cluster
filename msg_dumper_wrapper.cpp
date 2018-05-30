@@ -5,6 +5,7 @@
 #include <syslog.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <string>
 #include <stdexcept>
 #include "msg_dumper_wrapper.h"

@@ -1,5 +1,5 @@
-#ifndef COMMON_DEFINITION_H
-#define COMMON_DEFINITION_H
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,9 +7,11 @@
 #include <syslog.h>
 #include <assert.h>
 #include <errno.h>
+#include <unistd.h>
 #include <list>
 #include <deque>
 #include <string>
+#include <map>
 #include "msg_dumper_wrapper.h"
 
 
@@ -52,8 +54,10 @@ do{\
 }while(0)
 #endif
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
+
 extern const unsigned short SHORT_STRING_SIZE;
 extern const unsigned short STRING_SIZE;
 extern const unsigned short LONG_STRING_SIZE;
@@ -103,14 +107,25 @@ extern const int RECV_BUF_SIZE;
 //extern const unsigned short NOTIFY_DEAD_CLIENT;
 //extern const unsigned short NOTIFY_CHECK_KEEPALIVE;
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
+
 enum NotifyType{NOTIFY_DEAD_CLIENT, NOTIFY_CHECK_KEEPALIVE};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Typedef
+
+typedef std::list<char*> CHAR_LIST;
+typedef CHAR_LIST* PCHAR_LIST;
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
-typedef std::list<char*> CHAR_LIST;
-typedef CHAR_LIST* PCHAR_LIST;
+
+unsigned short get_local_interface_ip(std::map<std::string, std::string>& interface_ip_map);
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -132,5 +147,32 @@ public:
 //	virtual ~MsgNotifyObserverInf();
 };
 typedef MsgNotifyObserverInf* PMSG_NOTIFY_OBSERVER_INF;
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Class
+
+
+class IPv4Addr
+{
+public:
+	static unsigned short ipv4_value2str(const unsigned char ipv4_value[], char** ipv4_str);
+	static unsigned short ipv4_str2value(const char* ipv4_str, unsigned char ipv4_value[]);
+	static unsigned short get_netmask(int netmask_digits, unsigned char ipv4_mask[]);
+	static unsigned short get_network(const unsigned char ipv4_value[], int netmask_digits, unsigned char ipv4_network[]);
+
+private:
+	unsigned char addr_value[4];
+	char* addr_str;
+
+public:
+	IPv4Addr(unsigned char ipv4_value[]);
+	IPv4Addr(const char* ipv4_str);
+
+	~IPv4Addr();
+
+	bool is_same_network(int netmask_digits, unsigned char ipv4_network[])const;
+	bool is_same_network(int netmask_digits, const char* ipv4_network_str)const;
+};
 
 #endif

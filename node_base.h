@@ -1,7 +1,7 @@
 #ifndef NODE_BASE_H
 #define NODE_BASE_H
 
-#include "common_definition.h"
+#include "common.h"
 
 
 class NodeBase : public MsgNotifyObserverInf

@@ -1,5 +1,5 @@
-#include <netdb.h>
-#include <ifaddrs.h>
+// #include <netdb.h>
+// #include <ifaddrs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,8 +8,8 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
+// #include <arpa/inet.h>
+// #include <sys/socket.h>
 #include "cluster_mgr.h"
 #include "leader_node.h"
 #include "follower_node.h"
@@ -39,124 +39,124 @@ const int ClusterMgr::TRY_TIMES = 3;
 unsigned short ClusterMgr::find_local_ip()
 {
 	unsigned short ret = RET_SUCCESS;
-	char current_path[LONG_STRING_SIZE];
-	getcwd(current_path, sizeof(current_path));
+// 	char current_path[LONG_STRING_SIZE];
+// 	getcwd(current_path, sizeof(current_path));
 
-	char server_list_conf_filepath[EX_LONG_STRING_SIZE];
-	snprintf(server_list_conf_filepath, EX_LONG_STRING_SIZE, "%s/%s/%s", current_path, CONF_FODLERNAME, SERVER_LIST_CONF_FILENAME);
+// 	char server_list_conf_filepath[EX_LONG_STRING_SIZE];
+// 	snprintf(server_list_conf_filepath, EX_LONG_STRING_SIZE, "%s/%s/%s", current_path, CONF_FODLERNAME, SERVER_LIST_CONF_FILENAME);
 
-	WRITE_FORMAT_DEBUG("Check the file[%s] exist", server_list_conf_filepath);
+// 	WRITE_FORMAT_DEBUG("Check the file[%s] exist", server_list_conf_filepath);
 
-	FILE* fp = fopen(server_list_conf_filepath, "r");
-	if (fp == NULL)
-	{
-		WRITE_FORMAT_ERROR("The server list configuration file[%s] does NOT exist", server_list_conf_filepath);
-		return RET_FAILURE_NOT_FOUND;
-	}
-// Parse the server IP list
-	char buf[STRING_SIZE];
-	while (fgets(buf, sizeof(char) * STRING_SIZE, fp) != NULL)
-	{
-		bool found = false;
-		int index = 0;
-		for (int i = 0 ; i < STRING_SIZE ; i++)
-		{
-			if (buf[i] == '\n')
-			{
-				buf[i] = '\0';
-				found = true;
-				index = i;
-				break;
-			}
-		}
-		if (!found)
-		{
-			WRITE_ERROR("Incorrect config format in the server list");
-			return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
-		}
+// 	FILE* fp = fopen(server_list_conf_filepath, "r");
+// 	if (fp == NULL)
+// 	{
+// 		WRITE_FORMAT_ERROR("The server list configuration file[%s] does NOT exist", server_list_conf_filepath);
+// 		return RET_FAILURE_NOT_FOUND;
+// 	}
+// // Parse the server IP list
+// 	char buf[STRING_SIZE];
+// 	while (fgets(buf, sizeof(char) * STRING_SIZE, fp) != NULL)
+// 	{
+// 		bool found = false;
+// 		int index = 0;
+// 		for (int i = 0 ; i < STRING_SIZE ; i++)
+// 		{
+// 			if (buf[i] == '\n')
+// 			{
+// 				buf[i] = '\0';
+// 				found = true;
+// 				index = i;
+// 				break;
+// 			}
+// 		}
+// 		if (!found)
+// 		{
+// 			WRITE_ERROR("Incorrect config format in the server list");
+// 			return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
+// 		}
 
-		if (index == 0)
-			continue;
-//		WRITE_FORMAT_DEBUG("Param content: %s", buf);
-//		fprintf(stderr, "Param content: %s\n", buf);
+// 		if (index == 0)
+// 			continue;
+// //		WRITE_FORMAT_DEBUG("Param content: %s", buf);
+// //		fprintf(stderr, "Param content: %s\n", buf);
 
-		int str_len = strlen(buf);
-		char* new_ip = new char[str_len + 1];
-		if (new_ip == NULL)
-		{
-			WRITE_ERROR("Fail to allocate memory: new_ip");
-			return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
-		}
-		new_ip[str_len] = '\0';
-		memcpy(new_ip, buf, sizeof(char) * str_len);
-		server_list.push_back(new_ip);
-	}
-	fclose(fp);
-	fp = NULL;
+// 		int str_len = strlen(buf);
+// 		char* new_ip = new char[str_len + 1];
+// 		if (new_ip == NULL)
+// 		{
+// 			WRITE_ERROR("Fail to allocate memory: new_ip");
+// 			return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
+// 		}
+// 		new_ip[str_len] = '\0';
+// 		memcpy(new_ip, buf, sizeof(char) * str_len);
+// 		server_list.push_back(new_ip);
+// 	}
+// 	fclose(fp);
+// 	fp = NULL;
 
-	list<char*>::iterator iter_show = server_list.begin();
-	WRITE_DEBUG("Server IP List:");
-	while (iter_show != server_list.end())
-		WRITE_FORMAT_ERROR("%s", *iter_show++);
+// 	list<char*>::iterator iter_show = server_list.begin();
+// 	WRITE_DEBUG("Server IP List:");
+// 	while (iter_show != server_list.end())
+// 		WRITE_FORMAT_ERROR("%s", *iter_show++);
 
-	struct ifaddrs* ifAddrStruct = NULL;
-	void* tmpAddrPtr = NULL;
+// 	struct ifaddrs* ifAddrStruct = NULL;
+// 	void* tmpAddrPtr = NULL;
 
-	getifaddrs(&ifAddrStruct);
+// 	getifaddrs(&ifAddrStruct);
 
-// Traverse the ethernet card on local PC
-	WRITE_DEBUG("Traverse the all IPs bounded to local network interface...");
-	bool found = false;
-	for (struct ifaddrs* ifa = ifAddrStruct ; ifa != NULL ; ifa = ifa->ifa_next)
-	{
-		if (!ifa->ifa_addr)
-			continue;
+// // Traverse the ethernet card on local PC
+// 	WRITE_DEBUG("Traverse the all IPs bounded to local network interface...");
+// 	bool found = false;
+// 	for (struct ifaddrs* ifa = ifAddrStruct ; ifa != NULL ; ifa = ifa->ifa_next)
+// 	{
+// 		if (!ifa->ifa_addr)
+// 			continue;
 
-		if (ifa->ifa_addr->sa_family == AF_INET) // check it is IP4
-		{
-			tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-			char addressBuffer[INET_ADDRSTRLEN];
-			inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-			WRITE_FORMAT_DEBUG("%s IPv4 Address %s", ifa->ifa_name, addressBuffer);
+// 		if (ifa->ifa_addr->sa_family == AF_INET) // check it is IP4
+// 		{
+// 			tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+// 			char addressBuffer[INET_ADDRSTRLEN];
+// 			inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+// 			WRITE_FORMAT_DEBUG("%s IPv4 Address %s", ifa->ifa_name, addressBuffer);
 
-// Check if the IP found in the server list
-			list<char*>::iterator iter = server_list.begin();
-			while (iter != server_list.end())
-			{
-				if (strcmp(*iter++, addressBuffer) == 0)
-				{
-					found = true;
-					WRITE_FORMAT_DEBUG("Find Address %s", addressBuffer);
-					int len = strlen(addressBuffer) + 1;
-					local_ip = new char[len];
-					if (local_ip == NULL)
-					{
-						WRITE_ERROR("Fail to allocate memory: local_ip");
-						return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
-					}
-					memcpy(local_ip, addressBuffer, len);
-					break;
-				}
-			}
-		}
-		else if (ifa->ifa_addr->sa_family == AF_INET6) // check it is IP6
-		{
-			tmpAddrPtr = &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
-			char addressBuffer[INET6_ADDRSTRLEN];
-			inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
-			WRITE_FORMAT_DEBUG("%s IPv6 Address %s", ifa->ifa_name, addressBuffer);
-		}
-	}
+// // Check if the IP found in the server list
+// 			list<char*>::iterator iter = server_list.begin();
+// 			while (iter != server_list.end())
+// 			{
+// 				if (strcmp(*iter++, addressBuffer) == 0)
+// 				{
+// 					found = true;
+// 					WRITE_FORMAT_DEBUG("Find Address %s", addressBuffer);
+// 					int len = strlen(addressBuffer) + 1;
+// 					local_ip = new char[len];
+// 					if (local_ip == NULL)
+// 					{
+// 						WRITE_ERROR("Fail to allocate memory: local_ip");
+// 						return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
+// 					}
+// 					memcpy(local_ip, addressBuffer, len);
+// 					break;
+// 				}
+// 			}
+// 		}
+// 		else if (ifa->ifa_addr->sa_family == AF_INET6) // check it is IP6
+// 		{
+// 			tmpAddrPtr = &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
+// 			char addressBuffer[INET6_ADDRSTRLEN];
+// 			inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
+// 			WRITE_FORMAT_DEBUG("%s IPv6 Address %s", ifa->ifa_name, addressBuffer);
+// 		}
+// 	}
 
-// Release the resource
-	if (ifAddrStruct!=NULL)
-		freeifaddrs(ifAddrStruct);
+// // Release the resource
+// 	if (ifAddrStruct!=NULL)
+// 		freeifaddrs(ifAddrStruct);
 
-	if (!found)
-	{
-		WRITE_ERROR("There are no IPs existing in the server list");
-		return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
-	}
+// 	if (!found)
+// 	{
+// 		WRITE_ERROR("There are no IPs existing in the server list");
+// 		return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
+// 	}
 
 	return ret;
 }

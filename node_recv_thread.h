@@ -2,7 +2,7 @@
 #define NODE_RECV_THREAD
 
 #include <pthread.h>
-#include "common_definition.h"
+#include "common.h"
 
 
 class LeaderNode;

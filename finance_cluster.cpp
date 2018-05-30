@@ -1,8 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <signal.h>
 #include "cluster_mgr.h"
-#include "common_definition.h"
+#include "common.h"
 
 // extern ClusterMgr cluster_mgr;
 
@@ -100,8 +98,8 @@ unsigned short parse_param(int argc, char** argv)
 
 unsigned short check_param()
 {
-	static const int ERROR_MSG_SIZE = 256;
-	static char error_msg[ERROR_MSG_SIZE];
+	// static const int ERROR_MSG_SIZE = 256;
+	// static char error_msg[ERROR_MSG_SIZE];
 	return RET_SUCCESS;
 }
 
@@ -111,8 +109,13 @@ unsigned short setup_param()
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
+	// IPv4Addr ipv4_addr("172.17.83.40");
+	// printf("Res: %s\n", (ipv4_addr.is_same_network(24, "172.17.83.0") ? "True" : "False"));
+	// printf("Res: %s\n", (ipv4_addr.is_same_network(24, "172.17.84.0") ? "True" : "False"));
+	// printf("Res: %s\n", (ipv4_addr.is_same_network(23, "172.17.84.0") ? "True" : "False"));
+	// exit(EXIT_SUCCESS);
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));
@@ -122,6 +125,10 @@ int main()
 		print_errmsg_and_exit("Fail to register the signal: SIGTERM");
 	if (sigaction(SIGINT, &sa, NULL) == -1)
 		print_errmsg_and_exit("Fail to register the signal: SIGINT");
+
+	parse_param(argc, argv);
+	check_param();
+	setup_param();
 
 	ClusterMgr cluster_mgr;
 	printf("Start the Node...\n");

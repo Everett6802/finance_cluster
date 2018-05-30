@@ -5,7 +5,7 @@
 #include <list>
 #include <pthread.h>
 #include <string>
-#include "common_definition.h"
+#include "common.h"
 
 
 class LeaderNode;
