@@ -5,7 +5,7 @@
 
 using namespace std;
 
-#define DEBUG 
+// #define DEBUG 
 
 #ifdef DEBUG
 #define PRINT_IPV4(X, Y)\
@@ -16,7 +16,7 @@ do{\
 	printf("\n");\
 }while(0)
 #else
-#define PRINT_IPV4(X)
+#define PRINT_IPV4(X, Y)
 #endif
 
 

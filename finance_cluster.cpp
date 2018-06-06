@@ -46,7 +46,6 @@ static void signal_handler(int signo)
 	exit(EXIT_SUCCESS);
 }
 
-
 void show_usage_and_exit()
 {
 	PRINT("====================== Usage ======================\n");

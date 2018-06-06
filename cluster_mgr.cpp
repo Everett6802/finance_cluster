@@ -36,9 +36,83 @@ const int ClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
 const int ClusterMgr::TRY_TIMES = 3;
 // DECLARE_MSG_DUMPER_PARAM();
 
+unsigned short ClusterMgr::parse_config()
+{
+	unsigned short ret = RET_SUCCESS;
+	list<string> conf_line_list;
+	ret = read_config_file_lines(conf_line_list, FINANCE_CLUSTER_CONF_FILENAME);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	list<string>::iterator iter = conf_line_list.begin();
+	while (iter != conf_line_list.end())
+	{
+		string line = (string)*iter;
+		char* line_tmp = strdup(line.c_str());
+		char* conf_name = strtok(line_tmp, "=");
+		if (conf_name == NULL)
+		{
+			WRITE_FORMAT_ERROR("Incorrect configuration name: %s", line_tmp);
+			return RET_FAILURE_INCORRECT_CONFIG;
+		}
+		char* conf_value = strtok(NULL, "=");
+		if (conf_value == NULL)
+		{
+			WRITE_FORMAT_ERROR("Incorrect configuration value: %s", line_tmp);
+			return RET_FAILURE_INCORRECT_CONFIG;
+		}
+
+		if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
+			cluster_network = string(conf_value);
+		else if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
+			cluster_netmask_digits = atoi(conf_value);
+		else
+		{
+			static const int ERRMSG_SIZE = 64;
+			char errmsg[ERRMSG_SIZE];
+			snprintf(errmsg, ERRMSG_SIZE, "Unknown config field: %s", conf_name);
+			throw invalid_argument(errmsg);
+		}
+
+		if (line_tmp != NULL)
+		{
+			free(line_tmp);
+			line_tmp = NULL;
+		}
+		iter++;
+	}
+	return RET_SUCCESS;
+}
+
 unsigned short ClusterMgr::find_local_ip()
 {
 	unsigned short ret = RET_SUCCESS;
+
+	map<string, string> interface_ip_map;
+	ret = get_local_interface_ip(interface_ip_map);
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	bool found = false;
+	map<string, string>::iterator iter = interface_ip_map.begin();
+	while (iter != interface_ip_map.end())
+	{
+		string interface = iter->first;
+      	string ip = iter->second;
+      	IPv4Addr ipv4_addr(ip.c_str());
+      	if (ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+      	{
+      		local_ip = strdup(ip.c_str());
+      		WRITE_FORMAT_DEBUG("The local IP: %s", local_ip);
+      		found = true;
+      		break;
+      	}
+		iter++;
+	}
+	if (!found)
+	{
+		WRITE_FORMAT_ERROR("Fail to find the interface in the network: %s/%d", cluster_network.c_str(), cluster_netmask_digits);
+		return RET_FAILURE_INCORRECT_CONFIG;
+	}
 // 	char current_path[LONG_STRING_SIZE];
 // 	getcwd(current_path, sizeof(current_path));
 
@@ -397,15 +471,15 @@ unsigned short ClusterMgr::initialize()
 		WRITE_FORMAT_DEBUG("The local IP of this Node: %s", local_ip);
 	}
 
-// Define a leader/follower and establish the connection
-	ret = start_connection();
-	if (CHECK_FAILURE(ret))
-		return ret;
+// // Define a leader/follower and establish the connection
+// 	ret = start_connection();
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
 
-// Start a keep-alive timer
-	ret = start_keepalive_timer();
-	if (CHECK_FAILURE(ret))
-		return ret;
+// // Start a keep-alive timer
+// 	ret = start_keepalive_timer();
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
 
 	return RET_SUCCESS;
 }

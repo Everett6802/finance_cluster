@@ -96,8 +96,14 @@ const int KEEPALIVE_PERIOD = 3;
 const int MAX_CONNECTED_CLIENT = 5;
 
 const char* CONF_FODLERNAME = "conf";
+const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
 const int PORT_NO = 6802;
 const int RECV_BUF_SIZE = 512;
 
+const char* CONFIG_FOLDER_NAME = "conf";
+const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";
+const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
+
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;
+

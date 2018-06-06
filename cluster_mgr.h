@@ -19,6 +19,10 @@ class ClusterMgr : public MsgNotifyObserverInf
 	static const int TRY_TIMES;
 
 private:
+// config
+	std::string cluster_network;
+	int cluster_netmask_digits;
+
 	std::list<char*> server_list;
 	char* local_ip;
 	PMSG_TRANSFER_INF msg_trasnfer;
@@ -27,6 +31,8 @@ private:
 	unsigned short runtime_ret;
 	pthread_mutex_t mtx_runtime_ret;
 	pthread_cond_t cond_runtime_ret;
+
+	unsigned short parse_config();
 
 	unsigned short find_local_ip();
 	void set_keepalive_timer_interval(int delay=0, int period=0);

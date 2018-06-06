@@ -54,6 +54,17 @@ do{\
 }while(0)
 #endif
 
+#ifndef CREATE_PROJECT_FILEPATH
+#define CREATE_PROJECT_FILEPATH(variable_name, foldername, filename)\
+const int variable_name##_buf_size = 256;\
+char variable_name[variable_name##_buf_size];\
+do{\
+	static const int FILE_PATH_SIZE = 256;\
+	char current_working_directory[FILE_PATH_SIZE];\
+	getcwd(current_working_directory, FILE_PATH_SIZE);\
+	snprintf(variable_name, variable_name##_buf_size, "%s/%s/%s", current_working_directory, foldername, filename);\
+}while(0);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -101,8 +112,13 @@ extern const int KEEPALIVE_PERIOD;
 extern const int MAX_CONNECTED_CLIENT;
 
 extern const char* CONF_FODLERNAME;
+extern const char* FINANCE_CLUSTER_CONF_FILENAME;
 extern const int PORT_NO;
 extern const int RECV_BUF_SIZE;
+
+extern const char* CONFIG_FOLDER_NAME;
+extern const char* CONF_FIELD_CLUSTER_NETWORK;
+extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 
 //extern const unsigned short NOTIFY_DEAD_CLIENT;
 //extern const unsigned short NOTIFY_CHECK_KEEPALIVE;
@@ -125,6 +141,12 @@ typedef CHAR_LIST* PCHAR_LIST;
 // Functions
 
 unsigned short get_local_interface_ip(std::map<std::string, std::string>& interface_ip_map);
+bool check_file_exist(const char* filepath);
+bool check_config_file_exist(const char* config_filename);
+unsigned short get_file_line_count(unsigned int &line_count, const char* filepath);
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character=',');
+unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
+unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
