@@ -1,10 +1,9 @@
-#include <unistd.h>
+// #include <unistd.h>
 #include <fcntl.h>
-#include <errno.h>
+// #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-// #include <stdexcept>
 #include "follower_node.h"
 #include "node_recv_thread.h"
 

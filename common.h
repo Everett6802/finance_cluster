@@ -12,6 +12,7 @@
 #include <deque>
 #include <string>
 #include <map>
+#include <stdexcept>
 #include "msg_dumper_wrapper.h"
 
 
