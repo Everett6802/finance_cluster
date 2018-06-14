@@ -62,9 +62,15 @@ unsigned short ClusterMgr::parse_config()
 		}
 
 		if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
+		{
 			cluster_network = string(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_CLUSTER_NETWORK, cluster_network.c_str());
+		}
 		else if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
+		{
 			cluster_netmask_digits = atoi(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_CLUSTER_NETMASK_DIGITS, cluster_netmask_digits);
+		}
 		else
 		{
 			static const int ERRMSG_SIZE = 64;
@@ -113,130 +119,13 @@ unsigned short ClusterMgr::find_local_ip()
 		WRITE_FORMAT_ERROR("Fail to find the interface in the network: %s/%d", cluster_network.c_str(), cluster_netmask_digits);
 		return RET_FAILURE_INCORRECT_CONFIG;
 	}
-// 	char current_path[LONG_STRING_SIZE];
-// 	getcwd(current_path, sizeof(current_path));
-
-// 	char server_list_conf_filepath[EX_LONG_STRING_SIZE];
-// 	snprintf(server_list_conf_filepath, EX_LONG_STRING_SIZE, "%s/%s/%s", current_path, CONF_FODLERNAME, SERVER_LIST_CONF_FILENAME);
-
-// 	WRITE_FORMAT_DEBUG("Check the file[%s] exist", server_list_conf_filepath);
-
-// 	FILE* fp = fopen(server_list_conf_filepath, "r");
-// 	if (fp == NULL)
-// 	{
-// 		WRITE_FORMAT_ERROR("The server list configuration file[%s] does NOT exist", server_list_conf_filepath);
-// 		return RET_FAILURE_NOT_FOUND;
-// 	}
-// // Parse the server IP list
-// 	char buf[STRING_SIZE];
-// 	while (fgets(buf, sizeof(char) * STRING_SIZE, fp) != NULL)
-// 	{
-// 		bool found = false;
-// 		int index = 0;
-// 		for (int i = 0 ; i < STRING_SIZE ; i++)
-// 		{
-// 			if (buf[i] == '\n')
-// 			{
-// 				buf[i] = '\0';
-// 				found = true;
-// 				index = i;
-// 				break;
-// 			}
-// 		}
-// 		if (!found)
-// 		{
-// 			WRITE_ERROR("Incorrect config format in the server list");
-// 			return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
-// 		}
-
-// 		if (index == 0)
-// 			continue;
-// //		WRITE_FORMAT_DEBUG("Param content: %s", buf);
-// //		fprintf(stderr, "Param content: %s\n", buf);
-
-// 		int str_len = strlen(buf);
-// 		char* new_ip = new char[str_len + 1];
-// 		if (new_ip == NULL)
-// 		{
-// 			WRITE_ERROR("Fail to allocate memory: new_ip");
-// 			return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
-// 		}
-// 		new_ip[str_len] = '\0';
-// 		memcpy(new_ip, buf, sizeof(char) * str_len);
-// 		server_list.push_back(new_ip);
-// 	}
-// 	fclose(fp);
-// 	fp = NULL;
-
-// 	list<char*>::iterator iter_show = server_list.begin();
-// 	WRITE_DEBUG("Server IP List:");
-// 	while (iter_show != server_list.end())
-// 		WRITE_FORMAT_ERROR("%s", *iter_show++);
-
-// 	struct ifaddrs* ifAddrStruct = NULL;
-// 	void* tmpAddrPtr = NULL;
-
-// 	getifaddrs(&ifAddrStruct);
-
-// // Traverse the ethernet card on local PC
-// 	WRITE_DEBUG("Traverse the all IPs bounded to local network interface...");
-// 	bool found = false;
-// 	for (struct ifaddrs* ifa = ifAddrStruct ; ifa != NULL ; ifa = ifa->ifa_next)
-// 	{
-// 		if (!ifa->ifa_addr)
-// 			continue;
-
-// 		if (ifa->ifa_addr->sa_family == AF_INET) // check it is IP4
-// 		{
-// 			tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-// 			char addressBuffer[INET_ADDRSTRLEN];
-// 			inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-// 			WRITE_FORMAT_DEBUG("%s IPv4 Address %s", ifa->ifa_name, addressBuffer);
-
-// // Check if the IP found in the server list
-// 			list<char*>::iterator iter = server_list.begin();
-// 			while (iter != server_list.end())
-// 			{
-// 				if (strcmp(*iter++, addressBuffer) == 0)
-// 				{
-// 					found = true;
-// 					WRITE_FORMAT_DEBUG("Find Address %s", addressBuffer);
-// 					int len = strlen(addressBuffer) + 1;
-// 					local_ip = new char[len];
-// 					if (local_ip == NULL)
-// 					{
-// 						WRITE_ERROR("Fail to allocate memory: local_ip");
-// 						return MSG_DUMPER_FAILURE_INSUFFICIENT_MEMORY;
-// 					}
-// 					memcpy(local_ip, addressBuffer, len);
-// 					break;
-// 				}
-// 			}
-// 		}
-// 		else if (ifa->ifa_addr->sa_family == AF_INET6) // check it is IP6
-// 		{
-// 			tmpAddrPtr = &((struct sockaddr_in6*)ifa->ifa_addr)->sin6_addr;
-// 			char addressBuffer[INET6_ADDRSTRLEN];
-// 			inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
-// 			WRITE_FORMAT_DEBUG("%s IPv6 Address %s", ifa->ifa_name, addressBuffer);
-// 		}
-// 	}
-
-// // Release the resource
-// 	if (ifAddrStruct!=NULL)
-// 		freeifaddrs(ifAddrStruct);
-
-// 	if (!found)
-// 	{
-// 		WRITE_ERROR("There are no IPs existing in the server list");
-// 		return MSG_DUMPER_FAILURE_INCORRECT_CONFIG;
-// 	}
 
 	return ret;
 }
 
 ClusterMgr::ClusterMgr() :
 	local_ip(NULL),
+	cluster_ip(NULL),
 	msg_trasnfer(NULL),
 	cluster_node(NULL),
 	pid(0),
@@ -254,16 +143,22 @@ ClusterMgr::~ClusterMgr()
 		cluster_node = NULL;
 	}
 
+	if (cluster_ip != NULL)
+	{
+		delete[] cluster_ip;
+		cluster_ip = NULL;
+	}
+
 	if (local_ip != NULL)
 	{
 		delete[] local_ip;
 		local_ip = NULL;
 	}
 
-	list<char*>::iterator iter = server_list.begin();
-	while (iter != server_list.end())
-		delete [] (char*)*iter++;
-	server_list.clear();
+	// list<char*>::iterator iter = server_list.begin();
+	// while (iter != server_list.end())
+	// 	delete [] (char*)*iter++;
+	// server_list.clear();
 
 	RELEASE_MSG_DUMPER()
 }
@@ -299,6 +194,7 @@ void ClusterMgr::stop_keepalive_timer()
 
 unsigned short ClusterMgr::become_leader()
 {
+	assert(local_ip != NULL && "local_ip should NOT be NULL");
 	cluster_node = new LeaderNode(local_ip);
 	if (cluster_node == NULL)
 	{
@@ -317,7 +213,10 @@ unsigned short ClusterMgr::become_leader()
 
 unsigned short ClusterMgr::become_follower()
 {
-	cluster_node = new FollowerNode(&server_list, local_ip);
+	assert(local_ip != NULL && "local_ip should NOT be NULL");
+	assert(cluster_ip != NULL && "cluster_ip should NOT be NULL");
+
+	cluster_node = new FollowerNode(cluster_ip, local_ip);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
@@ -337,20 +236,26 @@ unsigned short ClusterMgr::start_connection()
 {
 	unsigned short ret = RET_SUCCESS;
 
-	WRITE_FORMAT_DEBUG("Node[%s] Try to become follower...", local_ip);
-// Try to find the follower node
-	ret = become_follower();
-	if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
+	if (cluster_ip != NULL)
 	{
-		if (node_type != NONE)
+		WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_ip, cluster_ip);
+	// Try to find the follower node
+		ret = become_follower();
+		if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
 		{
-			WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
-			return RET_FAILURE_INCORRECT_OPERATION;
+			if (node_type != NONE)
+			{
+				WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
+				return RET_FAILURE_INCORRECT_OPERATION;
+			}
+
 		}
-// Fail to connect to any server, be the server
+	}
+	else
+	{
 		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
 // Try to find the leader node
-		ret = become_leader();
+		ret = become_leader();		
 	}
 
 	return ret;
@@ -377,53 +282,53 @@ unsigned short ClusterMgr::try_reconnection()
 {
 	unsigned short ret = RET_SUCCESS;
 
-	int server_candidate_id = 0;
-	if (cluster_node != NULL)
-		server_candidate_id = ((PFOLLOWER_NODE)cluster_node)->get_server_candidate_id();
+	// int server_candidate_id = 0;
+	// if (cluster_node != NULL)
+	// 	server_candidate_id = ((PFOLLOWER_NODE)cluster_node)->get_server_candidate_id();
 
 // Close the old connection
 	ret = stop_connection();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-// The server candidate ID should exist in the Follower
-	if (server_candidate_id == 0)
-	{
-		WRITE_FORMAT_ERROR("The Follower[%s] server candidate ID is NOT correct", local_ip);
-		return RET_FAILURE_INCORRECT_OPERATION;
-	}
+// // The server candidate ID should exist in the Follower
+// 	if (server_candidate_id == 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("The Follower[%s] server candidate ID is NOT correct", local_ip);
+// 		return RET_FAILURE_INCORRECT_OPERATION;
+// 	}
 
-	while (server_candidate_id > 1)
-	{
-		for (int i = 1 ; i < TRY_TIMES ; i++)
-		{
-			WRITE_FORMAT_DEBUG("Node[%s] try to become a Follower...", local_ip);
-			ret = become_follower();
-			if (CHECK_SUCCESS(ret))
-				goto OUT;
-			else
-			{
-// Check the error code, if connection time-out, sleep for a while before trying to connect again
-				if (IS_TRY_CONNECTION_TIMEOUT(ret))
-				{
-					WRITE_FORMAT_WARN("Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME, local_ip);
-					sleep(RETRY_WAIT_CONNECTION_TIME);
-				}
-				else
-					goto OUT;
-			}
-			WRITE_FORMAT_DEBUG("Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
-		}
+// 	while (server_candidate_id > 1)
+// 	{
+// 		for (int i = 1 ; i < TRY_TIMES ; i++)
+// 		{
+// 			WRITE_FORMAT_DEBUG("Node[%s] try to become a Follower...", local_ip);
+// 			ret = become_follower();
+// 			if (CHECK_SUCCESS(ret))
+// 				goto OUT;
+// 			else
+// 			{
+// // Check the error code, if connection time-out, sleep for a while before trying to connect again
+// 				if (IS_TRY_CONNECTION_TIMEOUT(ret))
+// 				{
+// 					WRITE_FORMAT_WARN("Sleep %d seconds before re-trying node[%s] to become a Follower", RETRY_WAIT_CONNECTION_TIME, local_ip);
+// 					sleep(RETRY_WAIT_CONNECTION_TIME);
+// 				}
+// 				else
+// 					goto OUT;
+// 			}
+// 			WRITE_FORMAT_DEBUG("Node[%s] try to find Leader for %d times, but still FAIL......", local_ip, TRY_TIMES);
+// 		}
 
-		server_candidate_id--;
-	}
+// 		server_candidate_id--;
+// 	}
 
-OUT:
-	if (server_candidate_id == 1)
-	{
-		WRITE_FORMAT_DEBUG("Node[%s] try to become a Leader...", local_ip);
-		ret = become_leader();
-	}
+// OUT:
+// 	if (server_candidate_id == 1)
+// 	{
+// 		WRITE_FORMAT_DEBUG("Node[%s] try to become a Leader...", local_ip);
+// 		ret = become_leader();
+// 	}
 
 	return ret;
 }
@@ -462,26 +367,29 @@ void ClusterMgr::check_keepalive()
 unsigned short ClusterMgr::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
+	ret = parse_config();
+	if (CHECK_FAILURE(ret))
+		ret;
 // Find local IP
 	if (local_ip == NULL)
 	{
 		ret  = find_local_ip();
 		if (CHECK_FAILURE(ret))
 			return ret;
-		WRITE_FORMAT_DEBUG("The local IP of this Node: %s", local_ip);
+		// WRITE_FORMAT_DEBUG("The local IP of this Node: %s", local_ip);
 	}
 
-// // Define a leader/follower and establish the connection
-// 	ret = start_connection();
-// 	if (CHECK_FAILURE(ret))
-// 		return ret;
+// Define a leader/follower and establish the connection
+	ret = start_connection();
+	if (CHECK_FAILURE(ret))
+		return ret;
 
-// // Start a keep-alive timer
-// 	ret = start_keepalive_timer();
-// 	if (CHECK_FAILURE(ret))
-// 		return ret;
+// Start a keep-alive timer
+	ret = start_keepalive_timer();
+	if (CHECK_FAILURE(ret))
+		return ret;
 
-	return RET_SUCCESS;
+	return ret;
 }
 
 unsigned short ClusterMgr::deinitialize()

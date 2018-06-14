@@ -17,9 +17,11 @@ class LeaderNode : public NodeBase
 
 	static const char* thread_tag;
 private:
+	int leader_socket;
+	int cluster_node_cnt;
+
 	volatile bool exit;
 	pthread_t pid;
-	int leader_socket;
 	//	class NodeRecvThread; // Caution: Fail to compile
 	//	class LeaderSendThread; // Caution: Fail to compile
 	std::deque<NodeRecvThread*>* client_recv_thread_deque;
@@ -33,7 +35,7 @@ private:
 	unsigned short thread_handler_internal();
 
 public:
-	LeaderNode(char* ip);
+	LeaderNode(const char* ip);
 	virtual ~LeaderNode();
 
 // From NodeBase

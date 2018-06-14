@@ -19,20 +19,22 @@ private:
 	static const int CHECK_KEEPALIVE_TIMES;
 	static const int TOTAL_KEEPALIVE_PERIOD;
 
-	CHAR_LIST server_list;
+	// CHAR_LIST server_list;
 	int follower_socket;
+	char* cluster_ip;
+
 //	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
 	NodeRecvThread* msg_recv_thread;
 	int keepalive_counter;
-	int server_candidate_id;
+	// int server_candidate_id;
 
-	unsigned short connect_leader(const char* server_ip);
-	unsigned short become_follower(const char* server_ip);
-	unsigned short find_leader();
+	unsigned short connect_leader();
+	unsigned short become_follower();
+	// unsigned short find_leader();
 	bool is_keepalive_packet(const std::string message)const;
 
 public:
-	FollowerNode(const PCHAR_LIST alist, char* ip);
+	FollowerNode(const char* server_ip, const char* ip);
 	virtual ~FollowerNode();
 
 // From NodeBase
@@ -43,7 +45,7 @@ public:
 	virtual unsigned short update(const std::string ip, const std::string message);
 	virtual unsigned short notify(NotifyType notify_type);
 
-	int get_server_candidate_id()const{return server_candidate_id;}
+	// int get_server_candidate_id()const{return server_candidate_id;}
 };
 typedef FollowerNode* PFOLLOWER_NODE;
 

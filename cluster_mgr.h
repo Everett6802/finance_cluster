@@ -23,10 +23,13 @@ private:
 	std::string cluster_network;
 	int cluster_netmask_digits;
 
-	std::list<char*> server_list;
 	char* local_ip;
-	PMSG_TRANSFER_INF msg_trasnfer;
+// Only for the follower
+	char* cluster_ip;
+	// std::list<char*> cluster_list;
+	NodeType node_type;
 	NodeBase* cluster_node;
+	PMSG_TRANSFER_INF msg_trasnfer;
 	pthread_t pid;
 	unsigned short runtime_ret;
 	pthread_mutex_t mtx_runtime_ret;
@@ -45,15 +48,14 @@ private:
 	unsigned short try_reconnection();
 	unsigned short initialize();
 	unsigned short deinitialize();
+	void check_keepalive();
+	void notify_exit(unsigned short exit_reason);
 
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
 
 protected:
-	NodeType node_type;
 
-	void check_keepalive();
-	void notify_exit(unsigned short exit_reason);
 
 public:
 	ClusterMgr();

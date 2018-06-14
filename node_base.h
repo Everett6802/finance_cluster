@@ -10,9 +10,12 @@ class NodeBase : public MsgNotifyObserverInf
 
 protected:
 	char* local_ip;
+// Start from 1, 1 for leader, otherwise for follower
+	int cluster_node_id;
 
 public:
 	NodeBase();
+	NodeBase(const char* ip);
 	virtual ~NodeBase();
 
 	virtual unsigned short initialize()=0;

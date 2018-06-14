@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdexcept>
+// #include <stdexcept>
 #include <string>
 #include <deque>
 #include "leader_node.h"
@@ -16,23 +16,26 @@ using namespace std;
 const char* LeaderNode::thread_tag = "Listen Thread";
 // DECLARE_MSG_DUMPER_PARAM();
 
-LeaderNode::LeaderNode(char* ip) :
+LeaderNode::LeaderNode(const char* ip) :
+	NodeBase(ip),
+	leader_socket(0),
+	cluster_node_cnt(0),
 	exit(false),
 	pid(0),
-	leader_socket(0),
 	client_recv_thread_deque(NULL),
 	client_send_thread(NULL),
 	thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
 
-	if (ip == NULL)
-		throw invalid_argument(string("ip == NULL"));
-	int ip_len = strlen(ip) + 1;
-	local_ip = new char[ip_len];
-	if (local_ip == NULL)
-		throw bad_alloc();
-	memcpy(local_ip, ip, sizeof(char) * ip_len);
+	// if (ip == NULL)
+	// 	throw invalid_argument(string("ip == NULL"));
+	// // int ip_len = strlen(ip) + 1;
+	// // local_ip = new char[ip_len];
+	// // if (local_ip == NULL)
+	// // 	throw bad_alloc();
+	// // memcpy(local_ip, ip, sizeof(char) * ip_len);
+	// local_ip = strdup(ip);
 }
 
 LeaderNode::~LeaderNode()
@@ -76,6 +79,8 @@ unsigned short LeaderNode::become_leader()
 		return RET_FAILURE_SYSTEM_API;
 	}
 	leader_socket = sock_fd;
+	cluster_node_id = 1;
+	cluster_node_cnt = 1;
 
 	WRITE_FORMAT_INFO("Node[%s] is a Leader", local_ip);
 	printf("Node[%s] is a leader !!!\n", local_ip);

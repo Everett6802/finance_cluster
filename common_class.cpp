@@ -84,7 +84,7 @@ unsigned short IPv4Addr::get_netmask(int netmask_digits, unsigned char ipv4_mask
 	};
 	if (netmask_digits < 0 || netmask_digits > 32)
 	{
-		STATIC_WRITE_FORMAT_DEBUG("The netmask digits[%d] is NOT in range [0, 32]", netmask_digits);
+		STATIC_WRITE_FORMAT_ERROR("The netmask digits[%d] is NOT in range [0, 32]", netmask_digits);
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 

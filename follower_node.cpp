@@ -4,7 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdexcept>
+// #include <stdexcept>
 #include "follower_node.h"
 #include "node_recv_thread.h"
 
@@ -17,47 +17,51 @@ const int FollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
 // DECLARE_MSG_DUMPER_PARAM();
 
-FollowerNode::FollowerNode(const PCHAR_LIST alist, char* ip) :
+FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
+	NodeBase(ip),
 	follower_socket(0),
-	msg_recv_thread(NULL),
-	server_candidate_id(0)
+	msg_recv_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 
-	if (alist == NULL || ip == NULL)
-		throw invalid_argument(string("alist/ip == NULL"));
+	if (server_ip == NULL || ip == NULL)
+		throw invalid_argument(string("server_ip/ip == NULL"));
+	cluster_ip = strdup(server_ip);
+	// CHAR_LIST::iterator iter = alist->begin();
+	// while (iter != alist->end())
+	// {
+	// 	int len = strlen(*iter) + 1;
+	// 	char* new_ip = new char[len];
+	// 	if (new_ip == NULL)
+	// 		throw bad_alloc();
+	// 	memcpy(new_ip, *iter, sizeof(char) * len);
+	// 	server_list.push_back(new_ip);
+	// 	iter++;
+	// }
 
-	CHAR_LIST::iterator iter = alist->begin();
-	while (iter != alist->end())
-	{
-		int len = strlen(*iter) + 1;
-		char* new_ip = new char[len];
-		if (new_ip == NULL)
-			throw bad_alloc();
-		memcpy(new_ip, *iter, sizeof(char) * len);
-		server_list.push_back(new_ip);
-		iter++;
-	}
-
-	int ip_len = strlen(ip) + 1;
-	local_ip = new char[ip_len];
-	if (local_ip == NULL)
-		throw bad_alloc();
-	memcpy(local_ip, ip, sizeof(char) * ip_len);
+	// int ip_len = strlen(ip) + 1;
+	// local_ip = new char[ip_len];
+	// if (local_ip == NULL)
+	// 	throw bad_alloc();
+	// memcpy(local_ip, ip, sizeof(char) * ip_len);
 }
 
 FollowerNode::~FollowerNode()
 {
+	if (cluster_ip != NULL)
+	{
+		free(cluster_ip);
+	}
 	if (follower_socket != 0)
 	{
 		close(follower_socket);
 		follower_socket = 0;
 	}
 
-	list<char*>::iterator iter = server_list.begin();
-	while (iter != server_list.end())
-		delete [] (char*)*iter++;
-	server_list.clear();
+	// list<char*>::iterator iter = server_list.begin();
+	// while (iter != server_list.end())
+	// 	delete [] (char*)*iter++;
+	// server_list.clear();
 
 	RELEASE_MSG_DUMPER()
 }
@@ -65,7 +69,21 @@ FollowerNode::~FollowerNode()
 unsigned short FollowerNode::initialize()
 {
 // Try to find the leader node
-	unsigned short ret = find_leader();
+	unsigned short ret = RET_SUCCESS;
+	for (int i = 0 ; i < TRY_TIMES ; i++)
+	{
+		ret = become_follower();
+// The node become a follower successfully
+		if (CHECK_SUCCESS(ret))
+			break;
+		else
+		{
+// Check if time-out occurs while trying to connect to the remote node
+			if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+				break;
+		}
+	}
+
 	if (CHECK_FAILURE(ret))
 	{
 		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
@@ -118,15 +136,9 @@ unsigned short FollowerNode::check_keepalive()
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::connect_leader(const char* server_ip)
+unsigned short FollowerNode::connect_leader()
 {
-	if (server_ip == NULL)
-	{
-		WRITE_ERROR("Server IP should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;
-	}
-
-	WRITE_FORMAT_DEBUG("Try to connect to %s......", server_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......", cluster_ip);
 
 // Create socket
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -154,7 +166,7 @@ unsigned short FollowerNode::connect_leader(const char* server_ip)
 	memset(&client_address, 0x0, sizeof(struct sockaddr_in));
 	client_address.sin_family = AF_INET;
 	client_address.sin_port = htons(PORT_NO);
-	client_address.sin_addr.s_addr = inet_addr(server_ip);
+	client_address.sin_addr.s_addr = inet_addr(cluster_ip);
 	int res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
 	if (res < 0)
 	{
@@ -218,19 +230,19 @@ unsigned short FollowerNode::connect_leader(const char* server_ip)
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", server_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_ip);
 	follower_socket = sock_fd;
 
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::become_follower(const char* server_ip)
+unsigned short FollowerNode::become_follower()
 {
 // Try to connect to the designated server
-	unsigned short ret = connect_leader(server_ip);
+	unsigned short ret = connect_leader();
 	if (IS_TRY_CONNECTION_TIMEOUT(ret))
 	{
-		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", server_ip);
+		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", cluster_ip);
 		return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
 	}
 	else
@@ -240,7 +252,7 @@ unsigned short FollowerNode::become_follower(const char* server_ip)
 	}
 
 	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_ip);
-	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, server_ip);
+	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, cluster_ip);
 
 // Create a thread to receive the remote data
 	msg_recv_thread = new NodeRecvThread();
@@ -253,37 +265,37 @@ unsigned short FollowerNode::become_follower(const char* server_ip)
 	return msg_recv_thread->initialize(this, follower_socket, local_ip);
 }
 
-unsigned short FollowerNode::find_leader()
-{
-	unsigned short ret = RET_SUCCESS;
-	for (int i = 0 ; i < TRY_TIMES ; i++)
-	{
-		CHAR_LIST::iterator iter = server_list.begin();
-		while (iter != server_list.end())
-		{
-			char* server_ip = (char*)*iter++;
-			if (server_ip == NULL)
-			{
-				WRITE_ERROR("Server IP should NOT be NULL");
-				return RET_FAILURE_INVALID_POINTER;
-			}
-			if (strcmp(local_ip, server_ip) == 0)
-				continue;
-			ret = become_follower(server_ip);
-// The node become a follower successfully
-			if (CHECK_SUCCESS(ret))
-				goto OUT;
-			else
-			{
-// Check if time-out occurs while trying to connect to the remote node
-				if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-					goto OUT;
-			}
-		}
-	}
-OUT:
-	return ret;
-}
+// unsigned short FollowerNode::find_leader()
+// {
+// 	unsigned short ret = RET_SUCCESS;
+// 	for (int i = 0 ; i < TRY_TIMES ; i++)
+// 	{
+// 		CHAR_LIST::iterator iter = server_list.begin();
+// 		while (iter != server_list.end())
+// 		{
+// 			char* cluster_ip = (char*)*iter++;
+// 			if (cluster_ip == NULL)
+// 			{
+// 				WRITE_ERROR("Server IP should NOT be NULL");
+// 				return RET_FAILURE_INVALID_POINTER;
+// 			}
+// 			if (strcmp(local_ip, cluster_ip) == 0)
+// 				continue;
+// 			ret = become_follower(cluster_ip);
+// // The node become a follower successfully
+// 			if (CHECK_SUCCESS(ret))
+// 				goto OUT;
+// 			else
+// 			{
+// // Check if time-out occurs while trying to connect to the remote node
+// 				if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+// 					goto OUT;
+// 			}
+// 		}
+// 	}
+// OUT:
+// 	return ret;
+// }
 
 bool FollowerNode::is_keepalive_packet(const std::string message)const
 {
@@ -293,22 +305,22 @@ bool FollowerNode::is_keepalive_packet(const std::string message)const
 unsigned short FollowerNode::update(const std::string ip, const std::string message)
 {
 	WRITE_FORMAT_DEBUG("Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	if (server_candidate_id == 0)
-	{
-		if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
-		{
-			size_t pos = message.find(":");
-			if (pos == string::npos)
-			{
-				WRITE_FORMAT_ERROR("Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
-				return RET_FAILURE_INCORRECT_CONFIG;
-			}
+	// if (server_candidate_id == 0)
+	// {
+	// 	if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
+	// 	{
+	// 		size_t pos = message.find(":");
+	// 		if (pos == string::npos)
+	// 		{
+	// 			WRITE_FORMAT_ERROR("Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
+	// 			return RET_FAILURE_INCORRECT_CONFIG;
+	// 		}
 
-			server_candidate_id = atoi(message.substr(pos + 1).c_str());
-			WRITE_FORMAT_INFO("Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
-			return RET_SUCCESS;
-		}
-	}
+	// 		server_candidate_id = atoi(message.substr(pos + 1).c_str());
+	// 		WRITE_FORMAT_INFO("Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
+	// 		return RET_SUCCESS;
+	// 	}
+	// }
 
 	if (is_keepalive_packet(message))
 	{
