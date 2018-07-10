@@ -13,7 +13,8 @@ NodeBase::NodeBase() :
 }
 
 NodeBase::NodeBase(const char* ip) :
-	local_ip(NULL)
+	local_ip(NULL),
+	cluster_node_id(0)
 {
 //	IMPLEMENT_MSG_DUMPER()
 	if (ip == NULL)

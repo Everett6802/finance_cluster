@@ -1,10 +1,11 @@
 #ifndef FOLLOWER_NODE_H
 #define FOLLOWER_NODE_H
 
-#include <pthread.h>
+// #include <pthread.h>
 #include <string>
-#include "node_base.h"
 #include "common.h"
+#include "node_base.h"
+#include "node_channel.h"
 
 
 class NodeRecvThread;
@@ -20,11 +21,12 @@ private:
 	static const int TOTAL_KEEPALIVE_PERIOD;
 
 	// CHAR_LIST server_list;
-	int follower_socket;
+	int socketfd;
 	char* cluster_ip;
+	PNODE_CHANNEL node_channel;
 
 //	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
-	NodeRecvThread* msg_recv_thread;
+	// NodeRecvThread* msg_recv_thread;
 	int keepalive_counter;
 	// int server_candidate_id;
 

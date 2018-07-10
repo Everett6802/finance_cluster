@@ -5,7 +5,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "follower_node.h"
-#include "node_recv_thread.h"
+// #include "node_recv_thread.h"
 
 
 using namespace std;
@@ -18,7 +18,8 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 
 FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
 	NodeBase(ip),
-	follower_socket(0),
+	socketfd(0),
+	node_channel(NULL),
 	msg_recv_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -47,16 +48,14 @@ FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
 
 FollowerNode::~FollowerNode()
 {
-	if (cluster_ip != NULL)
+	unsigned short ret = deinitialize();
+	if (CHECK_FAILURE(ret))
 	{
-		free(cluster_ip);
+		static const int ERRMSG_SIZE = 256;
+		char errmsg[ERRMSG_SIZE];
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription());
+		throw runtime_error(string(errmsg));
 	}
-	if (follower_socket != 0)
-	{
-		close(follower_socket);
-		follower_socket = 0;
-	}
-
 	// list<char*>::iterator iter = server_list.begin();
 	// while (iter != server_list.end())
 	// 	delete [] (char*)*iter++;
@@ -95,28 +94,41 @@ unsigned short FollowerNode::initialize()
 // Start a timer to check keep-alive
 	keepalive_counter = CHECK_KEEPALIVE_TIMES;
 
-	return RET_SUCCESS;
+// Create a thread of accessing the data
+	node_channel = new NodeChannel();
+	if (node_channel == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: node_channel");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	return node_channel->initialize(this, socketfd, local_ip);
 }
 
 unsigned short FollowerNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
-	if (msg_recv_thread != NULL)
+	if (node_channel != NULL)
 	{
-		ret = msg_recv_thread->deinitialize();
+		ret = node_channel->deinitialize();
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Fail to de-initialize the receiving message worker thread[Node: %s]", local_ip);
+			WRITE_FORMAT_ERROR("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
 			return ret;
 		}
-		delete msg_recv_thread;
-		msg_recv_thread = NULL;
+		delete node_channel;
+		node_channel = NULL;
 	}
 
-	if (follower_socket != 0)
+	if (socketfd != 0)
 	{
-		close(follower_socket);
-		follower_socket = 0;
+		close(socketfd);
+		socketfd = 0;
+	}
+	if (cluster_ip != NULL)
+	{
+		free(cluster_ip);
+		cluster_ip = NULL;
 	}
 
 	return RET_SUCCESS;
@@ -230,7 +242,7 @@ unsigned short FollowerNode::connect_leader()
 	}
 
 	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_ip);
-	follower_socket = sock_fd;
+	socketfd = sock_fd;
 
 	return RET_SUCCESS;
 }
@@ -253,15 +265,14 @@ unsigned short FollowerNode::become_follower()
 	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_ip);
 	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, cluster_ip);
 
-// Create a thread to receive the remote data
-	msg_recv_thread = new NodeRecvThread();
-	if (msg_recv_thread == NULL)
-	{
-		WRITE_ERROR("Fail to allocate memory: msg_recv_thread");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
-
-	return msg_recv_thread->initialize(this, follower_socket, local_ip);
+// // Create a thread to receive the remote data
+// 	msg_recv_thread = new NodeRecvThread();
+// 	if (msg_recv_thread == NULL)
+// 	{
+// 		WRITE_ERROR("Fail to allocate memory: msg_recv_thread");
+// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
+// 	}
+	return ret;
 }
 
 // unsigned short FollowerNode::find_leader()

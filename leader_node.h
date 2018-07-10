@@ -1,15 +1,17 @@
 #ifndef LEADER_NODE_H
 #define LEADER_NODE_H
 
+#include <pthread.h>
 //#include <list>
 #include <deque>
 #include <string>
-#include "node_base.h"
 #include "common.h"
+#include "node_base.h"
+#include "node_channel.h"
 
 
-class NodeRecvThread;
-class LeaderSendThread;
+// class NodeRecvThread;
+// class LeaderSendThread;
 
 class LeaderNode : public NodeBase
 {
@@ -17,17 +19,20 @@ class LeaderNode : public NodeBase
 
 	static const char* thread_tag;
 private:
-	int leader_socket;
+	int socketfd;
 	int cluster_node_cnt;
 
-	volatile bool exit;
-	pthread_t pid;
+	volatile int exit;
+	pthread_t listen_tid;
 	//	class NodeRecvThread; // Caution: Fail to compile
 	//	class LeaderSendThread; // Caution: Fail to compile
-	std::deque<NodeRecvThread*>* client_recv_thread_deque;
-	LeaderSendThread* client_send_thread;
+	// std::deque<NodeRecvThread*>* client_recv_thread_deque;
+	// LeaderSendThread* client_send_thread;
+	std::deque<PNODE_CHANNEL> node_channel_deque;
+	std::map<std::string, PNODE_CHANNEL> node_channel_map;
+
 	volatile unsigned short thread_ret;
-	pthread_mutex_t mtx_thread_list;
+	pthread_mutex_t mtx_node_channel;
 
 	unsigned short become_leader();
 

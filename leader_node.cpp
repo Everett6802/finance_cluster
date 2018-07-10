@@ -7,8 +7,8 @@
 // #include <string>
 #include <deque>
 #include "leader_node.h"
-#include "leader_send_thread.h"
-#include "node_recv_thread.h"
+// #include "leader_send_thread.h"
+// #include "node_recv_thread.h"
 
 
 using namespace std;
@@ -18,12 +18,12 @@ const char* LeaderNode::thread_tag = "Listen Thread";
 
 LeaderNode::LeaderNode(const char* ip) :
 	NodeBase(ip),
-	leader_socket(0),
+	socketfd(0),
 	cluster_node_cnt(0),
-	exit(false),
-	pid(0),
-	client_recv_thread_deque(NULL),
-	client_send_thread(NULL),
+	exit(0),
+	listen_tid(0),
+	// client_recv_thread_deque(NULL),
+	// client_send_thread(NULL),
 	thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -40,10 +40,13 @@ LeaderNode::LeaderNode(const char* ip) :
 
 LeaderNode::~LeaderNode()
 {
-	if (leader_socket != 0)
+	unsigned short ret = deinitialize();
+	if (CHECK_FAILURE(ret))
 	{
-		close(leader_socket);
-		leader_socket = 0;
+		static const int ERRMSG_SIZE = 256;
+		char errmsg[ERRMSG_SIZE];
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in LeaderNode::deinitialize(), due to :%s", GetErrorDescription(ret));
+		throw runtime_error(string(errmsg));
 	}
 
 	RELEASE_MSG_DUMPER()
@@ -78,7 +81,7 @@ unsigned short LeaderNode::become_leader()
 		WRITE_FORMAT_ERROR("listen() fail, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
-	leader_socket = sock_fd;
+	socketfd = sock_fd;
 	cluster_node_id = 1;
 	cluster_node_cnt = 1;
 
@@ -94,44 +97,44 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-	client_recv_thread_deque = new deque<NodeRecvThread*>();
-	if (client_recv_thread_deque == NULL)
-	{
-		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_deque");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
-// Initialize a thread to send the message to the remote
-	client_send_thread = new LeaderSendThread();
-	if (client_send_thread == NULL)
-	{
-		WRITE_ERROR("Fail to allocate the memory: client_send_thread");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
+// 	client_recv_thread_deque = new deque<NodeRecvThread*>();
+// 	if (client_recv_thread_deque == NULL)
+// 	{
+// 		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_deque");
+// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
+// 	}
+// // Initialize a thread to send the message to the remote
+// 	client_send_thread = new LeaderSendThread();
+// 	if (client_send_thread == NULL)
+// 	{
+// 		WRITE_ERROR("Fail to allocate the memory: client_send_thread");
+// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
+// 	}
 
-	ret = client_send_thread->initialize(this);
-	if (CHECK_FAILURE(ret))
-		goto OUT;
+// 	ret = client_send_thread->initialize(this);
+// 	if (CHECK_FAILURE(ret))
+// 		goto OUT;
 
-	mtx_thread_list = PTHREAD_MUTEX_INITIALIZER;
+	mtx_node_channel = PTHREAD_MUTEX_INITIALIZER;
 // Create a worker thread to access data...
-	if (pthread_create(&pid, NULL, thread_handler, this))
+	if (pthread_create(&listen_tid, NULL, thread_handler, this))
 	{
 		WRITE_FORMAT_ERROR("Fail to create a worker thread of accepting client, due to: %s",strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
 
 	return RET_SUCCESS;
-OUT:
-    if (client_send_thread != NULL)
-    {
-    	delete client_send_thread;
-    	client_send_thread = NULL;
-    }
-	if (client_recv_thread_deque != NULL)
-	{
-		delete client_recv_thread_deque;
-		client_recv_thread_deque = NULL;
-	}
+// OUT:
+//     if (client_send_thread != NULL)
+//     {
+//     	delete client_send_thread;
+//     	client_send_thread = NULL;
+//     }
+// 	if (client_recv_thread_deque != NULL)
+// 	{
+// 		delete client_recv_thread_deque;
+// 		client_recv_thread_deque = NULL;
+// 	}
 
     return ret;
 }
@@ -139,36 +142,119 @@ OUT:
 unsigned short LeaderNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
-    if (client_send_thread != NULL)
-    {
-    	client_send_thread->deinitialize();
-		if (CHECK_FAILURE(ret))
-			return ret;
+	void* status;
+	int kill_ret;
+  //   if (client_send_thread != NULL)
+  //   {
+  //   	client_send_thread->deinitialize();
+		// if (CHECK_FAILURE(ret))
+		// 	return ret;
 
-    	delete client_send_thread;
-    	client_send_thread = NULL;
-    }
+  //   	delete client_send_thread;
+  //   	client_send_thread = NULL;
+  //   }
+// Check listen thread alive
+	bool listen_thread_alive = false;
+	if (listen_tid != 0)
+	{
+		kill_ret = pthread_kill(listen_tid, 0);
+		if(kill_ret == ESRCH)
+		{
+			WRITE_WARN("The worker thread of sending message did NOT exist......");
+			ret = RET_SUCCESS;
+			// goto OUT;
+		}
+		else if(kill_ret == EINVAL)
+		{
+			WRITE_ERROR("The signal to the worker thread of sending message is invalid");
+			ret = RET_FAILURE_HANDLE_THREAD;
+			// goto OUT;
+		}
+		else
+		{
+			WRITE_DEBUG("The signal to the worker thread of sending message is STILL alive");
+			listen_thread_alive = true;
+		}
+	}
 
-	return RET_SUCCESS;
+// Notify the worker thread it's time to exit
+	__sync_fetch_and_add(&exit, 1);
+// Wait for listen thread's death
+	if (listen_thread_alive)
+	{
+		WRITE_DEBUG("Wait for the worker thread of sending message's death...");
+		pthread_join(send_tid, &status);
+		if (status == NULL)
+			WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
+			return thread_ret;
+		}
+	}
+// No need
+	// pthread_mutex_lock(&mtx_node_channel);
+	deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
+	while (iter != node_channel_deque.end())
+	{
+		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+		iter++;
+		if (node_channel != NULL)
+		{
+			node_channel->deinitialize();
+			delete node_channel;
+		}
+	}
+	node_channel_deque.clear();
+	node_channel_map.clear();
+// No need
+	// pthread_mutex_unlock(&mtx_node_channel);
+
+	if (socketfd != 0)
+	{
+		close(socketfd);
+		socketfd = 0;
+	}
+	return ret;
 }
 
 unsigned short LeaderNode::check_keepalive()
 {
-	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
-	if (client_send_thread->follower_connected())
+	// assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
+	// if (client_send_thread->follower_connected())
+	// {
+	// 	WRITE_DEBUG("Time to notify Followers that Leader is still alive......");
+	// 	client_send_thread->check_keepalive();
+	// }
+	unsigned short ret = RET_SUCCESS;
+	pthread_mutex_lock(&mtx_node_channel);
+	deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
+	while(iter != node_channel_deque.end())
 	{
-		WRITE_DEBUG("Time to notify Followers that Leader is still alive......");
-		client_send_thread->check_keepalive();
+		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+		assert(node_channel != NULL && "node_channel should NOT be NULL");
+		ret = node_channel->send_msg(CHECK_KEEPALIVE_TAG);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fail to send Keep-Alive packet to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
+			break;
+		}
+		iter++;
 	}
+	pthread_mutex_unlock(&mtx_node_channel);
 
-	return RET_SUCCESS;
+	return ret;
 }
 
 unsigned short LeaderNode::update(const std::string ip, const std::string message)
 {
 	WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
-	unsigned short ret = client_send_thread->send_msg(ip, message);
+	unsigned short ret = RET_SUCCESS;
+	pthread_mutex_lock(&mtx_node_channel);
+	PNODE_CHANNEL node_channel = node_channel_map[ip];
+	assert(node_channel != NULL && "node_channel should NOT be NULL");
+	mret = node_channel->send_msg(message.c_str());
+	pthread_mutex_unlock(&mtx_node_channel);
 
 	return ret;
 }
@@ -179,27 +265,27 @@ unsigned short LeaderNode::notify(NotifyType notify_type)
 	{
 	case NOTIFY_DEAD_CLIENT:
 	{
-		assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
-		assert(client_recv_thread_deque != NULL && "client_recv_thread_deque should NOT be NULL");
+		// assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
+		// assert(client_recv_thread_deque != NULL && "client_recv_thread_deque should NOT be NULL");
 
-		const std::deque<int>& dead_client_index_deque = client_send_thread->get_dead_client_index_deque();
-		pthread_mutex_lock(&mtx_thread_list);
-		int client_recv_thread_deque_size = (int)client_recv_thread_deque->size();
-		std::deque<int>::const_iterator iter = dead_client_index_deque.begin();
-		while (iter != dead_client_index_deque.end())
-		{
-			int index = (int)*iter++;
-			assert ((index >= 0 && index < client_recv_thread_deque_size) && "index is out of range");
+		// const std::deque<int>& dead_client_index_deque = client_send_thread->get_dead_client_index_deque();
+		// pthread_mutex_lock(&mtx_node_channel);
+		// int client_recv_thread_deque_size = (int)client_recv_thread_deque->size();
+		// std::deque<int>::const_iterator iter = dead_client_index_deque.begin();
+		// while (iter != dead_client_index_deque.end())
+		// {
+		// 	int index = (int)*iter++;
+		// 	assert ((index >= 0 && index < client_recv_thread_deque_size) && "index is out of range");
 
-			NodeRecvThread* thread = (NodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
-			assert (thread != NULL && "thread should NOT be NULL");
-			WRITE_FORMAT_DEBUG("Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
-			unsigned short ret = thread->deinitialize();
-			if (CHECK_FAILURE(ret))
-				WRITE_FORMAT_WARN("Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
-			delete thread;
-		}
-		pthread_mutex_unlock(&mtx_thread_list);
+		// 	NodeRecvThread* thread = (NodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
+		// 	assert (thread != NULL && "thread should NOT be NULL");
+		// 	WRITE_FORMAT_DEBUG("Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
+		// 	unsigned short ret = thread->deinitialize();
+		// 	if (CHECK_FAILURE(ret))
+		// 		WRITE_FORMAT_WARN("Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
+		// 	delete thread;
+		// }
+		// pthread_mutex_unlock(&mtx_node_channel);
 	}
 	break;
 	default:
@@ -233,7 +319,7 @@ unsigned short LeaderNode::thread_handler_internal()
 	int client_len;
 	while (!exit)
 	{
-		int sockfd = accept(leader_socket, &client_address, (socklen_t*)&client_len);
+		int sockfd = accept(socketfd, &client_address, (socklen_t*)&client_len);
 		if (client_address.sa_family != AF_INET) // AF_INET6
 		{
 //			struct sockaddr_in6 *s = (struct sockaddr_in6 *)&client_address;
@@ -251,24 +337,41 @@ unsigned short LeaderNode::thread_handler_internal()
 		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", thread_tag, ip);
 		printf("Follower[%s] connects to the Leader\n", ip);
 
-// Initialize a new thread to receive the message
-		NodeRecvThread* node_recv_thread = new NodeRecvThread();
-		if (node_recv_thread == NULL)
-		{
-			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: node_recv_thread", thread_tag);
-			return RET_FAILURE_INCORRECT_OPERATION;
-		}
-		ret = node_recv_thread->initialize(this, sockfd, ip);
-		if (CHECK_FAILURE(ret))
-			break;
-		pthread_mutex_lock(&mtx_thread_list);
-		client_recv_thread_deque->push_back(node_recv_thread);
-		pthread_mutex_unlock(&mtx_thread_list);
+// // Initialize a new thread to receive the message
+// 		NodeRecvThread* node_recv_thread = new NodeRecvThread();
+// 		if (node_recv_thread == NULL)
+// 		{
+// 			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: node_recv_thread", thread_tag);
+// 			return RET_FAILURE_INCORRECT_OPERATION;
+// 		}
+// 		ret = node_recv_thread->initialize(this, sockfd, ip);
+// 		if (CHECK_FAILURE(ret))
+// 			break;
+// 		pthread_mutex_lock(&mtx_node_channel);
+// 		client_recv_thread_deque->push_back(node_recv_thread);
+// 		pthread_mutex_unlock(&mtx_node_channel);
 
-// Add into the list of sending message
-		ret = client_send_thread->add_client(ip, sockfd);
+// // Add into the list of sending message
+// 		ret = client_send_thread->add_client(ip, sockfd);
+// 		if (CHECK_FAILURE(ret))
+// 			break;
+
+// Initialize a new thread for data transfer between follower
+		node_channel = new NodeChannel();
+		if (node_channel == NULL)
+		{
+			WRITE_ERROR("Fail to allocate memory: node_channel");
+			return RET_FAILURE_INSUFFICIENT_MEMORY;
+		}
+
+		ret = node_channel->initialize(this, sockfd, ip);
 		if (CHECK_FAILURE(ret))
-			break;
+			return ret;
+
+		pthread_mutex_lock(&mtx_node_channel);
+		node_channel_deque.push_back(node_channel);
+		node_channel_map[ip] = node_channel;
+		pthread_mutex_unlock(&mtx_node_channel);
 
 		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", thread_tag, ip);
 	}

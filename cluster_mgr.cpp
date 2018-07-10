@@ -248,7 +248,6 @@ unsigned short ClusterMgr::start_connection()
 				WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
 				return RET_FAILURE_INCORRECT_OPERATION;
 			}
-
 		}
 	}
 	else
@@ -377,6 +376,16 @@ unsigned short ClusterMgr::initialize()
 		if (CHECK_FAILURE(ret))
 			return ret;
 		// WRITE_FORMAT_DEBUG("The local IP of this Node: %s", local_ip);
+		if (cluster_ip != NULL)
+		{
+// Check if local_ip and cluster_ip are in the same network
+	      	IPv4Addr ipv4_addr(cluster_ip);
+	      	if (!ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+	      	{
+	      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%s]", local_ip, cluster_ip, cluster_network.c_str(), cluster_netmask_digits);
+	      		return RET_FAILURE_INCORRECT_CONFIG;
+	      	}
+		}
 	}
 
 // Define a leader/follower and establish the connection
@@ -403,6 +412,66 @@ unsigned short ClusterMgr::deinitialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
+	return RET_SUCCESS;
+}
+
+void ClusterMgr::notify_exit(unsigned short exit_reason)
+{
+	WRITE_FORMAT_DEBUG("Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
+
+	pthread_mutex_lock(&mtx_runtime_ret);
+	runtime_ret = exit_reason;
+	pthread_cond_signal(&cond_runtime_ret);
+	pthread_mutex_unlock(&mtx_runtime_ret);
+}
+
+unsigned short ClusterMgr::notify(NotifyType notify_type)
+{
+	switch (notify_type)
+	{
+	case NOTIFY_CHECK_KEEPALIVE:
+		check_keepalive();
+		break;
+	default:
+		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
+		return RET_FAILURE_IO_OPERATION;
+	}
+	return RET_SUCCESS;
+}
+
+void* ClusterMgr::thread_handler(void* pvoid)
+{
+	ClusterMgr* pthis = (ClusterMgr*)pvoid;
+	assert(pthis != NULL && "pvoid should NOT be NULL");
+	pthis->runtime_ret = pthis->thread_handler_internal();
+
+	pthread_exit((CHECK_SUCCESS(pthis->runtime_ret) ? NULL : (void*)GetErrorDescription(pthis->runtime_ret)));
+}
+
+unsigned short ClusterMgr::thread_handler_internal()
+{
+	unsigned short ret = RET_SUCCESS;
+
+	pthread_mutex_lock(&mtx_runtime_ret);
+	pthread_cond_wait(&cond_runtime_ret, &mtx_runtime_ret);
+	WRITE_DEBUG("Notify the parent it's time to leave......");
+	ret = deinitialize();
+	pthread_mutex_unlock(&mtx_runtime_ret);
+
+	return ret;
+}
+
+
+unsigned short ClusterMgr::set_cluster_ip(const char* ip)
+{
+	if (ip == NULL)
+	{
+		WRITE_DEBUG("ip should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	if (cluster_ip != NULL)
+		free(cluster_ip);
+	cluster_ip = strdup(ip);
 	return RET_SUCCESS;
 }
 
@@ -458,50 +527,3 @@ unsigned short ClusterMgr::wait_to_stop()
 
 	return ret;
 }
-
-void ClusterMgr::notify_exit(unsigned short exit_reason)
-{
-	WRITE_FORMAT_DEBUG("Notify the parent it's time to leave, exit reason: %s", GetErrorDescription(exit_reason));
-
-	pthread_mutex_lock(&mtx_runtime_ret);
-	runtime_ret = exit_reason;
-	pthread_cond_signal(&cond_runtime_ret);
-	pthread_mutex_unlock(&mtx_runtime_ret);
-}
-
-unsigned short ClusterMgr::notify(NotifyType notify_type)
-{
-	switch (notify_type)
-	{
-	case NOTIFY_CHECK_KEEPALIVE:
-		check_keepalive();
-		break;
-	default:
-		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
-		return RET_FAILURE_IO_OPERATION;
-	}
-	return RET_SUCCESS;
-}
-
-void* ClusterMgr::thread_handler(void* pvoid)
-{
-	ClusterMgr* pthis = (ClusterMgr*)pvoid;
-	assert(pthis != NULL && "pvoid should NOT be NULL");
-	pthis->runtime_ret = pthis->thread_handler_internal();
-
-	pthread_exit((CHECK_SUCCESS(pthis->runtime_ret) ? NULL : (void*)GetErrorDescription(pthis->runtime_ret)));
-}
-
-unsigned short ClusterMgr::thread_handler_internal()
-{
-	unsigned short ret = RET_SUCCESS;
-
-	pthread_mutex_lock(&mtx_runtime_ret);
-	pthread_cond_wait(&cond_runtime_ret, &mtx_runtime_ret);
-	WRITE_DEBUG("Notify the parent it's time to leave......");
-	ret = deinitialize();
-	pthread_mutex_unlock(&mtx_runtime_ret);
-
-	return ret;
-}
-

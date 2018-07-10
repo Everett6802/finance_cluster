@@ -1,6 +1,7 @@
 #ifndef NODE_BASE_H
 #define NODE_BASE_H
 
+#include <pthread.h>
 #include "common.h"
 
 

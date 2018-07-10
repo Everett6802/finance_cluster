@@ -61,6 +61,9 @@ public:
 	ClusterMgr();
 	~ClusterMgr();
 
+	unsigned short set_cluster_ip(const char* ip);
+
+
 	bool is_leader()const{return node_type == LEADER;}
 	unsigned short start();
 	unsigned short wait_to_stop();

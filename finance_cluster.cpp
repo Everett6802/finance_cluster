@@ -17,7 +17,7 @@ static void print_errmsg(const char* errmsg);
 static void print_errmsg_and_exit(const char* errmsg);
 static unsigned short parse_param(int argc, char** argv);
 static unsigned short check_param();
-static unsigned short setup_param();
+static unsigned short setup_param(ClusterMgr& cluster_mgr);
 
 DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();
 
@@ -102,19 +102,19 @@ unsigned short check_param()
 	return RET_SUCCESS;
 }
 
-unsigned short setup_param()
+unsigned short setup_param(ClusterMgr& cluster_mgr)
 {
+	unsigned short ret = RET_SUCCESS;
+	ret = cluster_mgr.set_cluster_ip(param_join);
+	if (CHECK_FAILURE(ret))
+		return ret;
+
 	return RET_SUCCESS;
 }
 
 
 int main(int argc, char** argv)
 {
-	// IPv4Addr ipv4_addr("172.17.83.40");
-	// printf("Res: %s\n", (ipv4_addr.is_same_network(24, "172.17.83.0") ? "True" : "False"));
-	// printf("Res: %s\n", (ipv4_addr.is_same_network(24, "172.17.84.0") ? "True" : "False"));
-	// printf("Res: %s\n", (ipv4_addr.is_same_network(23, "172.17.84.0") ? "True" : "False"));
-	// exit(EXIT_SUCCESS);
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));
@@ -125,26 +125,37 @@ int main(int argc, char** argv)
 	if (sigaction(SIGINT, &sa, NULL) == -1)
 		print_errmsg_and_exit("Fail to register the signal: SIGINT");
 
+	unsigned short ret = RET_SUCCESS;
+
 	parse_param(argc, argv);
 	check_param();
-	setup_param();
 
 	ClusterMgr cluster_mgr;
-	printf("Start the Node...\n");
 
-	unsigned short ret = cluster_mgr.start();
+	ret = setup_param(cluster_mgr);
 	if (CHECK_FAILURE(ret))
 	{
-		fprintf(stderr, "Fail to initialize...\n");
-		exit(EXIT_FAILURE);
+		snprintf(errmsg, ERRMSG_SIZE, "setup_param() fails, due to: %s", GetErrorDescription(ret));
+		print_errmsg_and_exit(errmsg);
+	}
+
+	printf("Start the Node...\n");
+
+	ret = cluster_mgr.start();
+	if (CHECK_FAILURE(ret))
+	{
+		// fprintf(stderr, "Fail to initialize...\n");
+		// exit(EXIT_FAILURE);
+		print_errmsg_and_exit("Fail to initialize...");
 	}
 
 	getchar();
 	ret = cluster_mgr.wait_to_stop();
 	if (CHECK_FAILURE(ret))
 	{
-		fprintf(stderr, "Fail to waiting for stop...\n");
-		exit(EXIT_FAILURE);
+		// fprintf(stderr, "Fail to waiting for stop...\n");
+		// exit(EXIT_FAILURE);
+		print_errmsg_and_exit("Fail to waiting for stop...");
 	}
 
 	getchar();
