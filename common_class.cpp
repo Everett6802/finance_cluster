@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdexcept>
+#include <algorithm>
 #include "common.h"
 
 
@@ -177,4 +178,130 @@ bool IPv4Addr::is_same_network(int netmask_digits, const char* ipv4_network_str)
 	if (CHECK_FAILURE(ret))
 		return ret;
 	return is_same_network(netmask_digits, ipv4_network_value);
+}
+
+//////////////////////////////////////////////////////////
+
+ClusterNode::ClusterNode(int id, string ip)
+{
+	node_id = id;
+	node_ip = ip;
+}
+
+bool ClusterNode::operator== (const ClusterNode &n)
+{
+	if (this == &n)
+		return true;
+	return node_id == n.node_id;
+}
+
+bool ClusterNode::operator== (const ClusterNode *p)
+{
+	assert(p != NULL && "p should NOT be NULL");
+	return this->operator== (*p);
+}
+
+// bool operator== (const ClusterNode &n1, const ClusterNode &n2)
+// {
+// 	return n1.node_id == n2.node_id;
+// }
+
+// bool operator== (const ClusterNode* p1, const ClusterNode* p2)
+// {
+// 	assert(p1 != NULL && p2 != NULL && "p1/p2 should NOT be NULL");
+// 	return operator== 	(*p1, *p2);
+// }
+
+void ClusterMap::reset_cluster_map_str()
+{
+	if (cluster_map_str != NULL)
+	{
+		free(cluster_map_str);
+		cluster_map_str = NULL;
+	}
+}
+
+
+ClusterMap::ClusterMap() :
+	cluster_map_str(NULL)
+{
+
+}
+	
+ClusterMap::~ClusterMap()
+{
+	reset_cluster_map_str();
+}
+
+unsigned short ClusterMap::add_node(int node_id, std::string node_ip)
+{
+	ClusterNode* cluster_node = new ClusterNode(node_id, node_ip);
+	if (cluster_node == NULL)
+		throw bad_alloc();
+	cluster_map.push_back(cluster_node);
+	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::add_node(const char* node_id_ip_str)
+{
+	assert(node_id_ip_str != NULL && "node_id_ip_str should NOT be NULL");
+	char* node_id_ip_str_tmp = strdup(node_id_ip_str);
+	char* str_ptr = node_id_ip_str_tmp;
+	char* node_id_str = strtok(str_ptr, ",");
+	char* node_ip_str = strtok(NULL, ",");
+	unsigned short ret = add_node(atoi(node_id_str), string(node_ip_str));
+	if (CHECK_FAILURE(ret))
+		return ret;
+	free(node_id_ip_str_tmp);
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::delete_node(int node_id)
+{
+	ClusterNode delete_node(node_id, string(""));
+	list<ClusterNode*>::iterator iter_find = find(cluster_map.begin(), cluster_map.end(), &delete_node/*ClusterNode(node_id, string(""))*/);
+	if (iter_find == cluster_map.end())
+		return RET_FAILURE_NOT_FOUND;
+	iter_find = cluster_map.erase(iter_find);
+	ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+	delete cluster_node;
+	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::cleanup_node()
+{
+	list<ClusterNode*>::iterator iter = cluster_map.begin();
+	while (iter != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter;
+		iter++;
+		delete cluster_node;
+	}
+	cluster_map.clear();
+	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+const char* ClusterMap::to_string()
+{
+	if (cluster_map_str == NULL)
+	{
+		string total_str;
+		static const int BUF_SIZE = 64;
+		char buf[BUF_SIZE];
+		list<ClusterNode*>::iterator iter = cluster_map.begin();
+		while (iter != cluster_map.end())
+		{
+			ClusterNode* cluster_node = (ClusterNode*)*iter;
+			snprintf(buf, BUF_SIZE, "%d:%s", cluster_node->node_id, cluster_node->node_ip.c_str());
+			if (!total_str.empty())
+				total_str += ",";
+			total_str += buf;
+			iter++;
+		}
+		cluster_map_str = strdup(total_str.c_str());	
+	}
+	return cluster_map_str;
 }

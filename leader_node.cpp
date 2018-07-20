@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 // #include <stdexcept>
 // #include <string>
 #include <deque>
@@ -183,7 +184,7 @@ unsigned short LeaderNode::deinitialize()
 	if (listen_thread_alive)
 	{
 		WRITE_DEBUG("Wait for the worker thread of sending message's death...");
-		pthread_join(send_tid, &status);
+		pthread_join(listen_tid, &status);
 		if (status == NULL)
 			WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
 		else
@@ -220,41 +221,13 @@ unsigned short LeaderNode::deinitialize()
 
 unsigned short LeaderNode::check_keepalive()
 {
-	// assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
-	// if (client_send_thread->follower_connected())
-	// {
-	// 	WRITE_DEBUG("Time to notify Followers that Leader is still alive......");
-	// 	client_send_thread->check_keepalive();
-	// }
-	unsigned short ret = RET_SUCCESS;
-	pthread_mutex_lock(&mtx_node_channel);
-	deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
-	while(iter != node_channel_deque.end())
-	{
-		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
-		assert(node_channel != NULL && "node_channel should NOT be NULL");
-		ret = node_channel->send_msg(CHECK_KEEPALIVE_TAG);
-		if (CHECK_FAILURE(ret))
-		{
-			WRITE_FORMAT_ERROR("Fail to send Keep-Alive packet to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
-			break;
-		}
-		iter++;
-	}
-	pthread_mutex_unlock(&mtx_node_channel);
-
-	return ret;
+	return send_data(CHECK_KEEPALIVE_TAG);
 }
 
 unsigned short LeaderNode::update(const std::string ip, const std::string message)
 {
 	WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
 	unsigned short ret = RET_SUCCESS;
-	pthread_mutex_lock(&mtx_node_channel);
-	PNODE_CHANNEL node_channel = node_channel_map[ip];
-	assert(node_channel != NULL && "node_channel should NOT be NULL");
-	mret = node_channel->send_msg(message.c_str());
-	pthread_mutex_unlock(&mtx_node_channel);
 
 	return ret;
 }
@@ -297,6 +270,41 @@ unsigned short LeaderNode::notify(NotifyType notify_type)
 	}
 
 	return RET_SUCCESS;
+}
+
+unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
+{
+	unsigned short ret = RET_SUCCESS;
+	assert(data != NULL && "data should NOT be NULL");
+	pthread_mutex_lock(&mtx_node_channel);
+	if (remote_ip != NULL)
+	{
+// Send to single node
+		PNODE_CHANNEL node_channel = node_channel_map[remote_ip];
+		assert(node_channel != NULL && "node_channel should NOT be NULL");
+		ret = node_channel->send_msg(data);
+		if (CHECK_FAILURE(ret))
+			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_ip, GetErrorDescription(ret));
+	}
+	else
+	{
+// Send to all nodes
+		deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
+		while(iter != node_channel_deque.end())
+		{
+			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+			assert(node_channel != NULL && "node_channel should NOT be NULL");
+			ret = node_channel->send_msg(data);
+			if (CHECK_FAILURE(ret))
+			{
+				WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
+				break;
+			}
+			iter++;
+		}
+	}
+	pthread_mutex_unlock(&mtx_node_channel);
+	return ret;
 }
 
 void* LeaderNode::thread_handler(void* pvoid)
@@ -357,7 +365,7 @@ unsigned short LeaderNode::thread_handler_internal()
 // 			break;
 
 // Initialize a new thread for data transfer between follower
-		node_channel = new NodeChannel();
+		PNODE_CHANNEL node_channel = new NodeChannel();
 		if (node_channel == NULL)
 		{
 			WRITE_ERROR("Fail to allocate memory: node_channel");

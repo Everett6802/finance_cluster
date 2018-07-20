@@ -26,8 +26,12 @@ private:
 	std::list<char*> send_buffer_list;
 	std::list<char*> send_access_list;
 
+	pthread_mutex_t mtx_buffer;
+	pthread_cond_t cond_buffer;
+
 	PMSG_NOTIFY_OBSERVER_INF msg_notify_observer;
 	unsigned short thread_ret;
+	bool send_data_trigger;
 
 	static void* send_thread_handler(void* pvoid);
 	unsigned short send_thread_handler_internal();
@@ -41,8 +45,8 @@ private:
 	unsigned short initialize(PMSG_NOTIFY_OBSERVER_INF observer, int socketfd, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
-	const std::string get_ip()const{return node_ip;}
-	const std::string get_remote_ip()const{return remote_ip;}
+	const char* get_ip()const{return node_ip.c_str();}
+	const char* get_remote_ip()const{return remote_ip.c_str();}
 
 	unsigned short send_msg(const char* msg_data);
 };

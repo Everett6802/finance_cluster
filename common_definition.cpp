@@ -86,11 +86,11 @@ const char *GetErrorDescription(unsigned short ret)
 }
 
 bool SHOW_CONSOLE = true;
-const string CHECK_KEEPALIVE_TAG = string("!1@2#3$4%5^6&7*8");
-const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
-const int CHECK_KEEPALIVE_TAG_LEN = CHECK_KEEPALIVE_TAG.length();
-const int CHECK_SERVER_CANDIDATE_TAG_LEN = CHECK_SERVER_CANDIDATE_TAG.length();
-const string END_OF_PACKET = string("\r\n\r\n");
+const char* CHECK_KEEPALIVE_TAG = "!1@2#3$4%5^6&7*8";
+// const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
+const int CHECK_KEEPALIVE_TAG_LEN = string(CHECK_KEEPALIVE_TAG).length();
+// const int CHECK_SERVER_CANDIDATE_TAG_LEN = CHECK_SERVER_CANDIDATE_TAG.length();
+const char* END_OF_PACKET = "\r\n\r\n";
 const int KEEPALIVE_DELAY_TIME = 3;
 const int KEEPALIVE_PERIOD = 3;
 const int MAX_CONNECTED_CLIENT = 5;

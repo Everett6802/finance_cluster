@@ -126,11 +126,11 @@ unsigned short ClusterMgr::find_local_ip()
 ClusterMgr::ClusterMgr() :
 	local_ip(NULL),
 	cluster_ip(NULL),
-	msg_trasnfer(NULL),
+	// msg_trasnfer(NULL),
+	node_type(NONE),
 	cluster_node(NULL),
 	pid(0),
-	runtime_ret(RET_SUCCESS),
-	node_type(NONE)
+	runtime_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -368,7 +368,7 @@ unsigned short ClusterMgr::initialize()
 	unsigned short ret = RET_SUCCESS;
 	ret = parse_config();
 	if (CHECK_FAILURE(ret))
-		ret;
+		return ret;
 // Find local IP
 	if (local_ip == NULL)
 	{

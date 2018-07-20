@@ -103,11 +103,11 @@ const char* GetErrorDescription(unsigned short ret);
 
 extern bool SHOW_CONSOLE;
 
-extern const std::string CHECK_KEEPALIVE_TAG;
-extern const std::string CHECK_SERVER_CANDIDATE_TAG;
+extern const char* CHECK_KEEPALIVE_TAG;
+// extern const std::string CHECK_SERVER_CANDIDATE_TAG;
 extern const int CHECK_KEEPALIVE_TAG_LEN;
-extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
-extern const std::string END_OF_PACKET;
+// extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
+extern const char* END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
 extern const int MAX_CONNECTED_CLIENT;
@@ -175,7 +175,6 @@ typedef MsgNotifyObserverInf* PMSG_NOTIFY_OBSERVER_INF;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class
 
-
 class IPv4Addr
 {
 public:
@@ -196,6 +195,51 @@ public:
 
 	bool is_same_network(int netmask_digits, unsigned char ipv4_network[])const;
 	bool is_same_network(int netmask_digits, const char* ipv4_network_str)const;
+};
+
+///////////////////////////////////////////////////
+
+class ClusterMap;
+
+class ClusterNode
+{
+	friend class ClusterMap;
+private:
+	int node_id;
+	std::string node_ip;
+
+	ClusterNode(int id, std::string ip);
+
+    // friend bool operator== (const ClusterNode &n1, const ClusterNode &n2);
+    // friend bool operator== (const ClusterNode* p1, const ClusterNode* p2);
+    bool operator== (const ClusterNode &n);
+    bool operator== (const ClusterNode* p);
+    // bool operator== (const ClusterNode* p1, const ClusterNode* p2);	
+};
+typedef ClusterNode* PCLUSTER_NODE;
+
+// bool operator== (const ClusterNode &n1, const ClusterNode &n2); 
+// bool operator== (const ClusterNode* p1, const ClusterNode* p2);
+
+///////////////////////////////////////////////////
+
+class ClusterMap
+{
+private:
+	std::list<ClusterNode*> cluster_map;
+	char* cluster_map_str;
+
+	void reset_cluster_map_str();
+
+public:
+	ClusterMap();
+	~ClusterMap();
+
+	unsigned short add_node(int node_id, std::string node_ip);
+	unsigned short add_node(const char* node_id_ip_str);
+	unsigned short delete_node(int node_id);
+	unsigned short cleanup_node();
+	const char* to_string();
 };
 
 #endif

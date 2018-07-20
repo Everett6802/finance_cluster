@@ -17,7 +17,8 @@ NodeChannel::NodeChannel() :
 	recv_tid(0),
 	node_socket(0),
 	msg_notify_observer(NULL),
-	thread_ret(RET_SUCCESS)
+	thread_ret(RET_SUCCESS),
+	send_data_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -38,6 +39,9 @@ unsigned short NodeChannel::initialize(PMSG_NOTIFY_OBSERVER_INF observer, int ac
 
 	node_socket = access_socket;
 	node_ip = string(ip);
+
+	mtx_buffer = PTHREAD_MUTEX_INITIALIZER;
+	cond_buffer = PTHREAD_COND_INITIALIZER;
 
 // Create a worker thread to access data...
     if (pthread_create(&send_tid, NULL, send_thread_handler, this) != 0)
@@ -202,7 +206,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 		if (!send_data_trigger)
 			pthread_cond_wait(&cond_buffer, &mtx_buffer);
 		list<char*>::iterator iter_buffer = send_buffer_list.begin();
-		while (iter_buffer != buffer_list.end())
+		while (iter_buffer != send_buffer_list.end())
 		{
 			char* msg_data = (char*)*send_buffer_list.erase(iter_buffer++);
 			send_access_list.push_back(msg_data);
@@ -226,7 +230,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 					char errmsg[ERRMSG_SIZE];
 					snprintf(errmsg, ERRMSG_SIZE, "Error occur while writing message to the Node[%s], due to: %s", remote_ip.c_str(), strerror(errno));
 					WRITE_ERROR(errmsg);
-					fprintf(stderr, errmsg);
+					// fprintf(stderr, errmsg);
 					ret = RET_FAILURE_SYSTEM_API;
 					goto OUT;
 				}

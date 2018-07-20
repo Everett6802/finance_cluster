@@ -19,8 +19,7 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
 	NodeBase(ip),
 	socketfd(0),
-	node_channel(NULL),
-	msg_recv_thread(NULL)
+	node_channel(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 
@@ -53,7 +52,7 @@ FollowerNode::~FollowerNode()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription());
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(string(errmsg));
 	}
 	// list<char*>::iterator iter = server_list.begin();

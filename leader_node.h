@@ -50,6 +50,8 @@ public:
 // From MsgNotifyObserverInf
 	virtual unsigned short update(const std::string ip, const std::string message);
 	virtual unsigned short notify(NotifyType notify_type);
+
+	unsigned short send_data(const char* data, const char* remote_ip=NULL);
 };
 typedef LeaderNode* PLEADER_NODE;
 

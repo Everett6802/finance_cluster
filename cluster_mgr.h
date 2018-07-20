@@ -29,7 +29,7 @@ private:
 	// std::list<char*> cluster_list;
 	NodeType node_type;
 	NodeBase* cluster_node;
-	PMSG_TRANSFER_INF msg_trasnfer;
+	// PMSG_TRANSFER_INF msg_trasnfer;
 	pthread_t pid;
 	unsigned short runtime_ret;
 	pthread_mutex_t mtx_runtime_ret;
