@@ -260,18 +260,60 @@ unsigned short ClusterMap::add_node(const char* node_id_ip_str)
 unsigned short ClusterMap::delete_node(int node_id)
 {
 	ClusterNode delete_node(node_id, string(""));
-	list<ClusterNode*>::iterator iter_find = find(cluster_map.begin(), cluster_map.end(), &delete_node/*ClusterNode(node_id, string(""))*/);
-	if (iter_find == cluster_map.end())
+// Does NOT work !!!
+	// list<ClusterNode*>::iterator iter_find = find(cluster_map.begin(), cluster_map.end(), &delete_nodeClusterNode(node_id, string("")));
+	// if (iter_find == cluster_map.end())
+	// 	return RET_FAILURE_NOT_FOUND;
+// Find the node to be deleted
+	bool found = false;
+	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_id == node_id)
+		{
+// Delete the node
+			delete cluster_node;
+			cluster_map.erase(iter_find);
+			found = true;
+			break;
+		}
+		iter_find++;
+	}
+	if (!found)
 		return RET_FAILURE_NOT_FOUND;
-	iter_find = cluster_map.erase(iter_find);
-	ClusterNode* cluster_node = (ClusterNode*)*iter_find;
-	delete cluster_node;
 	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::delete_node_by_ip(std::string node_ip)
+{
+	unsigned short ret = RET_SUCCESS;
+	int node_id;
+	ret = get_node_id(node_ip, node_id);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	return delete_node(node_id);
+}
+
+unsigned short ClusterMap::pop_node(ClusterNode** first_node)
+{
+// Caution: cluster_node should be released outside
+	assert(first_node != NULL && "first_node should NOT be NULL");
+	if (cluster_map.empty())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	list<ClusterNode*>::iterator iter_head = cluster_map.begin();
+	ClusterNode* cluster_node = (ClusterNode*)*iter_head;
+	cluster_map.erase(iter_head);
+	reset_cluster_map_str();
+	*first_node = cluster_node;
 	return RET_SUCCESS;
 }
 
 unsigned short ClusterMap::cleanup_node()
 {
+	if (cluster_map.empty())
+		return RET_SUCCESS;
 	list<ClusterNode*>::iterator iter = cluster_map.begin();
 	while (iter != cluster_map.end())
 	{
@@ -281,6 +323,51 @@ unsigned short ClusterMap::cleanup_node()
 	}
 	cluster_map.clear();
 	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+
+unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_only)
+{
+	unsigned short ret = RET_SUCCESS;
+	if (peek_only)
+	{
+		if (cluster_map.empty())
+			return RET_FAILURE_INCORRECT_OPERATION;
+		list<ClusterNode*>::iterator iter = cluster_map.begin();
+		ClusterNode* cluster_node = (ClusterNode*)*iter;
+		first_node_ip = cluster_node->node_ip;
+	}
+	else
+	{
+		ClusterNode* first_node = NULL;
+		ret = pop_node(&first_node);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		first_node_ip = first_node->node_ip;
+		delete first_node;
+
+	}
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::get_node_id(const std::string& node_ip, int& node_id)
+{
+	bool found = false;
+	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_ip == node_ip)
+		{
+			node_id = cluster_node->node_id;
+			found = true;
+			break;
+		}
+		iter_find++;
+	}
+	if (!found)
+		return RET_FAILURE_NOT_FOUND;
 	return RET_SUCCESS;
 }
 
@@ -305,3 +392,66 @@ const char* ClusterMap::to_string()
 	}
 	return cluster_map_str;
 }
+
+unsigned short ClusterMap::from_string(const char* cluster_map_str)
+{
+// cluster_map_str format:
+// 0:192.17.30.217;1:192.17.30.218;2:192.17.30.219
+	assert(cluster_map_str != NULL && "cluster_map_str should NOT be NULL");
+	unsigned short ret = cleanup_node();
+	if (CHECK_FAILURE(ret))
+		return ret;
+	char* cluster_map_str_tmp = strdup(cluster_map_str);
+	char* cluster_map_str_ptr = cluster_map_str_tmp;
+	char* cluster_map_str_rest;
+	char* cluster_node_id_ip;
+	while((cluster_node_id_ip=strtok_r(cluster_map_str_ptr, ";", &cluster_map_str_rest)) != NULL)
+	{
+		char* cluster_node_str_rest;
+		char* cluster_node_id = strtok_r(cluster_node_id_ip, ":", &cluster_node_str_rest);
+		char* cluster_node_ip = strtok_r(NULL, ":", &cluster_node_str_rest);
+		ret = add_node(atoi(cluster_node_id), string(cluster_node_ip));
+		if (CHECK_FAILURE(ret))
+			return ret;
+		cluster_map_str_ptr = NULL;
+	}
+
+	if (cluster_map_str_tmp != NULL)
+	{
+		free(cluster_map_str_tmp);
+		cluster_map_str_tmp = NULL;
+	}
+	return RET_SUCCESS;
+}
+
+KeepaliveTimerTask::KeepaliveTimerTask()
+{
+//	IMPLEMENT_MSG_DUMPER()
+}
+
+KeepaliveTimerTask::~KeepaliveTimerTask()
+{
+//	RELEASE_MSG_DUMPER()
+}
+
+unsigned short KeepaliveTimerTask::initialize(PIMSG_NOTIFY_OBSERVER observer)
+{
+	msg_notify_observer = observer;
+
+	return RET_SUCCESS;
+}
+
+unsigned short KeepaliveTimerTask::deinitialize()
+{
+	if (msg_notify_observer != NULL)
+		msg_notify_observer = NULL;
+
+	return RET_SUCCESS;
+}
+
+void KeepaliveTimerTask::trigger()
+{
+	if (msg_notify_observer != NULL)
+		msg_notify_observer->notify(NOTIFY_CHECK_KEEPALIVE);
+}
+

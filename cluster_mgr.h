@@ -7,9 +7,9 @@
 #include "common.h"
 
 
-class NodeBase;
+// class NodeBase;
 
-class ClusterMgr : public MsgNotifyObserverInf
+class ClusterMgr : public IMsgObserver
 {
 	enum NodeType{LEADER, FOLLOWER, NONE};
 	DECLARE_MSG_DUMPER()
@@ -28,7 +28,8 @@ private:
 	char* cluster_ip;
 	// std::list<char*> cluster_list;
 	NodeType node_type;
-	NodeBase* cluster_node;
+	// NodeBase* cluster_node;
+	PINODE cluster_node;
 	// PMSG_TRANSFER_INF msg_trasnfer;
 	pthread_t pid;
 	unsigned short runtime_ret;
@@ -54,22 +55,18 @@ private:
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
 
-protected:
-
-
 public:
 	ClusterMgr();
 	~ClusterMgr();
 
 	unsigned short set_cluster_ip(const char* ip);
 
-
 	bool is_leader()const{return node_type == LEADER;}
 	unsigned short start();
 	unsigned short wait_to_stop();
-// From MsgNotifyObserverInf
-	virtual unsigned short update(const std::string ip, const std::string message){return RET_FAILURE_INCORRECT_OPERATION;}
-	virtual unsigned short notify(NotifyType notify_type);
+// From IMsgObserver
+	virtual unsigned short recv(const std::string ip, const std::string message);
+	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
 };
 
 #endif

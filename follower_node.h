@@ -8,9 +8,9 @@
 #include "node_channel.h"
 
 
-class NodeRecvThread;
+// class NodeRecvThread;
 
-class FollowerNode : public NodeBase
+class FollowerNode : public INode
 {
 	DECLARE_MSG_DUMPER()
 
@@ -22,32 +22,40 @@ private:
 
 	// CHAR_LIST server_list;
 	int socketfd;
+	char* local_ip;
 	char* cluster_ip;
+// Start from 1, 1 for leader, otherwise for follower
+	int cluster_node_id;
+	ClusterMap cluster_map;
+	int keepalive_cnt;
 	PNODE_CHANNEL node_channel;
 
+	pthread_mutex_t mtx_node_channel;
 //	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
 	// NodeRecvThread* msg_recv_thread;
-	int keepalive_counter;
 	// int server_candidate_id;
 
 	unsigned short connect_leader();
 	unsigned short become_follower();
-	// unsigned short find_leader();
-	bool is_keepalive_packet(const std::string message)const;
+	unsigned short send_data(const char* data);
+	// unsigned short check_keepalive();
+	// // unsigned short find_leader();
+	// bool is_keepalive_packet(const std::string message)const;
+// events
+// recv
+	unsigned short recv_check_keepalive(const str::string& message_data);
+// send
+	unsigned short send_check_keepalive(void* param1, void* param2, void* param3);
 
 public:
 	FollowerNode(const char* server_ip, const char* ip);
 	virtual ~FollowerNode();
 
-// From NodeBase
+// Interface
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short check_keepalive();
-// From MsgNotifyObserverInf
-	virtual unsigned short update(const std::string ip, const std::string message);
-	virtual unsigned short notify(NotifyType notify_type);
-
-	// int get_server_candidate_id()const{return server_candidate_id;}
+	virtual unsigned short recv(MessageType message_type, const str::string& message_data);
+	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
 };
 typedef FollowerNode* PFOLLOWER_NODE;
 

@@ -18,8 +18,10 @@ const char* LeaderNode::thread_tag = "Listen Thread";
 // DECLARE_MSG_DUMPER_PARAM();
 
 LeaderNode::LeaderNode(const char* ip) :
-	NodeBase(ip),
+	// NodeBase(ip),
 	socketfd(0),
+	local_ip(NULL),
+	cluster_node_id(0),
 	cluster_node_cnt(0),
 	exit(0),
 	listen_tid(0),
@@ -28,15 +30,9 @@ LeaderNode::LeaderNode(const char* ip) :
 	thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
-
-	// if (ip == NULL)
-	// 	throw invalid_argument(string("ip == NULL"));
-	// // int ip_len = strlen(ip) + 1;
-	// // local_ip = new char[ip_len];
-	// // if (local_ip == NULL)
-	// // 	throw bad_alloc();
-	// // memcpy(local_ip, ip, sizeof(char) * ip_len);
-	// local_ip = strdup(ip);
+	if (ip == NULL)
+		throw invalid_argument(string("ip == NULL"));
+	local_ip = strdup(ip);
 }
 
 LeaderNode::~LeaderNode()
@@ -48,6 +44,13 @@ LeaderNode::~LeaderNode()
 		char errmsg[ERRMSG_SIZE];
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in LeaderNode::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(string(errmsg));
+	}
+
+	if (local_ip != NULL)
+	{
+		// delete[] local_ip;
+		free(local_ip);
+		local_ip = NULL;
 	}
 
 	RELEASE_MSG_DUMPER()
@@ -85,10 +88,71 @@ unsigned short LeaderNode::become_leader()
 	socketfd = sock_fd;
 	cluster_node_id = 1;
 	cluster_node_cnt = 1;
+// Update the cluster map
+	ret = cluster_map.cleanup_node();
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to cleanup node map, due to: %s", GetErrorDescription(ret));
+		return ret;
+	}
+	ret = cluster_map.add_node(cluster_node_id, local_ip);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to add leader into node map, due to: %s", GetErrorDescription(ret));
+		return ret;
+	}
 
 	WRITE_FORMAT_INFO("Node[%s] is a Leader", local_ip);
-	printf("Node[%s] is a leader !!!\n", local_ip);
+	// printf("Node[%s] is a leader !!!\n", local_ip);
 
+	return ret;
+}
+
+unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
+{
+	unsigned short ret = RET_SUCCESS;
+	assert(data != NULL && "data should NOT be NULL");
+	pthread_mutex_lock(&mtx_node_channel);
+	if (remote_ip != NULL)
+	{
+// Send to single node
+		PNODE_CHANNEL node_channel = node_channel_map[remote_ip];
+		assert(node_channel != NULL && "node_channel should NOT be NULL");
+		ret = node_channel->send_msg(data);
+		if (CHECK_FAILURE(ret))
+			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_ip, GetErrorDescription(ret));
+	}
+	else
+	{
+// Send to all nodes
+		// deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
+		// while(iter != node_channel_deque.end())
+		// {
+		// 	PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+		// 	assert(node_channel != NULL && "node_channel should NOT be NULL");
+		// 	ret = node_channel->send_msg(data);
+		// 	if (CHECK_FAILURE(ret))
+		// 	{
+		// 		WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
+		// 		break;
+		// 	}
+		// 	iter++;
+		// }
+		map<string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
+		while(iter != node_channel_map.end())
+		{
+			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
+			assert(node_channel != NULL && "node_channel should NOT be NULL");
+			ret = node_channel->send_msg(data);
+			if (CHECK_FAILURE(ret))
+			{
+				WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
+				break;
+			}
+			iter++;
+		}
+	}
+	pthread_mutex_unlock(&mtx_node_channel);
 	return ret;
 }
 
@@ -98,25 +162,8 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-// 	client_recv_thread_deque = new deque<NodeRecvThread*>();
-// 	if (client_recv_thread_deque == NULL)
-// 	{
-// 		WRITE_ERROR("Fail to allocate the memory: client_recv_thread_deque");
-// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
-// 	}
-// // Initialize a thread to send the message to the remote
-// 	client_send_thread = new LeaderSendThread();
-// 	if (client_send_thread == NULL)
-// 	{
-// 		WRITE_ERROR("Fail to allocate the memory: client_send_thread");
-// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
-// 	}
-
-// 	ret = client_send_thread->initialize(this);
-// 	if (CHECK_FAILURE(ret))
-// 		goto OUT;
-
 	mtx_node_channel = PTHREAD_MUTEX_INITIALIZER;
+	mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
 // Create a worker thread to access data...
 	if (pthread_create(&listen_tid, NULL, thread_handler, this))
 	{
@@ -125,19 +172,6 @@ unsigned short LeaderNode::initialize()
 	}
 
 	return RET_SUCCESS;
-// OUT:
-//     if (client_send_thread != NULL)
-//     {
-//     	delete client_send_thread;
-//     	client_send_thread = NULL;
-//     }
-// 	if (client_recv_thread_deque != NULL)
-// 	{
-// 		delete client_recv_thread_deque;
-// 		client_recv_thread_deque = NULL;
-// 	}
-
-    return ret;
 }
 
 unsigned short LeaderNode::deinitialize()
@@ -145,15 +179,7 @@ unsigned short LeaderNode::deinitialize()
 	unsigned short ret = RET_SUCCESS;
 	void* status;
 	int kill_ret;
-  //   if (client_send_thread != NULL)
-  //   {
-  //   	client_send_thread->deinitialize();
-		// if (CHECK_FAILURE(ret))
-		// 	return ret;
 
-  //   	delete client_send_thread;
-  //   	client_send_thread = NULL;
-  //   }
 // Check listen thread alive
 	bool listen_thread_alive = false;
 	if (listen_tid != 0)
@@ -194,11 +220,26 @@ unsigned short LeaderNode::deinitialize()
 		}
 	}
 // No need
-	// pthread_mutex_lock(&mtx_node_channel);
-	deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
-	while (iter != node_channel_deque.end())
+// 	// pthread_mutex_lock(&mtx_node_channel);
+// 	deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
+// 	while (iter != node_channel_deque.end())
+// 	{
+// 		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+// 		iter++;
+// 		if (node_channel != NULL)
+// 		{
+// 			node_channel->deinitialize();
+// 			delete node_channel;
+// 		}
+// 	}
+// 	node_channel_deque.clear();
+// 	node_channel_map.clear();
+// // No need
+// 	// pthread_mutex_unlock(&mtx_node_channel);
+	map<std::string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
+	while (iter != node_channel_map.end())
 	{
-		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
+		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
 		iter++;
 		if (node_channel != NULL)
 		{
@@ -206,10 +247,8 @@ unsigned short LeaderNode::deinitialize()
 			delete node_channel;
 		}
 	}
-	node_channel_deque.clear();
 	node_channel_map.clear();
-// No need
-	// pthread_mutex_unlock(&mtx_node_channel);
+	node_keepalive_map.clear();
 
 	if (socketfd != 0)
 	{
@@ -219,91 +258,100 @@ unsigned short LeaderNode::deinitialize()
 	return ret;
 }
 
-unsigned short LeaderNode::check_keepalive()
+unsigned short LeaderNode::recv(MessageType message_type, const str::string& message_data)
 {
-	return send_data(CHECK_KEEPALIVE_TAG);
+	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const str::string& message_data);
+	static RECV_FUNC_PTR recv_func_array[] =
+	{
+		&LeaderNode::recv_check_keepalive
+	};
+	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	{
+		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	return (this->*(recv_func_array[message_type]))(message_data);
 }
 
-unsigned short LeaderNode::update(const std::string ip, const std::string message)
+unsigned short LeaderNode::send(MessageType message_type, void* param1, void* param2, void* param3)
 {
-	WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	unsigned short ret = RET_SUCCESS;
+	typedef unsigned short (LeaderNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
+	static SEND_FUNC_PTR send_func_array[] =
+	{
+		&LeaderNode::send_check_keepalive
+	};
 
-	return ret;
+	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	{
+		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	return (this->*(send_func_array[message_type]))(param1, param2, param3);
 }
 
-unsigned short LeaderNode::notify(NotifyType notify_type)
+unsigned short LeaderNode::recv_check_keepalive(const str::string& message_data)
 {
-	switch (notify_type)
-	{
-	case NOTIFY_DEAD_CLIENT:
-	{
-		// assert(client_send_thread != NULL && "client_send_thread should NOT be NULL");
-		// assert(client_recv_thread_deque != NULL && "client_recv_thread_deque should NOT be NULL");
-
-		// const std::deque<int>& dead_client_index_deque = client_send_thread->get_dead_client_index_deque();
-		// pthread_mutex_lock(&mtx_node_channel);
-		// int client_recv_thread_deque_size = (int)client_recv_thread_deque->size();
-		// std::deque<int>::const_iterator iter = dead_client_index_deque.begin();
-		// while (iter != dead_client_index_deque.end())
-		// {
-		// 	int index = (int)*iter++;
-		// 	assert ((index >= 0 && index < client_recv_thread_deque_size) && "index is out of range");
-
-		// 	NodeRecvThread* thread = (NodeRecvThread*)*client_recv_thread_deque->erase(client_recv_thread_deque->begin() + index);
-		// 	assert (thread != NULL && "thread should NOT be NULL");
-		// 	WRITE_FORMAT_DEBUG("Remove the worker thread of receiving message from %s", thread->get_ip().c_str());
-		// 	unsigned short ret = thread->deinitialize();
-		// 	if (CHECK_FAILURE(ret))
-		// 		WRITE_FORMAT_WARN("Fail to de-initialied the worker thread of receiving message from %s", thread->get_ip().c_str());
-		// 	delete thread;
-		// }
-		// pthread_mutex_unlock(&mtx_node_channel);
-	}
-	break;
-	default:
-	{
-		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", notify_type);
-		return RET_FAILURE_INVALID_ARGUMENT;
-	}
-	break;
-	}
-
+// Message format:
+// EventType | Payload: Client IP| EOD
+	pthread_mutex_lock(&mtx_node_channel);
+	int cnt = node_keepalive_map[message_data];
+	if (cnt < MAX_KEEPALIVE_CNT)
+		node_keepalive_map[message_data]++;
+	pthread_mutex_unlock(&mtx_node_channel);
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
+unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
+// Message format:
+// EventType | EOD
 	unsigned short ret = RET_SUCCESS;
-	assert(data != NULL && "data should NOT be NULL");
+// Check if nodes in cluster are dead
 	pthread_mutex_lock(&mtx_node_channel);
-	if (remote_ip != NULL)
+	map<string, int>::iterator iter = node_keepalive_map.begin();
+	while (iter != node_keepalive_map.end())
 	{
-// Send to single node
-		PNODE_CHANNEL node_channel = node_channel_map[remote_ip];
-		assert(node_channel != NULL && "node_channel should NOT be NULL");
-		ret = node_channel->send_msg(data);
-		if (CHECK_FAILURE(ret))
-			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_ip, GetErrorDescription(ret));
-	}
-	else
-	{
-// Send to all nodes
-		deque<PNODE_CHANNEL>::iterator iter = node_channel_deque.begin();
-		while(iter != node_channel_deque.end())
+		string node_ip = (string)iter->first;
+		if ((int)iter->second == 0)
 		{
-			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
-			assert(node_channel != NULL && "node_channel should NOT be NULL");
-			ret = node_channel->send_msg(data);
+// Remove the node
+			PNODE_CHANNEL node_channel = node_channel_map[node_ip];
+			WRITE_FORMAT_WARN("The Follower[%s] is dead", node_channel->get_remote_ip());
+			node_channel->deinitialize();
+			node_channel_map.erase(node_ip);
+			node_keepalive_map.erase(iter++);
+
+			ret = cluster_map.delete_node_by_ip(node_ip);
 			if (CHECK_FAILURE(ret))
 			{
-				WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
-				break;
+				WRITE_FORMAT_ERROR("Fail to delete the node[%s] in the map", node_ip);
+				pthread_mutex_unlock(&mtx_node_channel);
+				return ret;
 			}
+		}
+		else
+		{
+			node_keepalive_map[node_ip]--;
 			iter++;
 		}
 	}
 	pthread_mutex_unlock(&mtx_node_channel);
+
+	char msg = (char)MSG_CHECK_KEEPALIVE;
+	return send_data(&msg);
+}
+
+unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, void* param3)
+{
+// Message format:
+// EventType | Payload | EOD
+	unsigned short ret = RET_SUCCESS;
+// mtx is called outside the fucntion
+	// pthread_mutex_lock(&mtx_node_channel);
+	ret = send_data(cluster_map.to_string());
+	// pthread_mutex_unlock(&mtx_node_channel);
+
 	return ret;
 }
 
@@ -345,41 +393,52 @@ unsigned short LeaderNode::thread_handler_internal()
 		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", thread_tag, ip);
 		printf("Follower[%s] connects to the Leader\n", ip);
 
-// // Initialize a new thread to receive the message
-// 		NodeRecvThread* node_recv_thread = new NodeRecvThread();
-// 		if (node_recv_thread == NULL)
-// 		{
-// 			WRITE_FORMAT_ERROR("[%s]Fail to allocate memory: node_recv_thread", thread_tag);
-// 			return RET_FAILURE_INCORRECT_OPERATION;
-// 		}
-// 		ret = node_recv_thread->initialize(this, sockfd, ip);
-// 		if (CHECK_FAILURE(ret))
-// 			break;
-// 		pthread_mutex_lock(&mtx_node_channel);
-// 		client_recv_thread_deque->push_back(node_recv_thread);
-// 		pthread_mutex_unlock(&mtx_node_channel);
-
-// // Add into the list of sending message
-// 		ret = client_send_thread->add_client(ip, sockfd);
-// 		if (CHECK_FAILURE(ret))
-// 			break;
-
 // Initialize a new thread for data transfer between follower
 		PNODE_CHANNEL node_channel = new NodeChannel();
 		if (node_channel == NULL)
 		{
 			WRITE_ERROR("Fail to allocate memory: node_channel");
+			pthread_mutex_unlock(&mtx_node_channel);
 			return RET_FAILURE_INSUFFICIENT_MEMORY;
 		}
 
 		ret = node_channel->initialize(this, sockfd, ip);
 		if (CHECK_FAILURE(ret))
+		{
+			pthread_mutex_unlock(&mtx_node_channel);
 			return ret;
-
+		}
+// Add a channel of the new follower
 		pthread_mutex_lock(&mtx_node_channel);
-		node_channel_deque.push_back(node_channel);
+		// node_channel_deque.push_back(node_channel);
 		node_channel_map[ip] = node_channel;
+		node_keepalive_map[ip] = MAX_KEEPALIVE_CNT;
+// Update the cluster map in Leader
+		ret = cluster_map.add_node(++cluster_node_cnt, ip);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fail to allocate memory: node_channel");
+			pthread_mutex_unlock(&mtx_node_channel);
+			return ret;
+		}
+// Update the cluster map to Followers
+		ret = send(MSG_UPDATE_CLUSTER_MAP);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fail to allocate memory: node_channel");
+			pthread_mutex_unlock(&mtx_node_channel);
+			return ret;
+		}
 		pthread_mutex_unlock(&mtx_node_channel);
+// // Update the cluster map in Leader
+// 		pthread_mutex_lock(&mtx_cluster_map);
+// 		ret = cluster_map.add_node(++cluster_node_cnt, ip);
+// 		pthread_mutex_unlock(&mtx_cluster_map);
+		// if (CHECK_FAILURE(ret))
+		// {
+		// 	WRITE_FORMAT_ERROR("Fails to add follower[%s] into node map, due to: %s", ip, GetErrorDescription(ret));
+		// 	return ret;
+		// }
 
 		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", thread_tag, ip);
 	}

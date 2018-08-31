@@ -3,7 +3,7 @@ MAKE := make
 
 CXXFLAGS := -g -Wall -std=c++0x
 
-SOURCES := msg_dumper_wrapper.cpp finance_cluster.cpp common_definition.cpp common_function.cpp common_class.cpp node_channel.cpp node_base.cpp leader_node.cpp follower_node.cpp cluster_mgr.cpp keepalive_timer_task.cpp
+SOURCES := msg_dumper_wrapper.cpp finance_cluster.cpp common_definition.cpp common_function.cpp common_class.cpp node_channel.cpp leader_node.cpp follower_node.cpp cluster_mgr.cpp
 OBJS := $(SOURCES:.cpp=.o)
 LIB_MSG_DUMPER := libmsg_dumper.so
 LIB_MSG_DUMPER_HEADER := msg_dumper.h

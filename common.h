@@ -103,13 +103,14 @@ const char* GetErrorDescription(unsigned short ret);
 
 extern bool SHOW_CONSOLE;
 
-extern const char* CHECK_KEEPALIVE_TAG;
+// extern const char* CHECK_KEEPALIVE_TAG;
 // extern const std::string CHECK_SERVER_CANDIDATE_TAG;
-extern const int CHECK_KEEPALIVE_TAG_LEN;
+// extern const int CHECK_KEEPALIVE_TAG_LEN;
 // extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
 extern const char* END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
+extern const int MAX_KEEPALIVE_CNT;
 extern const int MAX_CONNECTED_CLIENT;
 
 extern const char* CONF_FODLERNAME;
@@ -128,7 +129,12 @@ extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-enum NotifyType{NOTIFY_DEAD_CLIENT, NOTIFY_CHECK_KEEPALIVE};
+enum MessageType{MSG_CHECK_KEEPALIVE, MSG_UPDATE_CLUSTER_MAP, MSG_SIZE};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Macro
+#define GET_MSG_TYPE(x) int((*x) & 0xFF)
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,23 +159,32 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
 
-class MsgTransferInf
+class IMsgObserver
 {
 public:
-	virtual short send(unsigned char* buf)=0;
-	virtual short recv(unsigned char** buf)=0;
-//	virtual ~MsgTransferInf();
+	virtual unsigned short recv(MessageType message_type, const str::string& message_data)=0;
+	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)=0;
 };
-typedef MsgTransferInf* PMSG_TRANSFER_INF;
+typedef IMsgObserver* PIMSG_OBSERVER;
 
-class MsgNotifyObserverInf
+class INode : public IMsgObserver
 {
 public:
-	virtual unsigned short update(const std::string ip, const std::string message)=0;
-	virtual unsigned short notify(NotifyType notify_type)=0;
-//	virtual ~MsgNotifyObserverInf();
+	virtual ~INode();
+
+	virtual unsigned short initialize()=0;
+	virtual unsigned short deinitialize()=0;
 };
-typedef MsgNotifyObserverInf* PMSG_NOTIFY_OBSERVER_INF;
+typedef INode* PINODE;
+
+// class MsgTransferInf
+// {
+// public:
+// 	virtual short send(unsigned char* buf)=0;
+// 	virtual short recv(unsigned char** buf)=0;
+// //	virtual ~MsgTransferInf();
+// };
+// typedef MsgTransferInf* PMSG_TRANSFER_INF;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,12 +214,9 @@ public:
 
 ///////////////////////////////////////////////////
 
-class ClusterMap;
-
 class ClusterNode
 {
-	friend class ClusterMap;
-private:
+public:
 	int node_id;
 	std::string node_ip;
 
@@ -238,8 +250,30 @@ public:
 	unsigned short add_node(int node_id, std::string node_ip);
 	unsigned short add_node(const char* node_id_ip_str);
 	unsigned short delete_node(int node_id);
+	unsigned short delete_node_by_ip(std::string node_ip);
+	unsigned short pop_node(ClusterNode** first_node);
 	unsigned short cleanup_node();
+	unsigned short get_first_node_ip(std::string& first_node_ip, bool peek_only=false);
+	unsigned short get_node_id(const std::string& first_node_ip, int& node_id);
 	const char* to_string();
+	unsigned short from_string(const char* cluster_map_str);
+};
+
+///////////////////////////////////////////////////
+
+class KeepaliveTimerTask
+{
+//	DECLARE_MSG_DUMPER()
+private:
+	PIMSG_NOTIFY_OBSERVER msg_notify_observer;
+
+public:
+	KeepaliveTimerTask();
+	~KeepaliveTimerTask();
+
+	unsigned short initialize(PIMSG_NOTIFY_OBSERVER observer);
+	unsigned short deinitialize();
+	void trigger();
 };
 
 #endif

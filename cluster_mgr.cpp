@@ -13,7 +13,7 @@
 #include "cluster_mgr.h"
 #include "leader_node.h"
 #include "follower_node.h"
-#include "keepalive_timer_task.h"
+// #include "keepalive_timer_task.h"
 
 
 using namespace std;
@@ -25,7 +25,7 @@ static void timer_sigroutine(int signo)
 	{
 	case SIGALRM:
 //        printf("Catch a signal -- SIGALRM \n");
-		keepalive_timer_task.run();
+		keepalive_timer_task.trigger();
 		signal(SIGALRM, timer_sigroutine);
 		break;
 	}
@@ -337,7 +337,7 @@ void ClusterMgr::check_keepalive()
 	if (cluster_node != NULL)
 	{
 		WRITE_DEBUG("Check Keep-Alive...");
-		unsigned short ret = cluster_node->check_keepalive();
+		unsigned short ret = cluster_node->send(NOTIFY_CHECK_KEEPALIVE);
 		if (node_type == FOLLOWER)
 		{
 			if (CHECK_FAILURE(ret))
@@ -387,12 +387,10 @@ unsigned short ClusterMgr::initialize()
 	      	}
 		}
 	}
-
 // Define a leader/follower and establish the connection
 	ret = start_connection();
 	if (CHECK_FAILURE(ret))
 		return ret;
-
 // Start a keep-alive timer
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
@@ -423,20 +421,6 @@ void ClusterMgr::notify_exit(unsigned short exit_reason)
 	runtime_ret = exit_reason;
 	pthread_cond_signal(&cond_runtime_ret);
 	pthread_mutex_unlock(&mtx_runtime_ret);
-}
-
-unsigned short ClusterMgr::notify(NotifyType notify_type)
-{
-	switch (notify_type)
-	{
-	case NOTIFY_CHECK_KEEPALIVE:
-		check_keepalive();
-		break;
-	default:
-		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
-		return RET_FAILURE_IO_OPERATION;
-	}
-	return RET_SUCCESS;
 }
 
 void* ClusterMgr::thread_handler(void* pvoid)
@@ -526,4 +510,23 @@ unsigned short ClusterMgr::wait_to_stop()
 	}
 
 	return ret;
+}
+
+unsigned short ClusterMgr::recv(const std::string ip, const std::string message)
+{
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::send(NotifyType message_type, void* param1, void* param2, void* param3)
+{
+	switch (message_type)
+	{
+	case MSG_CHECK_KEEPALIVE:
+		check_keepalive();
+		break;
+	default:
+		WRITE_FORMAT_ERROR("Un-supported type: %d", message_type);
+		return RET_FAILURE_IO_OPERATION;
+	}
+	return RET_SUCCESS;
 }

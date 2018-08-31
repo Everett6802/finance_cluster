@@ -28,7 +28,7 @@ NodeChannel::~NodeChannel()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short NodeChannel::initialize(PMSG_NOTIFY_OBSERVER_INF observer, int access_socket, const char* ip)
+unsigned short NodeChannel::initialize(PIMSG_NOTIFY_OBSERVER observer, int access_socket, const char* ip)
 {
 	msg_notify_observer = observer;
 	if (msg_notify_observer == NULL || ip == NULL)
@@ -311,34 +311,52 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			}
 			else
 			{
-				string new_data = string(buf);
+				// string new_data = string(buf);
+// // Check if the data is completely sent from the remote site
+// 				size_t beg_pos = new_data.find(END_OF_MESSAGE);
+// 				if (beg_pos == string::npos)
+// 				{
+// 					WRITE_FORMAT_ERROR("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
+// 					data_buffer += new_data;
+// 					continue;
+// 				}
+// 				else
+// 				{
+// 					data_buffer += new_data.substr(0, beg_pos);
+// 				}
+
+// //				const char* new_message = data_buffer.c_str();
+// // Show the data read from the remote site
+// 				WRITE_FORMAT_DEBUG("[%s] Receive message: %s", thread_tag, data_buffer.c_str());
+// // The data is coming, notify the observer
+// 				ret = msg_notify_observer->update(node_ip, data_buffer);
+// 				if (CHECK_FAILURE(ret))
+// 				{
+// 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
+// 					break;
+// 				}
+// // Clean the message sent to the observer
+// 				data_buffer = "";
+// // Remove the data which is already shown
+// 				data_buffer = new_data.substr(beg_pos + END_OF_MESSAGE_LEN);
+
+				data_buffer += string(new_data);
 // Check if the data is completely sent from the remote site
-				size_t beg_pos = new_data.find(END_OF_MESSAGE);
+				size_t beg_pos = data_buffer.find(END_OF_MESSAGE);
 				if (beg_pos == string::npos)
 				{
-					WRITE_FORMAT_ERROR("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
-					data_buffer += new_data;
+					WRITE_FORMAT_WARN("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
 					continue;
 				}
-				else
-				{
-					data_buffer += new_data.substr(0, beg_pos);
-				}
-
-//				const char* new_message = data_buffer.c_str();
-// Show the data read from the remote site
-				WRITE_FORMAT_DEBUG("[%s] Receive message: %s", thread_tag, data_buffer.c_str());
 // The data is coming, notify the observer
-				ret = msg_notify_observer->update(node_ip, data_buffer);
+				ret = msg_notify_observer->update(data_buffer.substr(0, beg_pos).c_str());
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
 					break;
 				}
-// Clean the message sent to the observer
-				data_buffer = "";
 // Remove the data which is already shown
-				data_buffer = new_data.substr(beg_pos + END_OF_MESSAGE_LEN);
+				data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
 			}
 		}
 		else

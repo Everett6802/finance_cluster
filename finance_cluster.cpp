@@ -115,6 +115,18 @@ unsigned short setup_param(ClusterMgr& cluster_mgr)
 
 int main(int argc, char** argv)
 {
+	// ClusterMap cluster_map;
+	// cluster_map.from_string("0:192.17.30.217;1:192.17.30.218;2:192.17.30.219");
+	// printf("Map: %s\n", cluster_map.to_string());
+	// cluster_map.add_node(3, "192.17.30.220");
+	// printf("Map: %s\n", cluster_map.to_string());
+	// unsigned ret_test = cluster_map.delete_node(2);
+	// printf("Map: %s\n", cluster_map.to_string());
+	// printf("Res: %d\n", ret_test);
+	// // ClusterNode node1(1, "192.17.30.220");
+	// // ClusterNode node2(2, "192.17.30.220");
+	// // printf("%s\n", (node1 == node2 ? "True" : "False"));
+	// exit(EXIT_SUCCESS);
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));

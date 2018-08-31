@@ -29,7 +29,7 @@ private:
 	pthread_mutex_t mtx_buffer;
 	pthread_cond_t cond_buffer;
 
-	PMSG_NOTIFY_OBSERVER_INF msg_notify_observer;
+	PIMSG_NOTIFY_OBSERVER msg_notify_observer;
 	unsigned short thread_ret;
 	bool send_data_trigger;
 
@@ -42,7 +42,7 @@ private:
 	NodeChannel();
 	~NodeChannel();
 
-	unsigned short initialize(PMSG_NOTIFY_OBSERVER_INF observer, int socketfd, const char* ip);
+	unsigned short initialize(PIMSG_NOTIFY_OBSERVER observer, int socketfd, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
 	const char* get_ip()const{return node_ip.c_str();}

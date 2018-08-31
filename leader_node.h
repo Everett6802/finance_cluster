@@ -13,28 +13,39 @@
 // class NodeRecvThread;
 // class LeaderSendThread;
 
-class LeaderNode : public NodeBase
+class LeaderNode : public INode
 {
 	DECLARE_MSG_DUMPER()
 
 	static const char* thread_tag;
 private:
 	int socketfd;
+	char* local_ip;
+// Start from 1, 1 for leader, otherwise for follower
+	int cluster_node_id;
 	int cluster_node_cnt;
+	ClusterMap cluster_map;
 
 	volatile int exit;
 	pthread_t listen_tid;
-	//	class NodeRecvThread; // Caution: Fail to compile
-	//	class LeaderSendThread; // Caution: Fail to compile
-	// std::deque<NodeRecvThread*>* client_recv_thread_deque;
-	// LeaderSendThread* client_send_thread;
-	std::deque<PNODE_CHANNEL> node_channel_deque;
+
+	// std::deque<PNODE_CHANNEL> node_channel_deque;
 	std::map<std::string, PNODE_CHANNEL> node_channel_map;
+	std::map<std::string, int> node_keepalive_map;
 
 	volatile unsigned short thread_ret;
 	pthread_mutex_t mtx_node_channel;
+	pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
+	unsigned short send_data(const char* data, const char* remote_ip=NULL);
+// events
+// recv
+	unsigned short recv_check_keepalive(const str::string& message_data);
+	unsigned short recv_update_cluster_map(const str::string& message_data);
+// send
+	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
@@ -43,15 +54,11 @@ public:
 	LeaderNode(const char* ip);
 	virtual ~LeaderNode();
 
-// From NodeBase
+// Interface
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short check_keepalive();
-// From MsgNotifyObserverInf
-	virtual unsigned short update(const std::string ip, const std::string message);
-	virtual unsigned short notify(NotifyType notify_type);
-
-	unsigned short send_data(const char* data, const char* remote_ip=NULL);
+	virtual unsigned short recv(MessageType message_type, const str::string& message_data);
+	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
 };
 typedef LeaderNode* PLEADER_NODE;
 

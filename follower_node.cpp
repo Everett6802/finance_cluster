@@ -17,7 +17,7 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 // DECLARE_MSG_DUMPER_PARAM();
 
 FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
-	NodeBase(ip),
+	// NodeBase(ip),
 	socketfd(0),
 	node_channel(NULL)
 {
@@ -25,24 +25,10 @@ FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
 
 	if (server_ip == NULL || ip == NULL)
 		throw invalid_argument(string("server_ip/ip == NULL"));
+	if (ip == NULL)
+		throw invalid_argument(string("ip == NULL"));
+	local_ip = strdup(ip);
 	cluster_ip = strdup(server_ip);
-	// CHAR_LIST::iterator iter = alist->begin();
-	// while (iter != alist->end())
-	// {
-	// 	int len = strlen(*iter) + 1;
-	// 	char* new_ip = new char[len];
-	// 	if (new_ip == NULL)
-	// 		throw bad_alloc();
-	// 	memcpy(new_ip, *iter, sizeof(char) * len);
-	// 	server_list.push_back(new_ip);
-	// 	iter++;
-	// }
-
-	// int ip_len = strlen(ip) + 1;
-	// local_ip = new char[ip_len];
-	// if (local_ip == NULL)
-	// 	throw bad_alloc();
-	// memcpy(local_ip, ip, sizeof(char) * ip_len);
 }
 
 FollowerNode::~FollowerNode()
@@ -55,95 +41,8 @@ FollowerNode::~FollowerNode()
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(string(errmsg));
 	}
-	// list<char*>::iterator iter = server_list.begin();
-	// while (iter != server_list.end())
-	// 	delete [] (char*)*iter++;
-	// server_list.clear();
 
 	RELEASE_MSG_DUMPER()
-}
-
-unsigned short FollowerNode::initialize()
-{
-// Try to find the leader node
-	unsigned short ret = RET_SUCCESS;
-	for (int i = 0 ; i < TRY_TIMES ; i++)
-	{
-		ret = become_follower();
-// The node become a follower successfully
-		if (CHECK_SUCCESS(ret))
-			break;
-		else
-		{
-// Check if time-out occurs while trying to connect to the remote node
-			if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-				break;
-		}
-	}
-
-	if (CHECK_FAILURE(ret))
-	{
-		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to server", local_ip);
-		else
-			WRITE_FORMAT_WARN("Node[%s] try to search for the leader, buf time-out...", local_ip);
-		return ret;
-	}
-
-// Start a timer to check keep-alive
-	keepalive_counter = CHECK_KEEPALIVE_TIMES;
-
-// Create a thread of accessing the data
-	node_channel = new NodeChannel();
-	if (node_channel == NULL)
-	{
-		WRITE_ERROR("Fail to allocate memory: node_channel");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
-
-	return node_channel->initialize(this, socketfd, local_ip);
-}
-
-unsigned short FollowerNode::deinitialize()
-{
-	unsigned short ret = RET_SUCCESS;
-	if (node_channel != NULL)
-	{
-		ret = node_channel->deinitialize();
-		if (CHECK_FAILURE(ret))
-		{
-			WRITE_FORMAT_ERROR("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
-			return ret;
-		}
-		delete node_channel;
-		node_channel = NULL;
-	}
-
-	if (socketfd != 0)
-	{
-		close(socketfd);
-		socketfd = 0;
-	}
-	if (cluster_ip != NULL)
-	{
-		free(cluster_ip);
-		cluster_ip = NULL;
-	}
-
-	return RET_SUCCESS;
-}
-
-unsigned short FollowerNode::check_keepalive()
-{
-	if (keepalive_counter == 0)
-	{
-		WRITE_FORMAT_WARN("Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
-		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
-	}
-	__sync_fetch_and_sub(&keepalive_counter, 1);
-	WRITE_FORMAT_DEBUG("Check keep-alive....... %d", keepalive_counter);
-
-	return RET_SUCCESS;
 }
 
 unsigned short FollowerNode::connect_leader()
@@ -264,13 +163,20 @@ unsigned short FollowerNode::become_follower()
 	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_ip);
 	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, cluster_ip);
 
-// // Create a thread to receive the remote data
-// 	msg_recv_thread = new NodeRecvThread();
-// 	if (msg_recv_thread == NULL)
-// 	{
-// 		WRITE_ERROR("Fail to allocate memory: msg_recv_thread");
-// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
-// 	}
+	return ret;
+}
+
+unsigned short LeaderNode::send_data(const char* data)
+{
+	unsigned short ret = RET_SUCCESS;
+	assert(data != NULL && "data should NOT be NULL");
+	pthread_mutex_lock(&mtx_node_channel);
+// Send to leader
+	assert(node_channel != NULL && "node_channel should NOT be NULL");
+	ret = node_channel->send_msg(data);
+	if (CHECK_FAILURE(ret))
+		WRITE_FORMAT_ERROR("Fail to send data to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
+	pthread_mutex_unlock(&mtx_node_channel);
 	return ret;
 }
 
@@ -306,47 +212,152 @@ unsigned short FollowerNode::become_follower()
 // 	return ret;
 // }
 
-bool FollowerNode::is_keepalive_packet(const std::string message)const
+unsigned short FollowerNode::initialize()
 {
-	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
+// Try to find the leader node
+	unsigned short ret = RET_SUCCESS;
+	for (int i = 0 ; i < TRY_TIMES ; i++)
+	{
+		ret = become_follower();
+// The node become a follower successfully
+		if (CHECK_SUCCESS(ret))
+			break;
+		else
+		{
+// Check if time-out occurs while trying to connect to the remote node
+			if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+				break;
+		}
+	}
+
+	if (CHECK_FAILURE(ret))
+	{
+		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to server", local_ip);
+		else
+			WRITE_FORMAT_WARN("Node[%s] try to search for the leader, buf time-out...", local_ip);
+		return ret;
+	}
+
+// Start a timer to check keep-alive
+	keepalive_cnt = MAX_KEEPALIVE_CNT;
+
+// Create a thread of accessing the data
+	node_channel = new NodeChannel();
+	if (node_channel == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: node_channel");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	return node_channel->initialize(this, socketfd, local_ip);
 }
 
-unsigned short FollowerNode::update(const std::string ip, const std::string message)
+unsigned short FollowerNode::deinitialize()
 {
-	WRITE_FORMAT_DEBUG("Follower[%s] got the message from the Leader, data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	// if (server_candidate_id == 0)
-	// {
-	// 	if (message.compare(0, CHECK_SERVER_CANDIDATE_TAG_LEN, CHECK_SERVER_CANDIDATE_TAG) == 0)
-	// 	{
-	// 		size_t pos = message.find(":");
-	// 		if (pos == string::npos)
-	// 		{
-	// 			WRITE_FORMAT_ERROR("Incorrect config format, the message of getting server candidate ID: %s", message.c_str());
-	// 			return RET_FAILURE_INCORRECT_CONFIG;
-	// 		}
-
-	// 		server_candidate_id = atoi(message.substr(pos + 1).c_str());
-	// 		WRITE_FORMAT_INFO("Follower[%s] got server candidate id: %d", ip.c_str(), server_candidate_id);
-	// 		return RET_SUCCESS;
-	// 	}
-	// }
-
-	if (is_keepalive_packet(message))
+	unsigned short ret = RET_SUCCESS;
+	if (node_channel != NULL)
 	{
-		WRITE_FORMAT_DEBUG("Follower[%s] receive a Check-Alive packet......", ip.c_str());
-// Reset the keep-alive timer
-		__sync_lock_test_and_set(&keepalive_counter, CHECK_KEEPALIVE_TIMES);
+		ret = node_channel->deinitialize();
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
+			return ret;
+		}
+		delete node_channel;
+		node_channel = NULL;
 	}
-	else
+
+	if (socketfd != 0)
 	{
-// TODO: Access the message
+		close(socketfd);
+		socketfd = 0;
+	}
+	if (cluster_ip != NULL)
+	{
+		free(cluster_ip);
+		cluster_ip = NULL;
+	}
+	if (local_ip != NULL)
+	{
+		// delete[] local_ip;
+		free(local_ip);
+		local_ip = NULL;
 	}
 
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::notify(NotifyType notify_type)
+unsigned short FollowerNode::recv(MessageType message_type, const str::string& message_data)
 {
+	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const str::string& message_data);
+	static RECV_FUNC_PTR recv_func_array[] =
+	{
+		&FollowerNode::recv_check_keepalive
+	};
+	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	{
+		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	return (this->*(recv_func_array[message_type]))(message_data);
+}
+
+unsigned short FollowerNode::send(MessageType message_type, void* param1, void* param2, void* param3)
+{
+	typedef unsigned short (FollowerNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
+	static SEND_FUNC_PTR send_func_array[] =
+	{
+		&FollowerNode::send_check_keepalive
+	};
+
+	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	{
+		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	return (this->*(send_func_array[message_type]))(param1, param2, param3);
+}
+
+unsigned short FollowerNode::recv_check_keepalive(const str::string& message_data)
+{
+// Message format:
+// EventType | Payload: Client IP| EOD
+	pthread_mutex_lock(&mtx_node_channel);
+	if (cnt < MAX_KEEPALIVE_CNT)
+		keepalive_cnt++;
+	pthread_mutex_unlock(&mtx_node_channel);
 	return RET_SUCCESS;
 }
 
+unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
+{
+	if (keepalive_cnt == 0)
+	{
+		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%S]", local_ip, cluster_ip);
+		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
+	}
+
+	char msg = (char)MSG_CHECK_KEEPALIVE;
+	return send_data(&msg);
+}
+
+// unsigned short FollowerNode::check_keepalive()
+// {
+// 	if (keepalive_cnt == 0)
+// 	{
+// 		WRITE_FORMAT_WARN("Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
+// 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
+// 	}
+// 	__sync_fetch_and_sub(&keepalive_cnt, 1);
+// 	WRITE_FORMAT_DEBUG("Check keep-alive....... %d", keepalive_cnt);
+
+// 	return RET_SUCCESS;
+// }
+
+
+// bool FollowerNode::is_keepalive_packet(const std::string message)const
+// {
+// 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
+// }
