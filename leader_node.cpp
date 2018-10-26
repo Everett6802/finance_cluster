@@ -15,18 +15,16 @@
 using namespace std;
 
 const char* LeaderNode::thread_tag = "Listen Thread";
+const int LeaderNode::WAIT_CONNECTION_TIMEOUT = 3; // 5 seconds
 // DECLARE_MSG_DUMPER_PARAM();
 
 LeaderNode::LeaderNode(const char* ip) :
-	// NodeBase(ip),
 	socketfd(0),
 	local_ip(NULL),
 	cluster_node_id(0),
 	cluster_node_cnt(0),
 	exit(0),
 	listen_tid(0),
-	// client_recv_thread_deque(NULL),
-	// client_send_thread(NULL),
 	thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -163,7 +161,7 @@ unsigned short LeaderNode::initialize()
 		return ret;
 
 	mtx_node_channel = PTHREAD_MUTEX_INITIALIZER;
-	mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
+	// mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
 // Create a worker thread to access data...
 	if (pthread_create(&listen_tid, NULL, thread_handler, this))
 	{
@@ -258,15 +256,16 @@ unsigned short LeaderNode::deinitialize()
 	return ret;
 }
 
-unsigned short LeaderNode::recv(MessageType message_type, const str::string& message_data)
+unsigned short LeaderNode::recv(MessageType message_type, const std::string& message_data)
 {
 	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const str::string& message_data);
+	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const std::string& message_data);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
-		&LeaderNode::recv_check_keepalive
+		&LeaderNode::recv_check_keepalive,
+		&LeaderNode::recv_update_cluster_map
 	};
-	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	if (message_type < 0 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -279,10 +278,11 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 	typedef unsigned short (LeaderNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
 	static SEND_FUNC_PTR send_func_array[] =
 	{
-		&LeaderNode::send_check_keepalive
+		&LeaderNode::send_check_keepalive,
+		&LeaderNode::send_update_cluster_map
 	};
 
-	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	if (message_type < 0 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -290,7 +290,7 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 	return (this->*(send_func_array[message_type]))(param1, param2, param3);
 }
 
-unsigned short LeaderNode::recv_check_keepalive(const str::string& message_data)
+unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
@@ -302,11 +302,14 @@ unsigned short LeaderNode::recv_check_keepalive(const str::string& message_data)
 	return RET_SUCCESS;
 }
 
+unsigned short LeaderNode::recv_update_cluster_map(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
 // Message format:
 // EventType | EOD
 	unsigned short ret = RET_SUCCESS;
+	bool follower_dead_found = false;
 // Check if nodes in cluster are dead
 	pthread_mutex_lock(&mtx_node_channel);
 	map<string, int>::iterator iter = node_keepalive_map.begin();
@@ -325,10 +328,11 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 			ret = cluster_map.delete_node_by_ip(node_ip);
 			if (CHECK_FAILURE(ret))
 			{
-				WRITE_FORMAT_ERROR("Fail to delete the node[%s] in the map", node_ip);
+				WRITE_FORMAT_ERROR("Fail to delete the node[%s] in the map", node_ip.c_str());
 				pthread_mutex_unlock(&mtx_node_channel);
 				return ret;
 			}
+			follower_dead_found = true;
 		}
 		else
 		{
@@ -336,7 +340,22 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 			iter++;
 		}
 	}
+	char* cluster_map_msg = NULL;
+	if (follower_dead_found)
+		cluster_map_msg = strdup(cluster_map.to_string());
 	pthread_mutex_unlock(&mtx_node_channel);
+
+// Update the cluster map to Followers
+	if (follower_dead_found)
+	{
+		ret = send_data(cluster_map_msg);
+		free(cluster_map_msg);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fail to send the message of updating the cluster map, due to: %s", GetErrorDescription(ret));
+			return ret;
+		}
+	}
 
 	char msg = (char)MSG_CHECK_KEEPALIVE;
 	return send_data(&msg);
@@ -345,14 +364,12 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, void* param3)
 {
 // Message format:
-// EventType | Payload | EOD
-	unsigned short ret = RET_SUCCESS;
-// mtx is called outside the fucntion
-	// pthread_mutex_lock(&mtx_node_channel);
-	ret = send_data(cluster_map.to_string());
-	// pthread_mutex_unlock(&mtx_node_channel);
-
-	return ret;
+// EventType | cluster map string | EOD
+	pthread_mutex_lock(&mtx_node_channel);
+	string cluster_map_msg(cluster_map.to_string());
+	pthread_mutex_unlock(&mtx_node_channel);
+// Update the cluster map to Followers
+	return send_data(cluster_map_msg.c_str());
 }
 
 void* LeaderNode::thread_handler(void* pvoid)
@@ -366,6 +383,55 @@ void* LeaderNode::thread_handler(void* pvoid)
 	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
 }
 
+unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+      	case PARAM_NODE_ID:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		if (cluster_node_id == 0)
+    		{
+     			WRITE_ERROR("The cluster_node_id should NOT be 0");
+    			return RET_FAILURE_RUNTIME;   			
+    		}
+    		*(int*)param1 = cluster_node_id;
+    	}
+    	break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
 unsigned short LeaderNode::thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", thread_tag);
@@ -375,6 +441,28 @@ unsigned short LeaderNode::thread_handler_internal()
 	int client_len;
 	while (!exit)
 	{
+		struct timeval tv;
+		fd_set sock_set;
+		tv.tv_sec = WAIT_CONNECTION_TIMEOUT;
+		tv.tv_usec = 0;
+		FD_ZERO(&sock_set);
+		FD_SET(socketfd, &sock_set);
+		int res = select(socketfd + 1, NULL, &sock_set, NULL, &tv);
+		if (res < 0 && errno != EINTR)
+		{
+			WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+		else if (res > 0)
+		{
+		}
+		else
+		{
+			WRITE_DEBUG("Accept timeout");
+			continue;
+		}
+				
+// Follower connect to Leader
 		int sockfd = accept(socketfd, &client_address, (socklen_t*)&client_len);
 		if (client_address.sa_family != AF_INET) // AF_INET6
 		{
@@ -417,29 +505,19 @@ unsigned short LeaderNode::thread_handler_internal()
 		ret = cluster_map.add_node(++cluster_node_cnt, ip);
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Fail to allocate memory: node_channel");
+			WRITE_ERROR("Fail to allocate memory: node_channel");
 			pthread_mutex_unlock(&mtx_node_channel);
 			return ret;
 		}
+		string cluster_map_msg(cluster_map.to_string());
+		pthread_mutex_unlock(&mtx_node_channel);
 // Update the cluster map to Followers
-		ret = send(MSG_UPDATE_CLUSTER_MAP);
+		ret = send_data(cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Fail to allocate memory: node_channel");
-			pthread_mutex_unlock(&mtx_node_channel);
+			WRITE_FORMAT_ERROR("Fail to send the message of updating the cluster map, due to: %s", GetErrorDescription(ret));
 			return ret;
 		}
-		pthread_mutex_unlock(&mtx_node_channel);
-// // Update the cluster map in Leader
-// 		pthread_mutex_lock(&mtx_cluster_map);
-// 		ret = cluster_map.add_node(++cluster_node_cnt, ip);
-// 		pthread_mutex_unlock(&mtx_cluster_map);
-		// if (CHECK_FAILURE(ret))
-		// {
-		// 	WRITE_FORMAT_ERROR("Fails to add follower[%s] into node map, due to: %s", ip, GetErrorDescription(ret));
-		// 	return ret;
-		// }
-
 		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", thread_tag, ip);
 	}
 

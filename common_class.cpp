@@ -20,6 +20,14 @@ do{\
 #define PRINT_IPV4(X, Y)
 #endif
 
+#ifdef DEBUG
+#define PRINT_ERROR(format, ...)\
+do{\
+	fprintf(stderr, format, __VA_ARGS__);
+}while(0);
+#else
+#define PRINT_ERROR(format, ...)
+#endif
 
 unsigned short IPv4Addr::ipv4_value2str(const unsigned char ipv4_value[], char** ipv4_str)
 {
@@ -182,6 +190,134 @@ bool IPv4Addr::is_same_network(int netmask_digits, const char* ipv4_network_str)
 
 //////////////////////////////////////////////////////////
 
+NodeMessageAssembler::NodeMessageAssembler() :
+	full_message_buf(NULL)
+{
+}
+
+NodeMessageAssembler::~NodeMessageAssembler()
+{
+	if (full_message_buf != NULL)
+	{
+		delete[] full_message_buf;
+		full_message_buf = NULL;
+	}
+}
+
+unsigned short NodeMessageAssembler::assemble(MessageType message_type, const char* message)
+{
+	if (full_message_buf != NULL)
+		return RET_FAILURE_INCORRECT_OPERATION;
+
+	int buf_size = MESSAGE_TYPE_LEN + (message != NULL ? strlen(message) : 0) + END_OF_MESSAGE_LEN + 1;
+	full_message_buf = new char[buf_size];
+	if (full_message_buf == NULL)
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+
+	if (message != NULL)
+	{
+		snprintf(full_message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
+	}
+	else
+	{
+		snprintf(full_message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
+	}
+	return RET_SUCCESS;
+}
+
+const char* NodeMessageAssembler::get_full_message()const
+{
+	if (full_message_buf == NULL)
+		throw runtime_error("node_message_type should be NodeMessage_Assemble");
+	return full_message_buf;
+}
+
+NodeMessageParser::NodeMessageParser() :
+	full_message_found(false)
+{
+}
+
+NodeMessageParser::~NodeMessageParser(){}
+
+unsigned short NodeMessageParser::parse(const char* new_message)
+{
+	if (full_message_found)
+	{
+		PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+    if (new_message == NULL)
+    {
+    	PRINT_ERROR("%s", "invalid Argument: new_message should NOT be NULL\n");
+    	return RET_FAILURE_INVALID_ARGUMENT;
+    }
+
+	data_buffer += string(new_message);
+// Check if the data is completely sent from the remote site
+	data_beg_pos = data_buffer.find(END_OF_MESSAGE);
+	if (data_beg_pos == string::npos)
+		return RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
+// Parse the content of the full message
+	message_type = (MessageType)data_buffer.front();
+	if (message_type < 0 || message_type >= MSG_SIZE)
+	{
+		// static int char ERRMSG_SIZE = 256;
+		// char errmsg[ERRMSG_SIZE];
+		// snprintf(errmsg, ERRMSG_SIZE, "The message type[%d] is NOT in range [0, %d)", message_type, MSG_SIZE);
+		// throw out_of_range(errmsg);
+		PRINT_ERROR("The message type[%d] is NOT in range [0, %d)\n", message_type, MSG_SIZE);
+		return RET_FAILURE_RUNTIME;	
+	}
+	full_message_found = true;
+	return RET_SUCCESS;
+}
+
+unsigned short NodeMessageParser::remove_old()
+{
+	if (!full_message_found)
+	{
+		PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	data_buffer = data_buffer.substr(data_beg_pos + END_OF_MESSAGE_LEN);
+	full_message_found = false;
+	return RET_SUCCESS;
+}
+
+bool NodeMessageParser::is_cur_message_empty()const
+{
+	return data_buffer.empty();
+}
+
+const char* NodeMessageParser::cur_get_message()const
+{
+	return data_buffer.c_str();
+}
+
+const char* NodeMessageParser::get_message()const
+{
+	assert(full_message_found && "Incorrect Operation: full_message_found should NOT be True");
+	// if (!full_message_found)
+	// {
+	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+	// 	return RET_FAILURE_INCORRECT_OPERATION;
+	// }
+	return data_buffer.substr(1, data_beg_pos).c_str();
+}
+
+MessageType NodeMessageParser::get_message_type()const
+{
+	assert(full_message_found && "Incorrect Operation: full_message_found should NOT be True");
+	// if (!full_message_found)
+	// {
+	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+	// 	return RET_FAILURE_INCORRECT_OPERATION;
+	// }
+	return message_type;	
+}
+
+//////////////////////////////////////////////////////////
+
 ClusterNode::ClusterNode(int id, string ip)
 {
 	node_id = id;
@@ -231,6 +367,29 @@ ClusterMap::ClusterMap() :
 ClusterMap::~ClusterMap()
 {
 	reset_cluster_map_str();
+}
+
+bool ClusterMap::is_empty()const
+{
+	return cluster_map.empty();
+}
+
+unsigned short ClusterMap::copy(const ClusterMap& another_cluster_map)
+{
+	unsigned short ret = RET_SUCCESS;
+	ret = cleanup_node();
+	if (CHECK_FAILURE(ret))
+		return ret;
+	list<ClusterNode*>::const_iterator iter = another_cluster_map.cluster_map.begin();
+	while (iter != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter;
+		iter++;
+		ret = add_node(cluster_node->node_id, cluster_node->node_ip);
+		if (CHECK_FAILURE(ret))
+			break;
+	}
+	return ret;
 }
 
 unsigned short ClusterMap::add_node(int node_id, std::string node_ip)
@@ -326,8 +485,7 @@ unsigned short ClusterMap::cleanup_node()
 	return RET_SUCCESS;
 }
 
-
-unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_only)
+unsigned short ClusterMap::get_first_node(int& first_node_id, string& first_node_ip, bool peek_only)
 {
 	unsigned short ret = RET_SUCCESS;
 	if (peek_only)
@@ -336,6 +494,7 @@ unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_on
 			return RET_FAILURE_INCORRECT_OPERATION;
 		list<ClusterNode*>::iterator iter = cluster_map.begin();
 		ClusterNode* cluster_node = (ClusterNode*)*iter;
+		first_node_id = cluster_node->node_id;
 		first_node_ip = cluster_node->node_ip;
 	}
 	else
@@ -344,11 +503,18 @@ unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_on
 		ret = pop_node(&first_node);
 		if (CHECK_FAILURE(ret))
 			return ret;
+		first_node_id = first_node->node_id;
 		first_node_ip = first_node->node_ip;
 		delete first_node;
 
 	}
 	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_only)
+{
+	int first_node_id;
+	return get_first_node(first_node_id, first_node_ip, peek_only);
 }
 
 unsigned short ClusterMap::get_node_id(const std::string& node_ip, int& node_id)
@@ -368,6 +534,19 @@ unsigned short ClusterMap::get_node_id(const std::string& node_ip, int& node_id)
 	}
 	if (!found)
 		return RET_FAILURE_NOT_FOUND;
+	return RET_SUCCESS;
+}
+
+
+unsigned short ClusterMap::get_last_node_id(int& node_id)
+{
+	// unsigned short ret = RET_SUCCESS;
+    if (cluster_map.empty())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	list<ClusterNode*>::reverse_iterator iter = cluster_map.rbegin();
+    ClusterNode* cluster_node = (ClusterNode*)*iter;
+    assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+    node_id = cluster_node->node_id;
 	return RET_SUCCESS;
 }
 
@@ -424,6 +603,15 @@ unsigned short ClusterMap::from_string(const char* cluster_map_str)
 	return RET_SUCCESS;
 }
 
+// unsigned short ClusterMap::from_object(const ClusterMap& cluster_map_obj)
+// {
+// // cluster_map_str format:
+// // 0:192.17.30.217;1:192.17.30.218;2:192.17.30.219
+// 	return cluster_map_obj.from_string(to_string());
+// }
+
+//////////////////////////////////////////////////////////
+
 KeepaliveTimerTask::KeepaliveTimerTask()
 {
 //	IMPLEMENT_MSG_DUMPER()
@@ -434,24 +622,23 @@ KeepaliveTimerTask::~KeepaliveTimerTask()
 //	RELEASE_MSG_DUMPER()
 }
 
-unsigned short KeepaliveTimerTask::initialize(PIMSG_NOTIFY_OBSERVER observer)
+unsigned short KeepaliveTimerTask::initialize(PINOTIFY observer)
 {
-	msg_notify_observer = observer;
-
+	notify_observer = observer;
 	return RET_SUCCESS;
 }
 
 unsigned short KeepaliveTimerTask::deinitialize()
 {
-	if (msg_notify_observer != NULL)
-		msg_notify_observer = NULL;
-
+	if (notify_observer != NULL)
+		notify_observer = NULL;
 	return RET_SUCCESS;
 }
 
-void KeepaliveTimerTask::trigger()
+unsigned short KeepaliveTimerTask::trigger()
 {
-	if (msg_notify_observer != NULL)
-		msg_notify_observer->notify(NOTIFY_CHECK_KEEPALIVE);
+	if (notify_observer != NULL)
+		return notify_observer->notify(NOTIFY_CHECK_KEEPALIVE);
+	return RET_FAILURE_INCORRECT_OPERATION;
 }
 

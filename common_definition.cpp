@@ -17,17 +17,18 @@ const unsigned short EX_LONG_STRING_SIZE = DEF_EX_LONG_STRING_SIZE;
 const unsigned short RET_SUCCESS = 0;
 
 const unsigned short RET_FAILURE_UNKNOWN = 1;
-const unsigned short RET_FAILURE_INVALID_ARGUMENT = 2;
-const unsigned short RET_FAILURE_INVALID_POINTER = 3;
-const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY = 4;
-const unsigned short RET_FAILURE_INCORRECT_OPERATION = 5;
-const unsigned short RET_FAILURE_OPEN_FILE = 6;
-const unsigned short RET_FAILURE_NOT_FOUND = 7;
-const unsigned short RET_FAILURE_INCORRECT_CONFIG = 8;
-const unsigned short RET_FAILURE_INCORRECT_PATH = 9;
-const unsigned short RET_FAILURE_IO_OPERATION = 10;
-const unsigned short RET_FAILURE_HANDLE_THREAD = 11;
-const unsigned short RET_FAILURE_SYSTEM_API = 12;
+const unsigned short RET_FAILURE_RUNTIME = 2;
+const unsigned short RET_FAILURE_INVALID_ARGUMENT = 3;
+const unsigned short RET_FAILURE_INVALID_POINTER = 4;
+const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY = 5;
+const unsigned short RET_FAILURE_INCORRECT_OPERATION = 6;
+const unsigned short RET_FAILURE_OPEN_FILE = 7;
+const unsigned short RET_FAILURE_NOT_FOUND = 8;
+const unsigned short RET_FAILURE_INCORRECT_CONFIG = 9;
+const unsigned short RET_FAILURE_INCORRECT_PATH = 10;
+const unsigned short RET_FAILURE_IO_OPERATION = 11;
+const unsigned short RET_FAILURE_HANDLE_THREAD = 12;
+const unsigned short RET_FAILURE_SYSTEM_API = 13;
 
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
 const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 1;
@@ -36,6 +37,7 @@ const unsigned short RET_FAILURE_CONNECTION_CLOSE = RET_FAILURE_CONNECTION_BASE 
 const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 4;
 const unsigned short RET_FAILURE_CONNECTION_NO_SERVER = RET_FAILURE_CONNECTION_BASE + 5;
 const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE = RET_FAILURE_CONNECTION_BASE + 6;
+const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE = RET_FAILURE_CONNECTION_BASE + 7;
 
 const char *GetErrorDescription(unsigned short ret)
 {
@@ -43,6 +45,7 @@ const char *GetErrorDescription(unsigned short ret)
 	{
 		"Success",
 		"Failure Unknown",
+		"Failure Runtime",
 		"Failure Invalid Argument",
 		"Failure Invalid Pointer",
 		"Failure Insufficient Memory",
@@ -63,7 +66,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"ConnectionFailure Close",
 		"ConnectionFailure Keepalive Timeout",
 		"ConnectionFailure No Server",
-		"ConnectionFailure Already in Use"
+		"ConnectionFailure Already in Use",
+		"ConnectionFailure Message Incomplete"
 	};
 	static int ret_description_len = sizeof(ret_description) / sizeof(ret_description[0]);
 	static int connection_ret_description_len = sizeof(connection_ret_description) / sizeof(connection_ret_description[0]);
@@ -90,7 +94,11 @@ bool SHOW_CONSOLE = true;
 // const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
 // const int CHECK_KEEPALIVE_TAG_LEN = string(CHECK_KEEPALIVE_TAG).length();
 // const int CHECK_SERVER_CANDIDATE_TAG_LEN = CHECK_SERVER_CANDIDATE_TAG.length();
-const char* END_OF_PACKET = "\r\n\r\n";
+const int MESSAGE_TYPE_LEN = 1;
+const string END_OF_MESSAGE = "\r\n\r\n";
+const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
+
+// const char* END_OF_PACKET = "\r\n\r\n";
 const int KEEPALIVE_DELAY_TIME = 60;
 const int KEEPALIVE_PERIOD = 60;
 const int MAX_KEEPALIVE_CNT = 3;

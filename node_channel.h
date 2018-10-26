@@ -2,6 +2,7 @@
 #define NODE_CHANNEL
 
 #include <pthread.h>
+#include <string>
 #include "common.h"
 
 
@@ -14,6 +15,7 @@ class NodeChannel
 	friend class FollowerNode;
 
 	DECLARE_MSG_DUMPER()
+
 	static const char* thread_tag;
 
 private:
@@ -29,7 +31,8 @@ private:
 	pthread_mutex_t mtx_buffer;
 	pthread_cond_t cond_buffer;
 
-	PIMSG_NOTIFY_OBSERVER msg_notify_observer;
+	// PINOTIFY notify_observer;
+	PINODE parent;
 	unsigned short thread_ret;
 	bool send_data_trigger;
 
@@ -42,7 +45,7 @@ private:
 	NodeChannel();
 	~NodeChannel();
 
-	unsigned short initialize(PIMSG_NOTIFY_OBSERVER observer, int socketfd, const char* ip);
+	unsigned short initialize(PINODE node, int socketfd, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
 	const char* get_ip()const{return node_ip.c_str();}

@@ -55,6 +55,11 @@ do{\
 }while(0)
 #endif
 
+#ifndef FRPINT_ERROR
+#define FPRINT_ERROR(...)\
+FPRINT(stderr, __VA_ARGS__)
+#endif
+
 #ifndef CREATE_PROJECT_FILEPATH
 #define CREATE_PROJECT_FILEPATH(variable_name, foldername, filename)\
 const int variable_name##_buf_size = 256;\
@@ -79,6 +84,7 @@ extern const unsigned short EX_LONG_STRING_SIZE;
 extern const unsigned short RET_SUCCESS;
 
 extern const unsigned short RET_FAILURE_UNKNOWN;
+extern const unsigned short RET_FAILURE_RUNTIME;
 extern const unsigned short RET_FAILURE_INVALID_ARGUMENT;
 extern const unsigned short RET_FAILURE_INVALID_POINTER;
 extern const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY;
@@ -98,6 +104,8 @@ extern const unsigned short RET_FAILURE_CONNECTION_CLOSE;
 extern const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_NO_SERVER;
 extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
+extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
+
 
 const char* GetErrorDescription(unsigned short ret);
 
@@ -107,7 +115,12 @@ extern bool SHOW_CONSOLE;
 // extern const std::string CHECK_SERVER_CANDIDATE_TAG;
 // extern const int CHECK_KEEPALIVE_TAG_LEN;
 // extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
-extern const char* END_OF_PACKET;
+
+extern const int MESSAGE_TYPE_LEN;
+extern const std::string END_OF_MESSAGE;
+extern const int END_OF_MESSAGE_LEN;
+
+// extern const char* END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
 extern const int MAX_KEEPALIVE_CNT;
@@ -129,13 +142,35 @@ extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-enum MessageType{MSG_CHECK_KEEPALIVE, MSG_UPDATE_CLUSTER_MAP, MSG_SIZE};
+enum MessageType{
+	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
+	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
+	MSG_SIZE
+};
 
+enum ParamType{
+	PARAM_CLUSTER_MAP,
+	PARAM_NODE_ID,
+	PARAM_SIZE
+};
+
+enum NotifyType{
+	NOTIFY_CHECK_KEEPALIVE,
+/*	NOTIFY_RECV_DATA,*/
+	NOTIFY_SIZE
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Macro
 #define GET_MSG_TYPE(x) int((*x) & 0xFF)
 
+#define UNDEFINED_MSG_EXCEPTION(Node, Direction, message_type)\
+do{\
+	static int ERRMSG_SIZE = 256;\
+    char undefined_errmsg[ERRMSG_SIZE];\
+    snprintf(undefined_errmsg, ERRMSG_SIZE, "%s Message[%s:%d] is NOT defined", Node, Direction, message_type);\
+    throw std::runtime_error(undefined_errmsg);\
+}while(0)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Typedef
@@ -159,21 +194,32 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
 
-class IMsgObserver
+class IParam
 {
 public:
-	virtual unsigned short recv(MessageType message_type, const str::string& message_data)=0;
-	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)=0;
-};
-typedef IMsgObserver* PIMSG_OBSERVER;
+    // virtual ~IParam();
 
-class INode : public IMsgObserver
+    virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL)=0;
+    virtual unsigned short get(ParamType param_type, void* param1=NULL, void* param2=NULL)=0;
+};
+typedef IParam* PIPARAM;
+
+class INotify
 {
 public:
-	virtual ~INode();
+	virtual unsigned short notify(NotifyType notify_type, void* param=NULL)=0;
+};
+typedef INotify* PINOTIFY;
+
+class INode : public IParam
+{
+public:
+	virtual ~INode(){}
 
 	virtual unsigned short initialize()=0;
 	virtual unsigned short deinitialize()=0;
+	virtual unsigned short recv(MessageType message_type, const std::string& message_data)=0;
+	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)=0;
 };
 typedef INode* PINODE;
 
@@ -214,6 +260,43 @@ public:
 
 ///////////////////////////////////////////////////
 
+class NodeMessageAssembler
+{
+private:
+	char* full_message_buf;
+
+public:
+	NodeMessageAssembler();
+	~NodeMessageAssembler();
+
+	unsigned short assemble(MessageType message_type, const char* message=NULL);
+
+    const char* get_full_message()const;
+};
+
+class NodeMessageParser
+{
+private:
+	bool full_message_found;
+	std::string data_buffer;
+	size_t data_beg_pos;
+	MessageType message_type;
+
+public:
+	NodeMessageParser();
+	~NodeMessageParser();
+
+	unsigned short parse(const char* new_message);
+	unsigned short remove_old();
+
+	bool is_cur_message_empty()const;
+	const char* cur_get_message()const;
+    const char* get_message()const;
+    MessageType get_message_type()const;
+};
+
+///////////////////////////////////////////////////
+
 class ClusterNode
 {
 public:
@@ -247,16 +330,21 @@ public:
 	ClusterMap();
 	~ClusterMap();
 
+    bool is_empty()const;
+    unsigned short copy(const ClusterMap& another_cluster_map);
 	unsigned short add_node(int node_id, std::string node_ip);
 	unsigned short add_node(const char* node_id_ip_str);
 	unsigned short delete_node(int node_id);
 	unsigned short delete_node_by_ip(std::string node_ip);
 	unsigned short pop_node(ClusterNode** first_node);
 	unsigned short cleanup_node();
+	unsigned short get_first_node(int& first_node_id, std::string& first_node_ip, bool peek_only=false);
 	unsigned short get_first_node_ip(std::string& first_node_ip, bool peek_only=false);
-	unsigned short get_node_id(const std::string& first_node_ip, int& node_id);
+	unsigned short get_node_id(const std::string& node_ip, int& node_id);
+	unsigned short get_last_node_id(int& node_id);
 	const char* to_string();
 	unsigned short from_string(const char* cluster_map_str);
+	// unsigned short from_object(const ClusterMap& cluster_map_obj);
 };
 
 ///////////////////////////////////////////////////
@@ -265,15 +353,15 @@ class KeepaliveTimerTask
 {
 //	DECLARE_MSG_DUMPER()
 private:
-	PIMSG_NOTIFY_OBSERVER msg_notify_observer;
+	PINOTIFY notify_observer;
 
 public:
 	KeepaliveTimerTask();
 	~KeepaliveTimerTask();
 
-	unsigned short initialize(PIMSG_NOTIFY_OBSERVER observer);
+	unsigned short initialize(PINOTIFY observer);
 	unsigned short deinitialize();
-	void trigger();
+	unsigned short trigger();
 };
 
 #endif

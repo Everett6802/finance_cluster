@@ -30,6 +30,7 @@ private:
 	int keepalive_cnt;
 	PNODE_CHANNEL node_channel;
 
+	pthread_mutex_t mtx_cluster_map;
 	pthread_mutex_t mtx_node_channel;
 //	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
 	// NodeRecvThread* msg_recv_thread;
@@ -43,9 +44,11 @@ private:
 	// bool is_keepalive_packet(const std::string message)const;
 // events
 // recv
-	unsigned short recv_check_keepalive(const str::string& message_data);
+	unsigned short recv_check_keepalive(const std::string& message_data);
+	unsigned short recv_update_cluster_map(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 // send
-	unsigned short send_check_keepalive(void* param1, void* param2, void* param3);
+	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 
 public:
 	FollowerNode(const char* server_ip, const char* ip);
@@ -54,8 +57,10 @@ public:
 // Interface
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short recv(MessageType message_type, const str::string& message_data);
-	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
+	virtual unsigned short recv(MessageType message_type, const std::string& message_data);
+	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL);
+    virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);
+    virtual unsigned short get(ParamType param_type, void* param1=NULL, void* param2=NULL);
 };
 typedef FollowerNode* PFOLLOWER_NODE;
 

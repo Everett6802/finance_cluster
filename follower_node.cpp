@@ -19,6 +19,10 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
 	// NodeBase(ip),
 	socketfd(0),
+	local_ip(NULL),
+	cluster_ip(NULL),
+	cluster_node_id(0),
+	keepalive_cnt(0),
 	node_channel(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -166,7 +170,7 @@ unsigned short FollowerNode::become_follower()
 	return ret;
 }
 
-unsigned short LeaderNode::send_data(const char* data)
+unsigned short FollowerNode::send_data(const char* data)
 {
 	unsigned short ret = RET_SUCCESS;
 	assert(data != NULL && "data should NOT be NULL");
@@ -239,6 +243,9 @@ unsigned short FollowerNode::initialize()
 		return ret;
 	}
 
+	mtx_node_channel = PTHREAD_MUTEX_INITIALIZER;
+	mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
+
 // Start a timer to check keep-alive
 	keepalive_cnt = MAX_KEEPALIVE_CNT;
 
@@ -288,15 +295,16 @@ unsigned short FollowerNode::deinitialize()
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv(MessageType message_type, const str::string& message_data)
+unsigned short FollowerNode::recv(MessageType message_type, const std::string& message_data)
 {
 	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
-	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const str::string& message_data);
+	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const std::string& message_data);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
-		&FollowerNode::recv_check_keepalive
+		&FollowerNode::recv_check_keepalive,
+		&FollowerNode::recv_update_cluster_map
 	};
-	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	if (message_type < 0 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -309,10 +317,11 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 	typedef unsigned short (FollowerNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
 	static SEND_FUNC_PTR send_func_array[] =
 	{
-		&FollowerNode::send_check_keepalive
+		&FollowerNode::send_check_keepalive,
+		&FollowerNode::send_update_cluster_map
 	};
 
-	if (message_type < 0 || message_type >= NOTIFY_SIZE)
+	if (message_type < 0 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -320,28 +329,61 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 	return (this->*(send_func_array[message_type]))(param1, param2, param3);
 }
 
-unsigned short FollowerNode::recv_check_keepalive(const str::string& message_data)
+unsigned short FollowerNode::recv_check_keepalive(const std::string& message_data)
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
 	pthread_mutex_lock(&mtx_node_channel);
-	if (cnt < MAX_KEEPALIVE_CNT)
+	if (keepalive_cnt < MAX_KEEPALIVE_CNT)
 		keepalive_cnt++;
 	pthread_mutex_unlock(&mtx_node_channel);
 	return RET_SUCCESS;
 }
 
+unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: Cluster map string| EOD
+	unsigned short ret = RET_SUCCESS;
+	pthread_mutex_lock(&mtx_cluster_map);
+	ret = cluster_map.from_string(message_data.c_str());
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+		goto OUT;
+	}
+	if (cluster_node_id == 0)
+	{
+// New Follower get the Node ID from Leader
+	    ret = cluster_map.get_last_node_id(cluster_node_id);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+			goto OUT;
+		}
+
+    }
+OUT:
+	pthread_mutex_unlock(&mtx_cluster_map);
+	return ret;
+}
+
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
+// Message format:
+// EventType | EOD
 	if (keepalive_cnt == 0)
 	{
-		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%S]", local_ip, cluster_ip);
+// The leader die !!!
+		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%s]", local_ip, cluster_ip);
 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 	}
 
 	char msg = (char)MSG_CHECK_KEEPALIVE;
 	return send_data(&msg);
 }
+
+unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 
 // unsigned short FollowerNode::check_keepalive()
 // {
@@ -361,3 +403,65 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 // {
 // 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
 // }
+
+unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+    	case PARAM_CLUSTER_MAP:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
+            pthread_mutex_lock(&mtx_cluster_map);
+            ret = cluster_map_param.copy(cluster_map);
+            pthread_mutex_unlock(&mtx_cluster_map);
+    	}
+    	break;
+    	case PARAM_NODE_ID:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		if (cluster_node_id == 0)
+    		{
+     			WRITE_ERROR("The cluster_node_id should NOT be 0");
+    			return RET_FAILURE_RUNTIME;   			
+    		}
+    		*(int*)param1 = cluster_node_id;
+    	}
+    	break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}

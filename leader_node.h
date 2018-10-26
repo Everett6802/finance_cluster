@@ -18,6 +18,7 @@ class LeaderNode : public INode
 	DECLARE_MSG_DUMPER()
 
 	static const char* thread_tag;
+	static const int WAIT_CONNECTION_TIMEOUT;
 private:
 	int socketfd;
 	char* local_ip;
@@ -35,14 +36,14 @@ private:
 
 	volatile unsigned short thread_ret;
 	pthread_mutex_t mtx_node_channel;
-	pthread_mutex_t mtx_cluster_map;
+	// pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
 	unsigned short send_data(const char* data, const char* remote_ip=NULL);
 // events
 // recv
-	unsigned short recv_check_keepalive(const str::string& message_data);
-	unsigned short recv_update_cluster_map(const str::string& message_data);
+	unsigned short recv_check_keepalive(const std::string& message_data);
+	unsigned short recv_update_cluster_map(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -57,8 +58,10 @@ public:
 // Interface
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short recv(MessageType message_type, const str::string& message_data);
-	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
+	virtual unsigned short recv(MessageType message_type, const std::string& message_data);
+	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL);
+    virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);
+    virtual unsigned short get(ParamType param_type, void* param1=NULL, void* param2=NULL);
 };
 typedef LeaderNode* PLEADER_NODE;
 

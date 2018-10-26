@@ -11,6 +11,8 @@ static char* param_join = NULL;
 static const int ERRMSG_SIZE = 256;
 static char errmsg[ERRMSG_SIZE];
 
+static ClusterMgr cluster_mgr;
+
 static void signal_handler(int signo);
 // static void copy_param(const char* src_param, char** dst_param);
 static void print_errmsg(const char* errmsg);
@@ -28,19 +30,23 @@ static void signal_handler(int signo)
 		case SIGTERM:
 		{
 			PRINT("SIGTERM Caught, the Finance Analyzer process[%d] is going to die......\n", getpid());
-		}
+            cluster_mgr.deinitialize();
+            exit(EXIT_FAILURE);
+   		}
 		break;
 		case SIGINT:
 		{
 			PRINT("SIGINT Caught, the Finance Analyzer process[%d] is going to die......\n", getpid());
+            cluster_mgr.deinitialize();
+            exit(EXIT_FAILURE);
 		}
 		break;
-		default:
-		{
-			snprintf(errmsg, ERRMSG_SIZE,"UnExpected Signal[%d] Caught !!!", signo);
-			print_errmsg_and_exit(errmsg);
-		}
-		break;
+		// default:
+		// {
+		// 	snprintf(errmsg, ERRMSG_SIZE,"UnExpected Signal[%d] Caught !!!", signo);
+		// 	print_errmsg_and_exit(errmsg);
+		// }
+		// break;
 	}
 	sleep(1);
 	exit(EXIT_SUCCESS);
@@ -97,6 +103,10 @@ unsigned short parse_param(int argc, char** argv)
 
 unsigned short check_param()
 {
+	if (param_help)
+	{
+		FPRINT(stdout, "%s\n", "'help' is enabled, so other parameters are ignored");
+	}
 	// static const int ERROR_MSG_SIZE = 256;
 	// static char error_msg[ERROR_MSG_SIZE];
 	return RET_SUCCESS;
@@ -105,9 +115,12 @@ unsigned short check_param()
 unsigned short setup_param(ClusterMgr& cluster_mgr)
 {
 	unsigned short ret = RET_SUCCESS;
-	ret = cluster_mgr.set_cluster_ip(param_join);
-	if (CHECK_FAILURE(ret))
-		return ret;
+	if (param_join != NULL)
+	{
+		ret = cluster_mgr.set_cluster_ip(param_join);
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
 
 	return RET_SUCCESS;
 }
@@ -142,7 +155,8 @@ int main(int argc, char** argv)
 	parse_param(argc, argv);
 	check_param();
 
-	ClusterMgr cluster_mgr;
+	if (param_help)
+		show_usage_and_exit();
 
 	ret = setup_param(cluster_mgr);
 	if (CHECK_FAILURE(ret))
@@ -153,7 +167,8 @@ int main(int argc, char** argv)
 
 	printf("Start the Node...\n");
 
-	ret = cluster_mgr.start();
+	// ret = cluster_mgr.start();
+	ret = cluster_mgr.initialize();
 	if (CHECK_FAILURE(ret))
 	{
 		// fprintf(stderr, "Fail to initialize...\n");
@@ -162,12 +177,13 @@ int main(int argc, char** argv)
 	}
 
 	getchar();
-	ret = cluster_mgr.wait_to_stop();
+	// ret = cluster_mgr.wait_to_stop();
+	ret = cluster_mgr.deinitialize();
 	if (CHECK_FAILURE(ret))
 	{
 		// fprintf(stderr, "Fail to waiting for stop...\n");
 		// exit(EXIT_FAILURE);
-		print_errmsg_and_exit("Fail to waiting for stop...");
+		print_errmsg_and_exit("Fail to de-initialize...");
 	}
 
 	getchar();

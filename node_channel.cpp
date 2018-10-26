@@ -16,7 +16,7 @@ NodeChannel::NodeChannel() :
 	send_tid(0),
 	recv_tid(0),
 	node_socket(0),
-	msg_notify_observer(NULL),
+	parent(NULL),
 	thread_ret(RET_SUCCESS),
 	send_data_trigger(false)
 {
@@ -28,12 +28,12 @@ NodeChannel::~NodeChannel()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short NodeChannel::initialize(PIMSG_NOTIFY_OBSERVER observer, int access_socket, const char* ip)
+unsigned short NodeChannel::initialize(PINODE node, int access_socket, const char* ip)
 {
-	msg_notify_observer = observer;
-	if (msg_notify_observer == NULL || ip == NULL)
+	parent = node;
+	if (parent == NULL || ip == NULL)
 	{
-		WRITE_ERROR("msg_notify_observer/ip should NOT be NULL");
+		WRITE_ERROR("parent/ip should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
@@ -149,7 +149,7 @@ unsigned short NodeChannel::deinitialize()
 		node_socket = 0;
 	}
 
-	msg_notify_observer = NULL;
+	parent = NULL;
 	return ret;
 }
 
@@ -276,15 +276,13 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
 
-	static const string END_OF_MESSAGE = "\r\n\r\n";
-	static const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
-
 	char buf[RECV_BUF_SIZE];
+	unsigned short ret = RET_SUCCESS;
 //	int read_bytes = RECV_BUF_SIZE;
 //	int read_to_bytes = 0;
 //	unsigned short ret = RET_SUCCESS;
-	string data_buffer = "";
-
+	// string data_buffer = "";
+	NodeMessageParser node_message_parser;
 	while(exit == 0)
 	{
 		struct pollfd pfd;
@@ -329,7 +327,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // // Show the data read from the remote site
 // 				WRITE_FORMAT_DEBUG("[%s] Receive message: %s", thread_tag, data_buffer.c_str());
 // // The data is coming, notify the observer
-// 				ret = msg_notify_observer->update(node_ip, data_buffer);
+// 				ret = parent->update(node_ip, data_buffer);
 // 				if (CHECK_FAILURE(ret))
 // 				{
 // 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
@@ -340,34 +338,57 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // // Remove the data which is already shown
 // 				data_buffer = new_data.substr(beg_pos + END_OF_MESSAGE_LEN);
 
-				data_buffer += string(new_data);
-// Check if the data is completely sent from the remote site
-				size_t beg_pos = data_buffer.find(END_OF_MESSAGE);
-				if (beg_pos == string::npos)
+// 				data_buffer += string(buf);
+// // Check if the data is completely sent from the remote site
+// 				size_t beg_pos = data_buffer.find(END_OF_MESSAGE);
+// 				if (beg_pos == string::npos)
+// 				{
+// 					WRITE_FORMAT_WARN("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
+// 					continue;
+// 				}
+// // The data is coming, notify the parent
+// 				MessageType message_type = (MessageType)data_buffer.front();
+// 				if (message_type < 0 || message_type >= MSG_SIZE)
+// 				{
+// 					WRITE_FORMAT_ERROR("[%s] The message type[%d] is NOT in range [0, %d)", thread_tag, message_type, MSG_SIZE);
+// 					return RET_FAILURE_RUNTIME;				
+// 				}
+// Parse the message
+				ret = node_message_parser.parse(buf);
+				if (CHECK_FAILURE(ret))
 				{
-					WRITE_FORMAT_WARN("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
-					continue;
+					if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
+						continue;
+					else
+					{
+						WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
+						break;
+					}
 				}
-// The data is coming, notify the observer
-				ret = msg_notify_observer->update(data_buffer.substr(0, beg_pos).c_str());
+// Send the message to the parent
+				// ret = parent->recv(meesage_type, data_buffer.substr(1, beg_pos).c_str());
+				ret = parent->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
 					break;
 				}
 // Remove the data which is already shown
-				data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
+				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
+				node_message_parser.remove_old();
 			}
 		}
 		else
 		{
 			WRITE_DEBUG("Time out. Nothing happen...");
-			if (data_buffer.length() != 0)
-				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
+			// if (data_buffer.length() != 0)
+			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
+			if (node_message_parser.is_cur_message_empty())
+				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
 		}
 	}
 
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
 
-	return RET_SUCCESS;
+	return ret;
 }
