@@ -380,10 +380,10 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		}
 		else
 		{
-			WRITE_DEBUG("Time out. Nothing happen...");
 			// if (data_buffer.length() != 0)
 			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
-			if (node_message_parser.is_cur_message_empty())
+			// WRITE_DEBUG("Time out. Nothing happen...");
+			if (!node_message_parser.is_cur_message_empty())
 				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
 		}
 	}

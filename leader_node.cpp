@@ -458,7 +458,7 @@ unsigned short LeaderNode::thread_handler_internal()
 		}
 		else
 		{
-			WRITE_DEBUG("Accept timeout");
+			// WRITE_DEBUG("Accept timeout");
 			continue;
 		}
 				
@@ -479,7 +479,7 @@ unsigned short LeaderNode::thread_handler_internal()
 		char ip[INET_ADDRSTRLEN + 1];
 		inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
 		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", thread_tag, ip);
-		printf("Follower[%s] connects to the Leader\n", ip);
+		PRINT("Follower[%s] connects to the Leader\n", ip);
 
 // Initialize a new thread for data transfer between follower
 		PNODE_CHANNEL node_channel = new NodeChannel();
