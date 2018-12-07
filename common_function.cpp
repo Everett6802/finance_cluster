@@ -66,7 +66,7 @@ unsigned short get_file_line_count(unsigned int &line_count, const char* filepat
 	if (!check_file_exist(filepath))
 	{
 		STATIC_WRITE_FORMAT_ERROR("The file[%s] does NOT exist", filepath);
-		return RET_FAILURE_NOT_FOUND;		
+		return RET_FAILURE_NOT_FOUND;
 	}
 	FILE* fp = fopen(filepath, "r");
 	if (fp == NULL)

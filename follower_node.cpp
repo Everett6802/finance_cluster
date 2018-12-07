@@ -170,16 +170,25 @@ unsigned short FollowerNode::become_follower()
 	return ret;
 }
 
-unsigned short FollowerNode::send_data(const char* data)
+unsigned short FollowerNode::send_data(MessageType message_type, const char* data)
 {
 	unsigned short ret = RET_SUCCESS;
-	assert(data != NULL && "data should NOT be NULL");
+	// assert(msg != NULL && "msg should NOT be NULL");
+
+	NodeMessageAssembler node_message_assembler;
+	ret = node_message_assembler.assemble(message_type, data);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to assemble the message, due to: %s", GetErrorDescription(ret));
+		return ret;
+	}
+
 	pthread_mutex_lock(&mtx_node_channel);
 // Send to leader
 	assert(node_channel != NULL && "node_channel should NOT be NULL");
-	ret = node_channel->send_msg(data);
+	ret = node_channel->send_msg(node_message_assembler.get_full_message());
 	if (CHECK_FAILURE(ret))
-		WRITE_FORMAT_ERROR("Fail to send data to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
 	pthread_mutex_unlock(&mtx_node_channel);
 	return ret;
 }
@@ -301,12 +310,13 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const std::string& message_data);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
+		NULL,
 		&FollowerNode::recv_check_keepalive,
 		&FollowerNode::recv_update_cluster_map
 	};
-	if (message_type < 0 || message_type >= MSG_SIZE)
+	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
-		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		WRITE_FORMAT_ERROR("Unknown Message Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	return (this->*(recv_func_array[message_type]))(message_data);
@@ -317,11 +327,12 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 	typedef unsigned short (FollowerNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
 	static SEND_FUNC_PTR send_func_array[] =
 	{
+		NULL,
 		&FollowerNode::send_check_keepalive,
 		&FollowerNode::send_update_cluster_map
 	};
 
-	if (message_type < 0 || message_type >= MSG_SIZE)
+	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -337,6 +348,7 @@ unsigned short FollowerNode::recv_check_keepalive(const std::string& message_dat
 	if (keepalive_cnt < MAX_KEEPALIVE_CNT)
 		keepalive_cnt++;
 	pthread_mutex_unlock(&mtx_node_channel);
+	fprintf(stderr, "Recv Check-Keepalive: %d\n", keepalive_cnt);
 	return RET_SUCCESS;
 }
 
@@ -372,6 +384,7 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 {
 // Message format:
 // EventType | EOD
+	fprintf(stderr, "Recv30: Send Cheek Keepalive\n");
 	if (keepalive_cnt == 0)
 	{
 // The leader die !!!
@@ -379,8 +392,9 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 	}
 
-	char msg = (char)MSG_CHECK_KEEPALIVE;
-	return send_data(&msg);
+	return send_data(MSG_CHECK_KEEPALIVE);
+	// char msg = (char)MSG_CHECK_KEEPALIVE;
+	// return send_data(&msg);
 }
 
 unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}

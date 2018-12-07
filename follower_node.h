@@ -38,7 +38,7 @@ private:
 
 	unsigned short connect_leader();
 	unsigned short become_follower();
-	unsigned short send_data(const char* data);
+	unsigned short send_data(MessageType message_type, const char* data=NULL);
 	// unsigned short check_keepalive();
 	// // unsigned short find_leader();
 	// bool is_keepalive_packet(const std::string message)const;

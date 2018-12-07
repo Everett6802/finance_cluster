@@ -106,17 +106,26 @@ unsigned short LeaderNode::become_leader()
 	return ret;
 }
 
-unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
+unsigned short LeaderNode::send_data(MessageType message_type, const char* data, const char* remote_ip)
 {
 	unsigned short ret = RET_SUCCESS;
-	assert(data != NULL && "data should NOT be NULL");
+	// assert(data != NULL && "data should NOT be NULL");
+
+	NodeMessageAssembler node_message_assembler;
+	ret = node_message_assembler.assemble(message_type, data);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to assemble the message, due to: %s", GetErrorDescription(ret));
+		return ret;
+	}
+
 	pthread_mutex_lock(&mtx_node_channel);
 	if (remote_ip != NULL)
 	{
 // Send to single node
 		PNODE_CHANNEL node_channel = node_channel_map[remote_ip];
 		assert(node_channel != NULL && "node_channel should NOT be NULL");
-		ret = node_channel->send_msg(data);
+		ret = node_channel->send_msg(node_message_assembler.get_full_message());
 		if (CHECK_FAILURE(ret))
 			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_ip, GetErrorDescription(ret));
 	}
@@ -128,7 +137,7 @@ unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
 		// {
 		// 	PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
 		// 	assert(node_channel != NULL && "node_channel should NOT be NULL");
-		// 	ret = node_channel->send_msg(data);
+		// 	ret = node_channel->send_data(data);
 		// 	if (CHECK_FAILURE(ret))
 		// 	{
 		// 		WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
@@ -141,7 +150,7 @@ unsigned short LeaderNode::send_data(const char* data, const char* remote_ip)
 		{
 			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
 			assert(node_channel != NULL && "node_channel should NOT be NULL");
-			ret = node_channel->send_msg(data);
+			ret = node_channel->send_msg(node_message_assembler.get_full_message());
 			if (CHECK_FAILURE(ret))
 			{
 				WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_ip(), GetErrorDescription(ret));
@@ -262,12 +271,13 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const std::string& message_data);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
+		NULL,
 		&LeaderNode::recv_check_keepalive,
 		&LeaderNode::recv_update_cluster_map
 	};
-	if (message_type < 0 || message_type >= MSG_SIZE)
+	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
-		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		WRITE_FORMAT_ERROR("Unknown Message Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	return (this->*(recv_func_array[message_type]))(message_data);
@@ -278,11 +288,12 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 	typedef unsigned short (LeaderNode::*SEND_FUNC_PTR)(void* param1, void* param2, void* param3);
 	static SEND_FUNC_PTR send_func_array[] =
 	{
+		NULL,
 		&LeaderNode::send_check_keepalive,
 		&LeaderNode::send_update_cluster_map
 	};
 
-	if (message_type < 0 || message_type >= MSG_SIZE)
+	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
 		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
@@ -299,6 +310,7 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 	if (cnt < MAX_KEEPALIVE_CNT)
 		node_keepalive_map[message_data]++;
 	pthread_mutex_unlock(&mtx_node_channel);
+	fprintf(stderr, "Recv Check-Keepalive: %s:%d\n", message_data.c_str(), node_keepalive_map[message_data]);
 	return RET_SUCCESS;
 }
 
@@ -312,6 +324,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 	bool follower_dead_found = false;
 // Check if nodes in cluster are dead
 	pthread_mutex_lock(&mtx_node_channel);
+	fprintf(stderr, "Recv20: Send Cheek Keepalive\n");
 	map<string, int>::iterator iter = node_keepalive_map.begin();
 	while (iter != node_keepalive_map.end())
 	{
@@ -348,7 +361,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 // Update the cluster map to Followers
 	if (follower_dead_found)
 	{
-		ret = send_data(cluster_map_msg);
+		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg);
 		free(cluster_map_msg);
 		if (CHECK_FAILURE(ret))
 		{
@@ -357,19 +370,24 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 		}
 	}
 
-	char msg = (char)MSG_CHECK_KEEPALIVE;
-	return send_data(&msg);
+	return send_data(MSG_CHECK_KEEPALIVE);
 }
 
 unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, void* param3)
 {
 // Message format:
 // EventType | cluster map string | EOD
+	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&mtx_node_channel);
 	string cluster_map_msg(cluster_map.to_string());
 	pthread_mutex_unlock(&mtx_node_channel);
 // Update the cluster map to Followers
-	return send_data(cluster_map_msg.c_str());
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to assemble the message[%d, %s], due to: %s", MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str(), GetErrorDescription(ret));
+		return ret;
+	}
+	return send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
 }
 
 void* LeaderNode::thread_handler(void* pvoid)
@@ -512,7 +530,7 @@ unsigned short LeaderNode::thread_handler_internal()
 		string cluster_map_msg(cluster_map.to_string());
 		pthread_mutex_unlock(&mtx_node_channel);
 // Update the cluster map to Followers
-		ret = send_data(cluster_map_msg.c_str());
+		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
 			WRITE_FORMAT_ERROR("Fail to send the message of updating the cluster map, due to: %s", GetErrorDescription(ret));

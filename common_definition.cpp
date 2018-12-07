@@ -95,12 +95,12 @@ bool SHOW_CONSOLE = true;
 // const int CHECK_KEEPALIVE_TAG_LEN = string(CHECK_KEEPALIVE_TAG).length();
 // const int CHECK_SERVER_CANDIDATE_TAG_LEN = CHECK_SERVER_CANDIDATE_TAG.length();
 const int MESSAGE_TYPE_LEN = 1;
-const string END_OF_MESSAGE = "\r\n\r\n";
+const string END_OF_MESSAGE = std::string("\r\n\r\n");
 const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
 
 // const char* END_OF_PACKET = "\r\n\r\n";
-const int KEEPALIVE_DELAY_TIME = 60;
-const int KEEPALIVE_PERIOD = 60;
+const int KEEPALIVE_DELAY_TIME = 5;
+const int KEEPALIVE_PERIOD = 5;
 const int MAX_KEEPALIVE_CNT = 3;
 const int MAX_CONNECTED_CLIENT = 5;
 
@@ -115,4 +115,3 @@ const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
 
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;
-

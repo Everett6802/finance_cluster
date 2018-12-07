@@ -128,6 +128,25 @@ unsigned short setup_param(ClusterMgr& cluster_mgr)
 
 int main(int argc, char** argv)
 {
+	// char* message = NULL;
+	// int buf_size = MESSAGE_TYPE_LEN + (message != NULL ? strlen(message) : 0) + END_OF_MESSAGE_LEN + 1;
+	// MessageType message_type = (MessageType)257; //MSG_CHECK_KEEPALIVE;
+	// fprintf(stderr, "message_type: %d, message: %s, buf_size: %d\n", message_type, message, buf_size);
+	// char* full_message_buf = new char[buf_size];
+	// if (message != NULL)
+	// {
+	// 	snprintf(full_message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
+	// }
+	// else
+	// {
+	// 	snprintf(full_message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
+	// 	// snprintf(full_message_buf, buf_size, "%d", message_type);
+	// }
+	// fprintf(stderr, "assemble message: %s, assemble message length: %d\n", full_message_buf, strlen(full_message_buf));
+	// fprintf(stderr, "parser, message type: %d\n", GET_MSG_TYPE(full_message_buf));
+
+	// exit(0);
+
 	// ClusterMap cluster_map;
 	// cluster_map.from_string("0:192.17.30.217;1:192.17.30.218;2:192.17.30.219");
 	// printf("Map: %s\n", cluster_map.to_string());

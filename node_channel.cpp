@@ -18,7 +18,7 @@ NodeChannel::NodeChannel() :
 	node_socket(0),
 	parent(NULL),
 	thread_ret(RET_SUCCESS),
-	send_data_trigger(false)
+	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -158,10 +158,10 @@ void NodeChannel::notify_exit()
 	__sync_fetch_and_add(&exit, 1);
 // Notify the send thread to exit
 	pthread_mutex_lock(&mtx_buffer);
-	if (!send_data_trigger)
+	if (!send_msg_trigger)
 	{
 		pthread_cond_signal(&cond_buffer);
-		send_data_trigger = true;
+		send_msg_trigger = true;
 	}
 	pthread_mutex_unlock(&mtx_buffer);
 }
@@ -173,10 +173,10 @@ unsigned short NodeChannel::send_msg(const char* msg_data)
 // Put the new incoming message to the buffer first
 	pthread_mutex_lock(&mtx_buffer);
 	send_buffer_list.push_back(msg_data_dup);
-	if (!send_data_trigger)
+	if (!send_msg_trigger)
 	{
 		pthread_cond_signal(&cond_buffer);
-		send_data_trigger = true;
+		send_msg_trigger = true;
 	}
 	pthread_mutex_unlock(&mtx_buffer);
 
@@ -203,15 +203,18 @@ unsigned short NodeChannel::send_thread_handler_internal()
 	{
 // Move the data from one buffer to another......
 		pthread_mutex_lock(&mtx_buffer);
-		if (!send_data_trigger)
+		if (!send_msg_trigger)
 			pthread_cond_wait(&cond_buffer, &mtx_buffer);
 		list<char*>::iterator iter_buffer = send_buffer_list.begin();
 		while (iter_buffer != send_buffer_list.end())
 		{
-			char* msg_data = (char*)*send_buffer_list.erase(iter_buffer++);
+			// char* msg_data = (char*)*send_buffer_list.erase(iter_buffer++);
+			char* msg_data = (char*)*iter_buffer;
 			send_access_list.push_back(msg_data);
+			iter_buffer++;
 		}
-		send_data_trigger = false;
+		send_buffer_list.clear();
+		send_msg_trigger = false;
 		pthread_mutex_unlock(&mtx_buffer);
 // Send the data to the remote
 		list<char*>::iterator iter_access = send_access_list.begin();
@@ -240,7 +243,6 @@ unsigned short NodeChannel::send_thread_handler_internal()
 			iter_access++;
 			free(msg_data);
 		}
-
 		send_access_list.clear();
 	}
 OUT:
@@ -283,27 +285,32 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 //	unsigned short ret = RET_SUCCESS;
 	// string data_buffer = "";
 	NodeMessageParser node_message_parser;
+	fprintf(stderr, "Recv00: Enter RECV thread...\n");
 	while(exit == 0)
 	{
 		struct pollfd pfd;
 		pfd.fd = node_socket;
 		pfd.events = POLLIN | POLLHUP | POLLRDNORM;
 	    pfd.revents = 0;
+	    fprintf(stderr, "Recv11: Wait for message\n");
 		int ret = poll(&pfd, 1, 3000); // call poll with a timeout of 3000 ms
 // WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "poll() return value: %d", ret);
 		if (ret < 0)
 		{
 			WRITE_FORMAT_ERROR("[%s] poll() fail, due to %s", thread_tag, strerror(errno));
+			fprintf(stderr, "Recv01: poll() fail, due to %s\n", strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
 			// Read the data from the remote
 			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
+			fprintf(stderr, "Recv02: data received......\n");
 			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
 			{
+				fprintf(stderr, "Recv03: The connection is closed......\n");
 				WRITE_FORMAT_ERROR("[%s] The connection is closed......", thread_tag);
 				return RET_FAILURE_CONNECTION_CLOSE;
 			}
@@ -353,10 +360,13 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // 					WRITE_FORMAT_ERROR("[%s] The message type[%d] is NOT in range [0, %d)", thread_tag, message_type, MSG_SIZE);
 // 					return RET_FAILURE_RUNTIME;				
 // 				}
+				fprintf(stderr, "Recv04: buf: %s\n", buf);
 // Parse the message
 				ret = node_message_parser.parse(buf);
+				fprintf(stderr, "Recv05: assemble message\n");
 				if (CHECK_FAILURE(ret))
 				{
+					fprintf(stderr, "Recv06: message imcomplete !!!\n");
 					if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
 						continue;
 					else
@@ -367,6 +377,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				}
 // Send the message to the parent
 				// ret = parent->recv(meesage_type, data_buffer.substr(1, beg_pos).c_str());
+				fprintf(stderr, "Recv07: notify parent\n");
 				ret = parent->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
@@ -375,6 +386,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				}
 // Remove the data which is already shown
 				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
+				fprintf(stderr, "Recv08: remove the message in buffer\n");
 				node_message_parser.remove_old();
 			}
 		}
@@ -383,10 +395,15 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			// if (data_buffer.length() != 0)
 			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
 			// WRITE_DEBUG("Time out. Nothing happen...");
+			fprintf(stderr, "Recv12: Time out. No message !\n");
 			if (!node_message_parser.is_cur_message_empty())
+			{
+				fprintf(stderr, "Recv09: message should NOT exist in buffer\n");
 				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
+			}
 		}
 	}
+	fprintf(stderr, "Recv10: Exit RECV thread\n");
 
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
 

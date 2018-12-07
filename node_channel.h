@@ -34,7 +34,7 @@ private:
 	// PINOTIFY notify_observer;
 	PINODE parent;
 	unsigned short thread_ret;
-	bool send_data_trigger;
+	bool send_msg_trigger;
 
 	static void* send_thread_handler(void* pvoid);
 	unsigned short send_thread_handler_internal();

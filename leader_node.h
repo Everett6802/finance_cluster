@@ -39,7 +39,7 @@ private:
 	// pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
-	unsigned short send_data(const char* data, const char* remote_ip=NULL);
+	unsigned short send_data(MessageType message_type, const char* data=NULL, const char* remote_ip=NULL);
 // events
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);

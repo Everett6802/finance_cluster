@@ -24,11 +24,13 @@ static void timer_sigroutine(int signo)
 	switch (signo)
 	{
 	case SIGALRM:
+	{
 //        printf("Catch a signal -- SIGALRM \n");
 		unsigned short ret = keepalive_timer_task.trigger();
 		if (CHECK_SUCCESS(ret))
 			signal(SIGALRM, timer_sigroutine);
-		break;
+	}
+	break;
 	}
 }
 
@@ -591,9 +593,11 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* param)
 {
 	switch (notify_type)
 	{
-	case MSG_CHECK_KEEPALIVE:
+	case NOTIFY_CHECK_KEEPALIVE:
+	{
 		check_keepalive();
-		break;
+	}
+	break;
 	default:
 		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
 		return RET_FAILURE_IO_OPERATION;
