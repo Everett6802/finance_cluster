@@ -144,8 +144,9 @@ extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 
 enum MessageType{
 	MSG_CAN_NOT_USE = 0, // 0 can NOT use, due to serialization/deserialization
-	MSG_CHECK_KEEPALIVE = 1, // Bi-Direction, Leader <-> Follower 
+	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
+	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_SIZE
 };
 

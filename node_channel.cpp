@@ -9,6 +9,7 @@
 using namespace std;
 
 const char* NodeChannel::thread_tag = "Channel Thread";
+const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
 NodeChannel::NodeChannel() :
 	exit(0),
@@ -17,7 +18,8 @@ NodeChannel::NodeChannel() :
 	recv_tid(0),
 	node_socket(0),
 	parent(NULL),
-	thread_ret(RET_SUCCESS),
+	send_thread_ret(RET_SUCCESS),
+	recv_thread_ret(RET_SUCCESS),
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -61,15 +63,16 @@ unsigned short NodeChannel::initialize(PINODE node, int access_socket, const cha
 unsigned short NodeChannel::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
-	void* status;
-	int kill_ret;
-	// if (pid == 0)
-	// 	goto OUT;
+	// int kill_ret;
+	__sync_fetch_and_add(&exit, 1);
+	sleep(1);
+
+	bool thread_alive = false;
 // Check send thread alive
-	bool send_thread_alive = false;
+	// bool send_thread_alive = false;
 	if (send_tid != 0)
 	{
-		kill_ret = pthread_kill(send_tid, 0);
+		int kill_ret = pthread_kill(send_tid, 0);
 		if(kill_ret == ESRCH)
 		{
 			WRITE_WARN("The worker thread of sending message did NOT exist......");
@@ -85,14 +88,17 @@ unsigned short NodeChannel::deinitialize()
 		else
 		{
 			WRITE_DEBUG("The signal to the worker thread of sending message is STILL alive");
-			send_thread_alive = true;
+// Kill the thread
+		    if (pthread_cancel(send_tid) != 0)
+		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of sending message, due to: %s", strerror(errno));
+			thread_alive = true;
 		}
 	}
 // Check recv thread alive
-	bool recv_thread_alive = false;
+	// bool recv_thread_alive = false;
 	if (recv_tid != 0)
 	{
-		kill_ret = pthread_kill(recv_tid, 0);
+		int kill_ret = pthread_kill(recv_tid, 0);
 		if(kill_ret == ESRCH)
 		{
 			WRITE_WARN("The worker thread of receiving message did NOT exist......");
@@ -108,39 +114,53 @@ unsigned short NodeChannel::deinitialize()
 		else
 		{
 			WRITE_DEBUG("The signal to the worker thread of receiving message is STILL alive");
-			recv_thread_alive = false;
+		    if (pthread_cancel(recv_tid) != 0)
+		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
+			thread_alive = true;
 		}
 	}
-	
-// Notify the worker thread it's time to exit
-	notify_exit();
+	if (thread_alive) sleep(1);
 // Wait for send thread's death
-	if (send_thread_alive)
+	WRITE_DEBUG("Wait for the worker thread of sending message's death...");
+// Should NOT check the thread status in this way.
+// Segmentation fault occurs sometimes, seems the 'send_status' variable accesses the illegal address
+	// void* send_status;
+	// pthread_join(send_tid, &send_status);
+	// if (send_status == NULL)
+	// 	WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+	// else
+	// {
+	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)send_status);
+	// 	ret = send_thread_ret;
+	// }
+	pthread_join(send_tid, NULL);
+	if (CHECK_SUCCESS(send_thread_ret))
+		WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+	else
 	{
-		WRITE_DEBUG("Wait for the worker thread of sending message's death...");
-		pthread_join(send_tid, &status);
-		if (status == NULL)
-			WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
-		else
-		{
-			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
-			return thread_ret;
-			// goto OUT;
-		}
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", GetErrorDescription(send_thread_ret));
+		ret = send_thread_ret;
 	}
 // Wait for recv thread's death
-	if (recv_thread_alive)
+	WRITE_DEBUG("Wait for the worker thread of receiving message's death...");
+// Should NOT check the thread status in this way.
+// Segmentation fault occurs sometimes, seems the 'recv_status' variable accesses the illegal address
+	// void* recv_status;
+	// pthread_join(recv_tid, &recv_status);
+	// if (recv_status == NULL)
+	// 	WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+	// else
+	// {
+	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)recv_status);
+	// 	ret = recv_thread_ret;
+	// }
+	pthread_join(recv_tid, NULL);
+	if (CHECK_SUCCESS(recv_thread_ret))
+		WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+	else
 	{
-		WRITE_DEBUG("Wait for the worker thread of receiving message's death...");
-		pthread_join(recv_tid, &status);
-		if (status == NULL)
-			WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
-		else
-		{
-			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)status);
-			return thread_ret;
-			// goto OUT;
-		}
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", GetErrorDescription(recv_thread_ret));
+		ret = recv_thread_ret;
 	}
 
 	if (node_socket != 0)
@@ -186,12 +206,33 @@ unsigned short NodeChannel::send_msg(const char* msg_data)
 void* NodeChannel::send_thread_handler(void* pvoid)
 {
 	NodeChannel* pthis = (NodeChannel*)pvoid;
-	if (pthis != NULL)
-		pthis->thread_ret = pthis->send_thread_handler_internal();
-	else
+	if (pthis == NULL)
 		throw std::invalid_argument("pvoid should NOT be NULL");
 
-	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->send_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
+
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->send_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
+
+	if (CHECK_SUCCESS(pthis->send_thread_ret))
+	{
+		pthread_cleanup_push(send_thread_cleanup_handler, pthis);
+		pthis->send_thread_ret = pthis->send_thread_handler_internal();
+		pthread_cleanup_pop(1);		
+	}
+
+	pthread_exit((CHECK_SUCCESS(pthis->send_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->send_thread_ret)));
 }
 
 unsigned short NodeChannel::send_thread_handler_internal()
@@ -246,32 +287,81 @@ unsigned short NodeChannel::send_thread_handler_internal()
 		send_access_list.clear();
 	}
 OUT:
-	if (CHECK_FAILURE(ret))
-	{
-		list<char*>::iterator iter_access_failure = send_access_list.begin(); 
-		while(iter_access_failure != send_access_list.end())
-		{
-			char* msg_data_failure = (char*)(*iter_access_failure);
-			if (msg_data_failure != NULL)
-				free(msg_data_failure);
-			iter_access_failure++;
-		}
-		send_access_list.clear();
-	}
+	// if (CHECK_FAILURE(ret))
+	// {
+	// 	list<char*>::iterator iter_access_failure = send_access_list.begin(); 
+	// 	while(iter_access_failure != send_access_list.end())
+	// 	{
+	// 		char* msg_data_failure = (char*)(*iter_access_failure);
+	// 		if (msg_data_failure != NULL)
+	// 			free(msg_data_failure);
+	// 		iter_access_failure++;
+	// 	}
+	// 	send_access_list.clear();
+	// }
 
 	WRITE_FORMAT_INFO("[%s] The worker thread of sending message is dead", thread_tag);
 	return ret;
 }
 
+void NodeChannel::send_thread_cleanup_handler(void* pvoid)
+{
+	NodeChannel* pthis = (NodeChannel*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+	pthis->send_thread_cleanup_handler_internal();
+}
+
+void NodeChannel::send_thread_cleanup_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the send thread......", thread_tag);
+	list<char*>::iterator iter_buffer = send_buffer_list.begin();
+	while (iter_buffer != send_buffer_list.end())
+	{
+		char* msg_data = (char*)*iter_buffer;
+		iter_buffer++;
+		free(msg_data);
+		send_buffer_list.clear();
+	}
+	list<char*>::iterator iter_access = send_access_list.begin();
+	while (iter_access != send_access_list.end())
+	{
+		char* msg_data = (char*)*iter_access;
+		iter_access++;
+		free(msg_data);
+		send_access_list.clear();
+	}
+	// return RET_SUCCESS;
+}
+
 void* NodeChannel::recv_thread_handler(void* pvoid)
 {
 	NodeChannel* pthis = (NodeChannel*)pvoid;
-	if (pthis != NULL)
-		pthis->thread_ret = pthis->recv_thread_handler_internal();
-	else
+	if (pthis == NULL)
 		throw std::invalid_argument("pvoid should NOT be NULL");
 
-	pthread_exit((CHECK_SUCCESS(pthis->thread_ret) ? NULL : (void*)GetErrorDescription(pthis->thread_ret)));
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->recv_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
+
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->recv_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
+
+	if (CHECK_SUCCESS(pthis->recv_thread_ret))
+	{
+		pthis->recv_thread_ret = pthis->recv_thread_handler_internal();
+	}
+
+	pthread_exit(NULL);
 }
 
 unsigned short NodeChannel::recv_thread_handler_internal()
@@ -280,32 +370,28 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 
 	char buf[RECV_BUF_SIZE];
 	unsigned short ret = RET_SUCCESS;
-//	int read_bytes = RECV_BUF_SIZE;
-//	int read_to_bytes = 0;
-//	unsigned short ret = RET_SUCCESS;
-	// string data_buffer = "";
 	NodeMessageParser node_message_parser;
-	fprintf(stderr, "Recv00: Enter RECV thread...\n");
+	// fprintf(stderr, "Recv00: Enter RECV thread...\n");
 	while(exit == 0)
 	{
 		struct pollfd pfd;
 		pfd.fd = node_socket;
 		pfd.events = POLLIN | POLLHUP | POLLRDNORM;
 	    pfd.revents = 0;
-	    fprintf(stderr, "Recv11: Wait for message\n");
-		int ret = poll(&pfd, 1, 3000); // call poll with a timeout of 3000 ms
+	    // fprintf(stderr, "Recv11: Wait for message\n");
+		int ret = poll(&pfd, 1, WAIT_DATA_TIMEOUT); // call poll with a timeout of 3000 ms
 // WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "poll() return value: %d", ret);
 		if (ret < 0)
 		{
 			WRITE_FORMAT_ERROR("[%s] poll() fail, due to %s", thread_tag, strerror(errno));
-			fprintf(stderr, "Recv01: poll() fail, due to %s\n", strerror(errno));
+			// fprintf(stderr, "Recv01: poll() fail, due to %s\n", strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
 			// Read the data from the remote
 			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
-			fprintf(stderr, "Recv02: data received......\n");
+			// fprintf(stderr, "Recv02: data received......\n");
 			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
@@ -316,57 +402,13 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			}
 			else
 			{
-				// string new_data = string(buf);
-// // Check if the data is completely sent from the remote site
-// 				size_t beg_pos = new_data.find(END_OF_MESSAGE);
-// 				if (beg_pos == string::npos)
-// 				{
-// 					WRITE_FORMAT_ERROR("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
-// 					data_buffer += new_data;
-// 					continue;
-// 				}
-// 				else
-// 				{
-// 					data_buffer += new_data.substr(0, beg_pos);
-// 				}
-
-// //				const char* new_message = data_buffer.c_str();
-// // Show the data read from the remote site
-// 				WRITE_FORMAT_DEBUG("[%s] Receive message: %s", thread_tag, data_buffer.c_str());
-// // The data is coming, notify the observer
-// 				ret = parent->update(node_ip, data_buffer);
-// 				if (CHECK_FAILURE(ret))
-// 				{
-// 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
-// 					break;
-// 				}
-// // Clean the message sent to the observer
-// 				data_buffer = "";
-// // Remove the data which is already shown
-// 				data_buffer = new_data.substr(beg_pos + END_OF_MESSAGE_LEN);
-
-// 				data_buffer += string(buf);
-// // Check if the data is completely sent from the remote site
-// 				size_t beg_pos = data_buffer.find(END_OF_MESSAGE);
-// 				if (beg_pos == string::npos)
-// 				{
-// 					WRITE_FORMAT_WARN("[%s] The new incoming data[%s] is NOT completely......", thread_tag, data_buffer.c_str());
-// 					continue;
-// 				}
-// // The data is coming, notify the parent
-// 				MessageType message_type = (MessageType)data_buffer.front();
-// 				if (message_type < 0 || message_type >= MSG_SIZE)
-// 				{
-// 					WRITE_FORMAT_ERROR("[%s] The message type[%d] is NOT in range [0, %d)", thread_tag, message_type, MSG_SIZE);
-// 					return RET_FAILURE_RUNTIME;				
-// 				}
-				fprintf(stderr, "Recv04: buf: %s\n", buf);
-// Parse the message
+// 				fprintf(stderr, "Recv04: buf: %s\n", buf);
+// // Parse the message
 				ret = node_message_parser.parse(buf);
-				fprintf(stderr, "Recv05: assemble message\n");
+				// fprintf(stderr, "Recv05: assemble message\n");
 				if (CHECK_FAILURE(ret))
 				{
-					fprintf(stderr, "Recv06: message imcomplete !!!\n");
+					// fprintf(stderr, "Recv06: message imcomplete !!!\n");
 					if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
 						continue;
 					else
@@ -376,8 +418,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 					}
 				}
 // Send the message to the parent
-				// ret = parent->recv(meesage_type, data_buffer.substr(1, beg_pos).c_str());
-				fprintf(stderr, "Recv07: notify parent\n");
+				// fprintf(stderr, "Recv07: notify parent\n");
 				ret = parent->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
@@ -386,7 +427,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				}
 // Remove the data which is already shown
 				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
-				fprintf(stderr, "Recv08: remove the message in buffer\n");
+				// fprintf(stderr, "Recv08: remove the message in buffer\n");
 				node_message_parser.remove_old();
 			}
 		}
@@ -395,17 +436,18 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			// if (data_buffer.length() != 0)
 			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
 			// WRITE_DEBUG("Time out. Nothing happen...");
-			fprintf(stderr, "Recv12: Time out. No message !\n");
+			// fprintf(stderr, "Recv12: Time out. No message !\n");
 			if (!node_message_parser.is_cur_message_empty())
 			{
-				fprintf(stderr, "Recv09: message should NOT exist in buffer\n");
+				// fprintf(stderr, "Recv09: message should NOT exist in buffer\n");
 				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
 			}
 		}
 	}
-	fprintf(stderr, "Recv10: Exit RECV thread\n");
-
-	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
-
+	// fprintf(stderr, "Recv10: Exit RECV thread\n");
+// Segmetation fault occurs while calling WRITE_FORMAT_INFO
+// I don't know why. Perhaps similiar issue as below:
+// https://forum.bitcraze.io/viewtopic.php?t=1089
+	// WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
 	return ret;
 }

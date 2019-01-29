@@ -46,9 +46,11 @@ private:
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);
 	unsigned short recv_update_cluster_map(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+	unsigned short recv_transmit_text(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
+	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
 	FollowerNode(const char* server_ip, const char* ip);

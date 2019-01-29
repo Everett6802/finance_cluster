@@ -99,8 +99,8 @@ const string END_OF_MESSAGE = std::string("\r\n\r\n");
 const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
 
 // const char* END_OF_PACKET = "\r\n\r\n";
-const int KEEPALIVE_DELAY_TIME = 5;
-const int KEEPALIVE_PERIOD = 5;
+const int KEEPALIVE_DELAY_TIME = 30;
+const int KEEPALIVE_PERIOD = 60;
 const int MAX_KEEPALIVE_CNT = 3;
 const int MAX_CONNECTED_CLIENT = 5;
 

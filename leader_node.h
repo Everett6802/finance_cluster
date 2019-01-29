@@ -44,12 +44,16 @@ private:
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);
 	unsigned short recv_update_cluster_map(const std::string& message_data);
+	unsigned short recv_transmit_text(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 	static void* thread_handler(void* pvoid);
 	unsigned short thread_handler_internal();
+	static void thread_cleanup_handler(void* pvoid);
+	void thread_cleanup_handler_internal();
 
 public:
 	LeaderNode(const char* ip);

@@ -517,6 +517,26 @@ unsigned short ClusterMgr::set_cluster_ip(const char* ip)
 	return RET_SUCCESS;
 }
 
+unsigned short ClusterMgr::transmit_text(const char* data, const char* remote_ip)
+{
+	if (node_type == NONE)
+	{
+		WRITE_ERROR("node_type should NOT be NONE");
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	else if (node_type == FOLLOWER)
+	{
+		if (remote_ip != NULL)
+		{
+			WRITE_ERROR("remote_ip should be NULL in follower");
+			return RET_FAILURE_INVALID_ARGUMENT;
+		}
+	}
+	assert(cluster_node != NULL && "cluster_node shuold NOT be NULL");
+	return cluster_node->send(MSG_TRANSMIT_TEXT, (void*)data, (void*)remote_ip);
+}
+
+
 // unsigned short ClusterMgr::start()
 // {
 // // Initialize

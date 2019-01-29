@@ -312,7 +312,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 	{
 		NULL,
 		&FollowerNode::recv_check_keepalive,
-		&FollowerNode::recv_update_cluster_map
+		&FollowerNode::recv_update_cluster_map,
+		&FollowerNode::recv_transmit_text
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -329,7 +330,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 	{
 		NULL,
 		&FollowerNode::send_check_keepalive,
-		&FollowerNode::send_update_cluster_map
+		&FollowerNode::send_update_cluster_map,
+		&FollowerNode::send_transmit_text
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -380,6 +382,12 @@ OUT:
 	return ret;
 }
 
+unsigned short FollowerNode::recv_transmit_text(const std::string& message_data)
+{
+	printf("Recv Text: %s\n", message_data.c_str());
+	return RET_SUCCESS;
+}
+
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
 // Message format:
@@ -399,24 +407,22 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 
 unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 
-// unsigned short FollowerNode::check_keepalive()
-// {
-// 	if (keepalive_cnt == 0)
-// 	{
-// 		WRITE_FORMAT_WARN("Leader does NOT response for %d seconds, try to connect to another leader....", TOTAL_KEEPALIVE_PERIOD);
-// 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
-// 	}
-// 	__sync_fetch_and_sub(&keepalive_cnt, 1);
-// 	WRITE_FORMAT_DEBUG("Check keep-alive....... %d", keepalive_cnt);
+unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: text data
+// Message format:
+// EventType | text | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
 
-// 	return RET_SUCCESS;
-// }
+	const char* text_data = (const char*)param1;
 
-
-// bool FollowerNode::is_keepalive_packet(const std::string message)const
-// {
-// 	return (message.compare(0, CHECK_KEEPALIVE_TAG_LEN, CHECK_KEEPALIVE_TAG) == 0 ? true : false);
-// }
+	return send_data(MSG_TRANSMIT_TEXT, text_data);
+}
 
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {

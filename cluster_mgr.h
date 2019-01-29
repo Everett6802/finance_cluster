@@ -60,6 +60,7 @@ public:
 	unsigned short initialize();
 	unsigned short deinitialize();
 	unsigned short set_cluster_ip(const char* ip);
+	unsigned short transmit_text(const char* data, const char* remote_ip=NULL);
 
 	bool is_leader()const{return node_type == LEADER;}
 	// unsigned short start();

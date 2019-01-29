@@ -17,6 +17,7 @@ class NodeChannel
 	DECLARE_MSG_DUMPER()
 
 	static const char* thread_tag;
+	static const int WAIT_DATA_TIMEOUT;
 
 private:
 	volatile int exit;
@@ -33,11 +34,14 @@ private:
 
 	// PINOTIFY notify_observer;
 	PINODE parent;
-	unsigned short thread_ret;
+	unsigned short send_thread_ret;
+	unsigned short recv_thread_ret;
 	bool send_msg_trigger;
 
 	static void* send_thread_handler(void* pvoid);
 	unsigned short send_thread_handler_internal();
+	static void send_thread_cleanup_handler(void* pvoid);
+	void send_thread_cleanup_handler_internal();
 	static void* recv_thread_handler(void* pvoid);
 	unsigned short recv_thread_handler_internal();
 	void clearall();

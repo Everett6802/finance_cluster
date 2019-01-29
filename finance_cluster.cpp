@@ -196,7 +196,25 @@ int main(int argc, char** argv)
 	}
 
 	getchar();
+	if (!cluster_mgr.is_leader())
+	{
+		const char* msg;
+		msg = "This is a test 1";
+		printf("SND: %s\n", msg);
+		cluster_mgr.transmit_text(msg);
+		getchar();	
+		msg = "This is a test 2";
+		printf("SND: %s\n", msg);
+		cluster_mgr.transmit_text(msg);
+		getchar();
+		msg = "This is a test 3";
+		printf("SND: %s\n", msg);
+		cluster_mgr.transmit_text(msg);
+		getchar();	
+	}
+
 	// ret = cluster_mgr.wait_to_stop();
+	printf("Stop the Node\n");
 	ret = cluster_mgr.deinitialize();
 	if (CHECK_FAILURE(ret))
 	{
