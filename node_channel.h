@@ -20,6 +20,7 @@ class NodeChannel
 	static const int WAIT_DATA_TIMEOUT;
 
 private:
+	PINODE observer;
 	volatile int exit;
     std::string node_ip;
     std::string remote_ip;
@@ -32,8 +33,6 @@ private:
 	pthread_mutex_t mtx_buffer;
 	pthread_cond_t cond_buffer;
 
-	// PINOTIFY notify_observer;
-	PINODE parent;
 	unsigned short send_thread_ret;
 	unsigned short recv_thread_ret;
 	bool send_msg_trigger;
@@ -46,10 +45,10 @@ private:
 	unsigned short recv_thread_handler_internal();
 	void clearall();
 
-	NodeChannel();
+	NodeChannel(PINODE node);
 	~NodeChannel();
 
-	unsigned short initialize(PINODE node, int socketfd, const char* ip);
+	unsigned short initialize(int socketfd, const char* ip);
 	unsigned short deinitialize();
 	void notify_exit();
 	const char* get_ip()const{return node_ip.c_str();}

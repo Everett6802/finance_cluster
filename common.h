@@ -12,6 +12,7 @@
 #include <deque>
 #include <string>
 #include <map>
+#include <vector>
 #include <stdexcept>
 #include "msg_dumper_wrapper.h"
 
@@ -153,11 +154,13 @@ enum MessageType{
 enum ParamType{
 	PARAM_CLUSTER_MAP,
 	PARAM_NODE_ID,
+	PARAM_CONNECTION_RETRY,
 	PARAM_SIZE
 };
 
 enum NotifyType{
 	NOTIFY_CHECK_KEEPALIVE,
+	NOTIFY_NODE_DIE,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_SIZE
 };
@@ -206,14 +209,17 @@ public:
 };
 typedef IParam* PIPARAM;
 
+class NotifyCfg;
+
 class INotify
 {
 public:
-	virtual unsigned short notify(NotifyType notify_type, void* param=NULL)=0;
+	virtual unsigned short notify(NotifyType notify_type, void* notify_param=NULL)=0;
+	virtual unsigned short async_handle(NotifyCfg* notify_cfg)=0;
 };
 typedef INotify* PINOTIFY;
 
-class INode : public IParam
+class INode : public IParam, public INotify
 {
 public:
 	virtual ~INode(){}
@@ -224,15 +230,6 @@ public:
 	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)=0;
 };
 typedef INode* PINODE;
-
-// class MsgTransferInf
-// {
-// public:
-// 	virtual short send(unsigned char* buf)=0;
-// 	virtual short recv(unsigned char** buf)=0;
-// //	virtual ~MsgTransferInf();
-// };
-// typedef MsgTransferInf* PMSG_TRANSFER_INF;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,5 +362,67 @@ public:
 	unsigned short deinitialize();
 	unsigned short trigger();
 };
+
+///////////////////////////////////////////////////
+
+class NotifyCfg
+{
+protected:
+	NotifyType notify_type;
+	void* notify_param;
+
+public:
+	NotifyCfg(NotifyType type, const void* param=NULL, size_t param_size=0);
+	virtual ~NotifyCfg();
+
+	NotifyType get_notify_type()const;
+	const void* get_notify_param()const;
+};
+typedef NotifyCfg* PNOTIFY_CFG;
+
+///////////////////////////
+
+class NotifyNodeDieCfg : public NotifyCfg
+{
+public:
+	NotifyNodeDieCfg(const void* param=NULL, size_t param_size=0);
+	virtual ~NotifyNodeDieCfg();
+};
+
+///////////////////////////////////////////////////
+
+class NotifyThread
+{
+	DECLARE_MSG_DUMPER()
+	static const char* notify_thread_tag;
+
+private:
+	PINOTIFY notify_observer;
+
+	volatile int notify_exit;
+	pthread_t notify_tid;
+	volatile unsigned short notify_thread_ret;
+	bool new_notify_trigger;
+
+	std::vector<PNOTIFY_CFG> notify_buffer_vector;
+	std::vector<PNOTIFY_CFG> notify_execute_vector;
+
+	pthread_mutex_t notify_mtx;
+	pthread_cond_t notify_cond;
+
+	static void* notify_thread_handler(void* pvoid);
+	unsigned short notify_thread_handler_internal();
+	static void notify_thread_cleanup_handler(void* pvoid);
+	void notify_thread_cleanup_handler_internal();
+
+public:
+	NotifyThread(PINOTIFY observer);
+	~NotifyThread();
+
+	unsigned short initialize();
+	unsigned short deinitialize();
+	unsigned short add_event(const PNOTIFY_CFG notify_cfg);
+};
+typedef NotifyThread* PNOTIFY_THREAD;
 
 #endif

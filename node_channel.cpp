@@ -11,31 +11,33 @@ using namespace std;
 const char* NodeChannel::thread_tag = "Channel Thread";
 const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
-NodeChannel::NodeChannel() :
+NodeChannel::NodeChannel(PINODE node) :
+	observer(node),
 	exit(0),
 //	node_ip(NULL),
 	send_tid(0),
 	recv_tid(0),
 	node_socket(0),
-	parent(NULL),
 	send_thread_ret(RET_SUCCESS),
 	recv_thread_ret(RET_SUCCESS),
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
+	assert(observer == NULL && "observer should NOT be NULL");
 }
 
 NodeChannel::~NodeChannel()
 {
 	RELEASE_MSG_DUMPER()
+	if (observer != NULL)
+		observer = NULL;
 }
 
-unsigned short NodeChannel::initialize(PINODE node, int access_socket, const char* ip)
+unsigned short NodeChannel::initialize(int access_socket, const char* ip)
 {
-	parent = node;
-	if (parent == NULL || ip == NULL)
+	if (ip == NULL)
 	{
-		WRITE_ERROR("parent/ip should NOT be NULL");
+		WRITE_ERROR("ip should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
@@ -169,7 +171,7 @@ unsigned short NodeChannel::deinitialize()
 		node_socket = 0;
 	}
 
-	parent = NULL;
+	observer = NULL;
 	return ret;
 }
 
@@ -384,20 +386,26 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		if (ret < 0)
 		{
 			WRITE_FORMAT_ERROR("[%s] poll() fail, due to %s", thread_tag, strerror(errno));
-			// fprintf(stderr, "Recv01: poll() fail, due to %s\n", strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
 			// Read the data from the remote
 			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
-			// fprintf(stderr, "Recv02: data received......\n");
 			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
 			{
-				fprintf(stderr, "Recv03: The connection is closed......\n");
-				WRITE_FORMAT_ERROR("[%s] The connection is closed......", thread_tag);
+				// fprintf(stderr, "Recv03: The connection is closed......\n");
+// Allocate the nofity event parameter
+				// const char* notify_param = remote_ip.c_str();
+				size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
+				PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_ip.c_str(), notify_param_size);
+				if (notify_cfg == NULL)
+					throw bad_alloc();
+// Notify the event
+				observer->notify(NOTIFY_NODE_DIE, notify_cfg);
+				WRITE_FORMAT_WARN("[%s] The connection is closed......", thread_tag);
 				return RET_FAILURE_CONNECTION_CLOSE;
 			}
 			else
@@ -417,9 +425,9 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 						break;
 					}
 				}
-// Send the message to the parent
-				// fprintf(stderr, "Recv07: notify parent\n");
-				ret = parent->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
+// Send the message to the observer
+				// fprintf(stderr, "Recv07: notify observer\n");
+				ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));

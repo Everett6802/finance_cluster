@@ -13,7 +13,6 @@
 #include "cluster_mgr.h"
 #include "leader_node.h"
 #include "follower_node.h"
-// #include "keepalive_timer_task.h"
 
 
 using namespace std;
@@ -37,7 +36,6 @@ static void timer_sigroutine(int signo)
 const char* ClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
 const int ClusterMgr::RETRY_WAIT_CONNECTION_TIME = 3; // 3 seconds
 const int ClusterMgr::TRY_TIMES = 3;
-// DECLARE_MSG_DUMPER_PARAM();
 
 unsigned short ClusterMgr::parse_config()
 {
@@ -129,17 +127,24 @@ unsigned short ClusterMgr::find_local_ip()
 ClusterMgr::ClusterMgr() :
 	local_ip(NULL),
 	cluster_ip(NULL),
-	// msg_trasnfer(NULL),
 	node_type(NONE),
-	cluster_node(NULL)
-	// pid(0),
-	// runtime_ret(RET_SUCCESS)
+	cluster_node(NULL),
+	notify_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
 
 ClusterMgr::~ClusterMgr()
 {
+	unsigned short ret = deinitialize();
+	if (CHECK_FAILURE(ret))
+	{
+		static const int ERRMSG_SIZE = 256;
+		char errmsg[ERRMSG_SIZE];
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in ClusterMgr::deinitialize(), due to :%s", GetErrorDescription(ret));
+		throw runtime_error(string(errmsg));
+	}
+
 	if (cluster_node != NULL)
 	{
 		delete cluster_node;
@@ -157,11 +162,6 @@ ClusterMgr::~ClusterMgr()
 		delete[] local_ip;
 		local_ip = NULL;
 	}
-
-	// list<char*>::iterator iter = server_list.begin();
-	// while (iter != server_list.end())
-	// 	delete [] (char*)*iter++;
-	// server_list.clear();lr
 
 	RELEASE_MSG_DUMPER()
 }
@@ -198,7 +198,7 @@ void ClusterMgr::stop_keepalive_timer()
 unsigned short ClusterMgr::become_leader()
 {
 	assert(local_ip != NULL && "local_ip should NOT be NULL");
-	cluster_node = new LeaderNode(local_ip);
+	cluster_node = new LeaderNode(this, local_ip);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Leader)");
@@ -214,19 +214,22 @@ unsigned short ClusterMgr::become_leader()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::become_follower()
+unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 {
 	assert(local_ip != NULL && "local_ip should NOT be NULL");
 	assert(cluster_ip != NULL && "cluster_ip should NOT be NULL");
 
-	cluster_node = new FollowerNode(cluster_ip, local_ip);
+	cluster_node = new FollowerNode(this, cluster_ip, local_ip);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
-
-	unsigned short ret = cluster_node->initialize();
+	unsigned short ret = RET_SUCCESS;
+	ret = cluster_node->set(PARAM_CONNECTION_RETRY, (void*)&need_rebuild_cluster);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ret = cluster_node->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -235,33 +238,33 @@ unsigned short ClusterMgr::become_follower()
 	return ret;
 }
 
-unsigned short ClusterMgr::start_connection()
-{
-	unsigned short ret = RET_SUCCESS;
+// unsigned short ClusterMgr::start_connection(bool need_rebuild_cluster)
+// {
+// 	unsigned short ret = RET_SUCCESS;
 
-	if (cluster_ip != NULL)
-	{
-		WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_ip, cluster_ip);
-	// Try to find the follower node
-		ret = become_follower();
-		// if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
-		// {
-		// 	if (node_type != NONE)
-		// 	{
-		// 		WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
-		// 		return RET_FAILURE_INCORRECT_OPERATION;
-		// 	}
-		// }
-	}
-	else
-	{
-		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
-// Try to find the leader node
-		ret = become_leader();		
-	}
+// 	if (cluster_ip != NULL)
+// 	{
+// 		WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_ip, cluster_ip);
+// // Try to become the follower node
+// 		ret = become_follower();
+// 		// if (CHECK_FAILURE(ret) || IS_TRY_CONNECTION_TIMEOUT(ret))
+// 		// {
+// 		// 	if (node_type != NONE)
+// 		// 	{
+// 		// 		WRITE_FORMAT_ERROR("Node[%s] type should be None at this moment", local_ip);
+// 		// 		return RET_FAILURE_INCORRECT_OPERATION;
+// 		// 	}
+// 		// }
+// 	}
+// 	else
+// 	{
+// 		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
+// // Try to become the leader node
+// 		ret = become_leader();		
+// 	}
 
-	return ret;
-}
+// 	return ret;
+// }
 
 unsigned short ClusterMgr::stop_connection()
 {
@@ -281,7 +284,7 @@ unsigned short ClusterMgr::stop_connection()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::try_reconnection()
+unsigned short ClusterMgr::rebuild_cluster()
 {
 	if (node_type == LEADER)
 	{
@@ -295,13 +298,10 @@ unsigned short ClusterMgr::try_reconnection()
     ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 	if (CHECK_FAILURE(ret))
 		return ret;
-	else
+	if (cluster_map.is_empty())
 	{
-		if (cluster_map.is_empty())
-		{
-			WRITE_FORMAT_ERROR("Leader [%s] NEVER tries to re-connect", local_ip);
-			return RET_FAILURE_RUNTIME;
-		}		
+		WRITE_FORMAT_ERROR("The cluster map in Follower[%s] is empty", local_ip);
+		return RET_FAILURE_RUNTIME;
 	}
 // Get the node ID from the follower
 	int node_id;
@@ -326,35 +326,24 @@ unsigned short ClusterMgr::try_reconnection()
         if (leader_candidate_node_id == node_id)
         {
 // Leader
+	        WRITE_FORMAT_DEBUG("Node[%s] try to becomme the Leader in the Cluster......", local_ip);
         	if (cluster_ip != NULL)
         	{
         		free(cluster_ip);
         		cluster_ip = NULL;
         	}
+        	ret = become_leader();
         }
         else
         {
 // Follower
+	        WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", local_ip, cluster_ip);
         	set_cluster_ip(leader_candidate_node_ip.c_str());
+        	ret = become_follower(true);
+	        if (IS_TRY_CONNECTION_TIMEOUT(ret))
+	        	continue;
         }
-        ret = start_connection();
-        if (CHECK_FAILURE(ret))
-        {
-        	if (IS_TRY_CONNECTION_TIMEOUT(ret))
-        	{
-        		WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s], but time-out", local_ip, cluster_ip);
-        	}
-        	else
-        	{
-        	    break;	
-        	}
-        	
-        }
-        else
-        {
-        	WRITE_DEBUG("Rebuild the cluster successfully !!!");
-        	break;
-        }
+        break;
     }
     if (CHECK_FAILURE(ret))
     {
@@ -387,7 +376,7 @@ void ClusterMgr::check_keepalive()
 // Stop a keep-alive timer
 					stop_keepalive_timer();
 // The leader is dead, try to find the new leader
-					ret = try_reconnection();
+					ret = rebuild_cluster();
 					if (CHECK_FAILURE(ret))
 					{
 						// notify_exit(ret);
@@ -446,8 +435,25 @@ unsigned short ClusterMgr::initialize()
 	      	}
 		}
 	}
+// Initialize the worker thread for handling events
+	notify_thread = new NotifyThread(this);
+	if (notify_thread == NULL)
+		throw bad_alloc();
+	ret = notify_thread->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
 // Define a leader/follower and establish the connection
-	ret = start_connection();
+	// ret = start_connection();
+	if (cluster_ip != NULL)
+	{
+		WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_ip, cluster_ip);
+		ret = become_follower();
+	}
+	else
+	{
+		WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_ip);
+		ret = become_leader();		
+	}
 	if (CHECK_FAILURE(ret))
 		return ret;
 // Start a keep-alive timer
@@ -462,14 +468,17 @@ unsigned short ClusterMgr::deinitialize()
 {
 // Stop a keep-alive timer
 	stop_keepalive_timer();
-
-	unsigned short ret = RET_SUCCESS;
 // Close the connection
-	ret = stop_connection();
-	if (CHECK_FAILURE(ret))
-		return ret;
+	unsigned short ret = stop_connection();
+// Stop the event thread
+	if (notify_thread != NULL)
+	{
+		notify_thread->deinitialize();
+		delete notify_thread;
+		notify_thread = NULL;
+	}
 
-	return RET_SUCCESS;
+	return ret;
 }
 
 // void ClusterMgr::notify_exit(unsigned short exit_reason)
@@ -537,90 +546,66 @@ unsigned short ClusterMgr::transmit_text(const char* data, const char* remote_ip
 }
 
 
-// unsigned short ClusterMgr::start()
-// {
-// // Initialize
-// 	unsigned short ret = initialize();
-// // Start the thread of listening the connection requests
-// 	if (CHECK_SUCCESS(ret))
-// 	{
-// 		mtx_runtime_ret = PTHREAD_MUTEX_INITIALIZER;
-// 		cond_runtime_ret = PTHREAD_COND_INITIALIZER;
-// 		if (pthread_create(&pid, NULL, thread_handler, this) != 0)
-// 		{
-// 			WRITE_FORMAT_ERROR("Fail to create a worker thread of listening the connection requests, due to: %s",strerror(errno));
-// 			return RET_FAILURE_HANDLE_THREAD;
-// 		}
-// 	}
-
-// 	return ret;
-// }
-
-// unsigned short ClusterMgr::wait_to_stop()
-// {
-// 	unsigned short ret = RET_SUCCESS;
-// 	void* status;
-// //	if (pid == 0)
-// //		goto OUT;
-// //
-// //	int kill_ret = pthread_kill(pid, 0);
-// //	if(kill_ret == ESRCH)
-// //	{
-// //		WRITE_WARN("The worker thread of waiting to stop did NOT exist......");
-// //		ret = RET_SUCCESS;
-// //		goto OUT;
-// //	}
-// //	else if(kill_ret == EINVAL)
-// //	{
-// //		WRITE_ERROR("The signal to the worker thread of waiting to stop is invalid");
-// //		ret = RET_FAILURE_HANDLE_THREAD;
-// //		goto OUT;
-// //	}
-
-// 	WRITE_DEBUG("Wait for the worker thread of waiting to stop's death...");
-// 	pthread_join(pid, &status);
-// 	if (status == NULL)
-// 		WRITE_DEBUG("Wait for the worker thread of waiting to stop's death Successfully !!!");
-// 	else
-// 	{
-// 		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of waiting to stop's death, due to: %s", (char*)status);
-// 		ret = runtime_ret;
-// 	}
-
-// 	return ret;
-// }
-
-// unsigned short ClusterMgr::recv(const std::string ip, const std::string message)
-// {
-// 	return RET_SUCCESS;
-// }
-
-// unsigned short ClusterMgr::send(NotifyType message_type, void* param1, void* param2, void* param3)
-// {
-// 	switch (message_type)
-// 	{
-// 	case MSG_CHECK_KEEPALIVE:
-// 		check_keepalive();
-// 		break;
-// 	default:
-// 		WRITE_FORMAT_ERROR("Un-supported type: %d", message_type);
-// 		return RET_FAILURE_IO_OPERATION;
-// 	}
-// 	return RET_SUCCESS;
-// }
-
-unsigned short ClusterMgr::notify(NotifyType notify_type, void* param)
+unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 {
+    unsigned short ret = RET_SUCCESS;
 	switch (notify_type)
 	{
-	case NOTIFY_CHECK_KEEPALIVE:
-	{
-		check_keepalive();
+// Synchronous event
+		case NOTIFY_CHECK_KEEPALIVE:
+		{
+			check_keepalive();
+		}
+		break;
+// Asynchronous event:
+      	case NOTIFY_NODE_DIE:
+    	{
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		if (notify_cfg == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		ret = notify_thread->add_event(notify_cfg);
+    	}
+		break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
 	}
-	break;
-	default:
-		WRITE_FORMAT_ERROR("Un-supported type: %d", notify_type);
-		return RET_FAILURE_IO_OPERATION;
-	}
-	return RET_SUCCESS;
+	return ret;
+}
+
+
+unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
+{
+	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+    unsigned short ret = RET_SUCCESS;
+    NotifyType notify_type = notify_cfg->get_notify_type();
+    switch(notify_type)
+    {
+      	case NOTIFY_NODE_DIE:
+    	{
+    		assert (node_type == FOLLOWER && "node type should be FOLLOWER");
+    		string leader_ip((char*)notify_cfg->get_notify_param());
+    		WRITE_FORMAT_WARN("The leader[%s] dies, try to re-build the cluster", leader_ip.c_str());
+    		ret = rebuild_cluster();
+    	}
+    	break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
 }

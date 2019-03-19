@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <signal.h>
 #include <stdexcept>
 #include <algorithm>
 #include "common.h"
@@ -642,3 +643,268 @@ unsigned short KeepaliveTimerTask::trigger()
 	return RET_FAILURE_INCORRECT_OPERATION;
 }
 
+//////////////////////////////////////////////////////////
+
+NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
+	notify_type(type),
+	notify_param(NULL)
+{
+	if (param != NULL)
+	{
+		assert(param_size != 0 && "param_size should NOT be 0");
+		notify_param = malloc(param_size);
+		if (notify_param == NULL)
+			throw bad_alloc();
+		memcpy(notify_param, param, param_size);
+	}
+}
+
+NotifyCfg::~NotifyCfg()
+{
+	// assert(notify_param != NULL && "notify_param should be NULL");
+	if (notify_param != NULL)
+	{
+		free(notify_param);
+		notify_param = NULL;
+	}
+}
+
+NotifyType NotifyCfg::get_notify_type()const{return notify_type;}
+
+const void* NotifyCfg::get_notify_param()const{return notify_param;}
+
+///////////////////////////
+
+NotifyNodeDieCfg::NotifyNodeDieCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_NODE_DIE, param, param_size)
+{
+
+}
+
+NotifyNodeDieCfg::~NotifyNodeDieCfg()
+{
+	if(notify_param != NULL)
+	{
+		char* notify_node_die_param = (char*)notify_param;
+		free(notify_node_die_param);
+		notify_param = NULL;
+	}
+}
+
+//////////////////////////////////////////////////////////
+
+const char* NotifyThread::notify_thread_tag = "Notify Thread";
+
+void* NotifyThread::notify_thread_handler(void* pvoid)
+{
+	NotifyThread* pthis = (NotifyThread*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->notify_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
+
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->notify_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
+
+	if (CHECK_SUCCESS(pthis->notify_thread_ret))
+	{
+		pthread_cleanup_push(notify_thread_cleanup_handler, pthis);
+		pthis->notify_thread_ret = pthis->notify_thread_handler_internal();
+		pthread_cleanup_pop(1);
+	}
+
+// No need to send data to pthread_join
+	// pthread_exit((CHECK_SUCCESS(pthis->notify_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->notify_thread_ret)));
+	pthread_exit(NULL);
+}
+
+unsigned short NotifyThread::notify_thread_handler_internal()
+{
+	assert(notify_observer != NULL && "notify_observer should NOT be NULL");
+	WRITE_FORMAT_INFO("[%s] The worker thread of notifying socket is running", notify_thread_tag);
+	unsigned short ret = RET_SUCCESS;
+	while (notify_exit == 0)
+	{
+		pthread_mutex_lock(&notify_mtx);
+//wait for the signal with cond as condition variable
+		if (!new_notify_trigger)
+			pthread_cond_wait(&notify_cond, &notify_mtx);
+//		WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "Thread[%s]=> The worker thread to write the data......", worker_thread_name);
+// Move the message
+		int notify_buffer_vector_size = notify_buffer_vector.size();
+//		WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Thread[%s]=> There are totally %d data in the queue", worker_thread_name, notify_buffer_vector_size);
+		if (notify_buffer_vector_size > 0)
+		{
+			for (int i = 0 ; i < notify_buffer_vector_size ; i++)
+			{
+//				WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Thread[%s]=> Move the message[%s] to another buffer", worker_thread_name, notify_buffer_vector[i]->data);
+				PNOTIFY_CFG notify_cfg =  notify_buffer_vector[i];
+				notify_buffer_vector[i] = NULL;
+				notify_execute_vector.push_back(notify_cfg);
+			}
+// Clean-up the container
+			notify_buffer_vector.clear();
+		}
+		new_notify_trigger = 0;
+		pthread_mutex_unlock(&notify_mtx);
+
+		int notify_execute_vector_size = notify_execute_vector.size();
+		if (notify_execute_vector_size > 0)
+		{
+// execute the notification
+			for (int i = 0 ; i < notify_execute_vector_size ; i++)
+			{
+				PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_execute_vector[i];
+				assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+				notify_execute_vector[i] = NULL;
+				WRITE_FORMAT_DEBUG("Handle asynchronous event: %d", notify_cfg->get_notify_type());
+				ret = notify_observer->async_handle(notify_cfg);
+// Remove the old notification
+				delete notify_cfg;				
+				if (CHECK_FAILURE(ret))
+				{
+					WRITE_FORMAT_DEBUG("Thread[%s]=> Fail to execute event, due to %d", notify_thread_tag, ret);
+					break;
+				}
+			}
+			notify_execute_vector.clear();
+		}	
+	}
+
+	WRITE_FORMAT_INFO("[%s] The worker thread of notifying socket is dead", notify_thread_tag);
+	return ret;
+}
+
+void NotifyThread::notify_thread_cleanup_handler(void* pvoid)
+{
+	NotifyThread* pthis = (NotifyThread*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+	pthis->notify_thread_cleanup_handler_internal();
+}
+
+void NotifyThread::notify_thread_cleanup_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the notify thread......", notify_thread_tag);
+	int notify_buffer_vector_size = notify_buffer_vector.size();
+	if (notify_buffer_vector_size > 0)
+	{
+		for (int i = 0 ; i < notify_buffer_vector_size ; i++)
+		{
+			delete notify_buffer_vector[i];
+			notify_buffer_vector[i] = NULL;
+		}
+		notify_buffer_vector.clear();
+	}
+	int notify_execute_vector_size = notify_execute_vector.size();
+	if (notify_execute_vector_size > 0)
+	{
+		for (int i = 0 ; i < notify_execute_vector_size ; i++)
+		{
+			delete notify_execute_vector[i];
+			notify_execute_vector[i] = NULL;
+		}
+		notify_execute_vector.clear();
+	}
+}
+
+NotifyThread::NotifyThread(PINOTIFY observer) :
+	notify_observer(observer)
+{
+	IMPLEMENT_MSG_DUMPER()
+}
+
+NotifyThread::~NotifyThread()
+{
+	if (notify_observer != NULL)
+		notify_observer = NULL;
+
+	RELEASE_MSG_DUMPER()
+}
+
+unsigned short NotifyThread::initialize()
+{
+	notify_mtx = PTHREAD_MUTEX_INITIALIZER;
+	notify_cond = PTHREAD_COND_INITIALIZER;
+	if (pthread_create(&notify_tid, NULL, notify_thread_handler, this))
+	{
+		WRITE_FORMAT_ERROR("Fail to create a worker thread of notifying event, due to: %s",strerror(errno));
+		return RET_FAILURE_HANDLE_THREAD;
+	}
+
+	return RET_SUCCESS;
+}
+
+unsigned short NotifyThread::deinitialize()
+{
+	unsigned short ret = RET_SUCCESS;
+	// void* status;
+// Notify the worker thread it's time to exit
+	__sync_fetch_and_add(&notify_exit, 1);
+	sleep(1);
+// Check notify thread alive
+	// bool notify_thread_alive = false;
+	if (notify_tid != 0)
+	{
+		int kill_ret = pthread_kill(notify_tid, 0);
+		if(kill_ret == ESRCH)
+		{
+			WRITE_WARN("The worker thread of notifying did NOT exist......");
+			ret = RET_SUCCESS;
+			// goto OUT;
+		}
+		else if(kill_ret == EINVAL)
+		{
+			WRITE_ERROR("The signal to the worker thread of notifying is invalid");
+			ret = RET_FAILURE_HANDLE_THREAD;
+			// goto OUT;
+		}
+		else
+		{
+			WRITE_DEBUG("The signal to the worker thread of notifying is STILL alive");
+			// notify_thread_alive = true;
+// Kill the thread
+		    if (pthread_cancel(notify_tid) != 0)
+		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
+			sleep(1);
+		}
+	}
+
+	WRITE_DEBUG("Wait for the worker thread of notifying's death...");
+// Wait for notify thread's death
+	pthread_join(notify_tid, NULL);
+	if (CHECK_SUCCESS(notify_thread_ret))
+		WRITE_DEBUG("Wait for the worker thread of notifying's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of notifying's death, due to: %s", GetErrorDescription(notify_thread_ret));
+		ret = notify_thread_ret;
+	}
+
+	return ret;
+}
+
+unsigned short NotifyThread::add_event(const PNOTIFY_CFG notify_cfg)
+{
+	// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Write message [severity: %d, message: %s]", severity, msg);
+	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+	pthread_mutex_lock(&notify_mtx);
+	notify_buffer_vector.push_back(notify_cfg);
+// Wake up waiting thread with condition variable, if it is called before this function
+	if (!new_notify_trigger)
+		pthread_cond_signal(&notify_cond);
+	new_notify_trigger = true;
+	pthread_mutex_unlock(&notify_mtx);
+	return MSG_DUMPER_SUCCESS;
+}

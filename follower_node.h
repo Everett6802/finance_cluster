@@ -8,19 +8,19 @@
 #include "node_channel.h"
 
 
-// class NodeRecvThread;
-
 class FollowerNode : public INode
 {
 	DECLARE_MSG_DUMPER()
 
 private:
 	static const int WAIT_CONNECTION_TIMEOUT; // 5 seconds
-	static const int TRY_TIMES;
+	static const int TRY_CONNECTION_TIMES;
+	static const int TRY_CONNECTION_SLEEP_TIMES;
 	static const int CHECK_KEEPALIVE_TIMES;
 	static const int TOTAL_KEEPALIVE_PERIOD;
 
 	// CHAR_LIST server_list;
+	PINOTIFY observer;
 	int socketfd;
 	char* local_ip;
 	char* cluster_ip;
@@ -28,20 +28,16 @@ private:
 	int cluster_node_id;
 	ClusterMap cluster_map;
 	int keepalive_cnt;
+	bool connection_retry;
 	PNODE_CHANNEL node_channel;
+	PNOTIFY_THREAD notify_thread;
 
-	pthread_mutex_t mtx_cluster_map;
-	pthread_mutex_t mtx_node_channel;
-//	class FinanceClusterNodeRecvThread; // Caution: Fail to compile
-	// NodeRecvThread* msg_recv_thread;
-	// int server_candidate_id;
+	pthread_mutex_t cluster_map_mtx;
+	pthread_mutex_t node_channel_mtx;
 
 	unsigned short connect_leader();
 	unsigned short become_follower();
 	unsigned short send_data(MessageType message_type, const char* data=NULL);
-	// unsigned short check_keepalive();
-	// // unsigned short find_leader();
-	// bool is_keepalive_packet(const std::string message)const;
 // events
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);
@@ -53,16 +49,21 @@ private:
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
-	FollowerNode(const char* server_ip, const char* ip);
+	FollowerNode(PINOTIFY notify, const char* server_ip, const char* ip);
 	virtual ~FollowerNode();
 
 // Interface
+// INode
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
 	virtual unsigned short recv(MessageType message_type, const std::string& message_data);
 	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL);
+// IParam
     virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);
     virtual unsigned short get(ParamType param_type, void* param1=NULL, void* param2=NULL);
+// INotify
+    virtual unsigned short notify(NotifyType notify_type, void* notify_param=NULL);
+	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
 };
 typedef FollowerNode* PFOLLOWER_NODE;
 

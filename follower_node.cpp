@@ -5,25 +5,26 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "follower_node.h"
-// #include "node_recv_thread.h"
 
 
 using namespace std;
 
 const int FollowerNode::WAIT_CONNECTION_TIMEOUT = 5; // 5 seconds
-const int FollowerNode::TRY_TIMES = 3;
+const int FollowerNode::TRY_CONNECTION_TIMES = 10;
+const int FollowerNode::TRY_CONNECTION_SLEEP_TIMES = 15;
 const int FollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
-// DECLARE_MSG_DUMPER_PARAM();
 
-FollowerNode::FollowerNode(const char* server_ip, const char* ip) :
-	// NodeBase(ip),
+FollowerNode::FollowerNode(PINOTIFY notify, const char* server_ip, const char* ip) :
+	observer(notify),
 	socketfd(0),
 	local_ip(NULL),
 	cluster_ip(NULL),
 	cluster_node_id(0),
 	keepalive_cnt(0),
-	node_channel(NULL)
+	connection_retry(false),
+	node_channel(NULL),
+	notify_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 
@@ -45,6 +46,8 @@ FollowerNode::~FollowerNode()
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(string(errmsg));
 	}
+	if (observer != NULL)
+		observer = NULL;
 
 	RELEASE_MSG_DUMPER()
 }
@@ -183,53 +186,30 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 		return ret;
 	}
 
-	pthread_mutex_lock(&mtx_node_channel);
+	pthread_mutex_lock(&node_channel_mtx);
 // Send to leader
 	assert(node_channel != NULL && "node_channel should NOT be NULL");
 	ret = node_channel->send_msg(node_message_assembler.get_full_message());
 	if (CHECK_FAILURE(ret))
 		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
-	pthread_mutex_unlock(&mtx_node_channel);
+	pthread_mutex_unlock(&node_channel_mtx);
 	return ret;
 }
 
-// unsigned short FollowerNode::find_leader()
-// {
-// 	unsigned short ret = RET_SUCCESS;
-// 	for (int i = 0 ; i < TRY_TIMES ; i++)
-// 	{
-// 		CHAR_LIST::iterator iter = server_list.begin();
-// 		while (iter != server_list.end())
-// 		{
-// 			char* cluster_ip = (char*)*iter++;
-// 			if (cluster_ip == NULL)
-// 			{
-// 				WRITE_ERROR("Server IP should NOT be NULL");
-// 				return RET_FAILURE_INVALID_POINTER;
-// 			}
-// 			if (strcmp(local_ip, cluster_ip) == 0)
-// 				continue;
-// 			ret = become_follower(cluster_ip);
-// // The node become a follower successfully
-// 			if (CHECK_SUCCESS(ret))
-// 				goto OUT;
-// 			else
-// 			{
-// // Check if time-out occurs while trying to connect to the remote node
-// 				if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-// 					goto OUT;
-// 			}
-// 		}
-// 	}
-// OUT:
-// 	return ret;
-// }
 
 unsigned short FollowerNode::initialize()
 {
-// Try to find the leader node
+// Try to find the follower node
 	unsigned short ret = RET_SUCCESS;
-	for (int i = 0 ; i < TRY_TIMES ; i++)
+// Initialize the worker thread for handling events
+	notify_thread = new NotifyThread(this);
+	if (notify_thread == NULL)
+		throw bad_alloc();
+	ret = notify_thread->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	for (int i = 0 ; i < TRY_CONNECTION_TIMES ; i++)
 	{
 		ret = become_follower();
 // The node become a follower successfully
@@ -238,7 +218,12 @@ unsigned short FollowerNode::initialize()
 		else
 		{
 // Check if time-out occurs while trying to connect to the remote node
-			if (!IS_TRY_CONNECTION_TIMEOUT(ret))
+			if (IS_TRY_CONNECTION_TIMEOUT(ret) && connection_retry)
+			{
+				WRITE_FORMAT_DEBUG("Re-build the cluster. Node[%s] try to connect to Leader[%s], but no response... %d", local_ip, cluster_ip, i);
+				sleep(TRY_CONNECTION_SLEEP_TIMES);
+			}
+			else
 				break;
 		}
 	}
@@ -246,27 +231,27 @@ unsigned short FollowerNode::initialize()
 	if (CHECK_FAILURE(ret))
 	{
 		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to server", local_ip);
+			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to Leader[%s], due to: %s", local_ip, cluster_ip, GetErrorDescription(ret));
 		else
-			WRITE_FORMAT_WARN("Node[%s] try to search for the leader, buf time-out...", local_ip);
+			WRITE_FORMAT_WARN("Node[%s] try to connect to Leader[%s], buf time-out...", local_ip, cluster_ip);
 		return ret;
 	}
-
-	mtx_node_channel = PTHREAD_MUTEX_INITIALIZER;
-	mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
+// Initialize the synchronization object
+	node_channel_mtx = PTHREAD_MUTEX_INITIALIZER;
+	cluster_map_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 // Start a timer to check keep-alive
 	keepalive_cnt = MAX_KEEPALIVE_CNT;
 
 // Create a thread of accessing the data
-	node_channel = new NodeChannel();
+	node_channel = new NodeChannel(this);
 	if (node_channel == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: node_channel");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	return node_channel->initialize(this, socketfd, local_ip);
+	return node_channel->initialize(socketfd, local_ip);
 }
 
 unsigned short FollowerNode::deinitialize()
@@ -300,7 +285,12 @@ unsigned short FollowerNode::deinitialize()
 		free(local_ip);
 		local_ip = NULL;
 	}
-
+	if (notify_thread != NULL)
+	{
+		notify_thread->deinitialize();
+		delete notify_thread;
+		notify_thread = NULL;
+	}
 	return RET_SUCCESS;
 }
 
@@ -336,7 +326,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
-		WRITE_FORMAT_ERROR("Unknown Notify Type: %d", message_type);
+		WRITE_FORMAT_ERROR("Unknown Message Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	return (this->*(send_func_array[message_type]))(param1, param2, param3);
@@ -346,11 +336,11 @@ unsigned short FollowerNode::recv_check_keepalive(const std::string& message_dat
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
-	pthread_mutex_lock(&mtx_node_channel);
+	pthread_mutex_lock(&node_channel_mtx);
 	if (keepalive_cnt < MAX_KEEPALIVE_CNT)
 		keepalive_cnt++;
-	pthread_mutex_unlock(&mtx_node_channel);
-	fprintf(stderr, "Recv Check-Keepalive: %d\n", keepalive_cnt);
+	pthread_mutex_unlock(&node_channel_mtx);
+	// fprintf(stderr, "Recv Check-Keepalive: %d\n", keepalive_cnt);
 	return RET_SUCCESS;
 }
 
@@ -359,7 +349,7 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 // Message format:
 // EventType | Payload: Cluster map string| EOD
 	unsigned short ret = RET_SUCCESS;
-	pthread_mutex_lock(&mtx_cluster_map);
+	pthread_mutex_lock(&cluster_map_mtx);
 	ret = cluster_map.from_string(message_data.c_str());
 	if (CHECK_FAILURE(ret))
 	{
@@ -378,7 +368,7 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 
     }
 OUT:
-	pthread_mutex_unlock(&mtx_cluster_map);
+	pthread_mutex_unlock(&cluster_map_mtx);
 	return ret;
 }
 
@@ -392,7 +382,7 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 {
 // Message format:
 // EventType | EOD
-	fprintf(stderr, "Recv30: Send Cheek Keepalive\n");
+	// fprintf(stderr, "Recv30: Send Cheek Keepalive\n");
 	if (keepalive_cnt == 0)
 	{
 // The leader die !!!
@@ -429,6 +419,11 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_CONNECTION_RETRY:
+    	{
+    		connection_retry = *(bool*)param1;
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -454,9 +449,9 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
-            pthread_mutex_lock(&mtx_cluster_map);
+            pthread_mutex_lock(&cluster_map_mtx);
             ret = cluster_map_param.copy(cluster_map);
-            pthread_mutex_unlock(&mtx_cluster_map);
+            pthread_mutex_unlock(&cluster_map_mtx);
     	}
     	break;
     	case PARAM_NODE_ID:
@@ -474,11 +469,60 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     		*(int*)param1 = cluster_node_id;
     	}
     	break;
+    	case PARAM_CONNECTION_RETRY:
+    	{
+    		 *(bool*)param1 = connection_retry;
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(notify_type)
+    {
+// Synchronous event:
+      	case NOTIFY_NODE_DIE:
+    	{
+    		assert(observer != NULL && "observer should NOT be NULL");
+    		ret = observer->notify(notify_type, notify_param);
+    	}
+    	break;
+// Asynchronous event:
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
+{
+	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+    unsigned short ret = RET_SUCCESS;
+    NotifyType notify_type = notify_cfg->get_notify_type();
+    switch(notify_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
     		throw std::invalid_argument(buf);
     	}
     	break;

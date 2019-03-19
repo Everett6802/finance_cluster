@@ -26,15 +26,9 @@ private:
 	char* local_ip;
 // Only for the follower
 	char* cluster_ip;
-	// std::list<char*> cluster_list;
 	NodeType node_type;
-	// NodeBase* cluster_node;
 	PINODE cluster_node;
-	// PMSG_TRANSFER_INF msg_trasnfer;
-	// pthread_t pid;
-	// unsigned short runtime_ret;
-	// pthread_mutex_t mtx_runtime_ret;
-	// pthread_cond_t cond_runtime_ret;
+	PNOTIFY_THREAD notify_thread;
 
 	unsigned short parse_config();
 
@@ -43,15 +37,11 @@ private:
 	unsigned short start_keepalive_timer();
 	void stop_keepalive_timer();
 	unsigned short become_leader();
-	unsigned short become_follower();
-	unsigned short start_connection();
+	unsigned short become_follower(bool need_rebuild_cluster=false);
+	// unsigned short start_connection();
 	unsigned short stop_connection();
-	unsigned short try_reconnection();
+	unsigned short rebuild_cluster();
 	void check_keepalive();
-	// void notify_exit(unsigned short exit_reason);
-
-	// static void* thread_handler(void* pvoid);
-	// unsigned short thread_handler_internal();
 
 public:
 	ClusterMgr();
@@ -65,10 +55,9 @@ public:
 	bool is_leader()const{return node_type == LEADER;}
 	// unsigned short start();
 	// unsigned short wait_to_stop();
-// // From IMsgObserver
-// 	virtual unsigned short recv(const std::string ip, const std::string message);
-// 	virtual unsigned short send(MessageType message_type, void* param1, void* param2, void* param3);
+// INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);
+	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
 };
 
 #endif
