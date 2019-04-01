@@ -12,7 +12,6 @@ const char* NodeChannel::thread_tag = "Channel Thread";
 const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
 NodeChannel::NodeChannel(PINODE node) :
-	observer(node),
 	exit(0),
 //	node_ip(NULL),
 	send_tid(0),
@@ -23,7 +22,8 @@ NodeChannel::NodeChannel(PINODE node) :
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
-	assert(observer == NULL && "observer should NOT be NULL");
+	observer = node;
+	assert(observer != NULL && "observer should NOT be NULL");
 }
 
 NodeChannel::~NodeChannel()
@@ -380,7 +380,6 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		pfd.fd = node_socket;
 		pfd.events = POLLIN | POLLHUP | POLLRDNORM;
 	    pfd.revents = 0;
-	    // fprintf(stderr, "Recv11: Wait for message\n");
 		int ret = poll(&pfd, 1, WAIT_DATA_TIMEOUT); // call poll with a timeout of 3000 ms
 // WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "poll() return value: %d", ret);
 		if (ret < 0)
@@ -396,7 +395,6 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
 			{
-				// fprintf(stderr, "Recv03: The connection is closed......\n");
 // Allocate the nofity event parameter
 				// const char* notify_param = remote_ip.c_str();
 				size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
@@ -404,19 +402,16 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				if (notify_cfg == NULL)
 					throw bad_alloc();
 // Notify the event
-				observer->notify(NOTIFY_NODE_DIE, notify_cfg);
 				WRITE_FORMAT_WARN("[%s] The connection is closed......", thread_tag);
+				observer->notify(NOTIFY_NODE_DIE, notify_cfg);
 				return RET_FAILURE_CONNECTION_CLOSE;
 			}
 			else
 			{
-// 				fprintf(stderr, "Recv04: buf: %s\n", buf);
 // // Parse the message
 				ret = node_message_parser.parse(buf);
-				// fprintf(stderr, "Recv05: assemble message\n");
 				if (CHECK_FAILURE(ret))
 				{
-					// fprintf(stderr, "Recv06: message imcomplete !!!\n");
 					if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
 						continue;
 					else
@@ -426,7 +421,6 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 					}
 				}
 // Send the message to the observer
-				// fprintf(stderr, "Recv07: notify observer\n");
 				ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
@@ -435,7 +429,6 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				}
 // Remove the data which is already shown
 				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
-				// fprintf(stderr, "Recv08: remove the message in buffer\n");
 				node_message_parser.remove_old();
 			}
 		}
@@ -444,15 +437,12 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			// if (data_buffer.length() != 0)
 			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
 			// WRITE_DEBUG("Time out. Nothing happen...");
-			// fprintf(stderr, "Recv12: Time out. No message !\n");
 			if (!node_message_parser.is_cur_message_empty())
 			{
-				// fprintf(stderr, "Recv09: message should NOT exist in buffer\n");
 				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
 			}
 		}
 	}
-	// fprintf(stderr, "Recv10: Exit RECV thread\n");
 // Segmetation fault occurs while calling WRITE_FORMAT_INFO
 // I don't know why. Perhaps similiar issue as below:
 // https://forum.bitcraze.io/viewtopic.php?t=1089

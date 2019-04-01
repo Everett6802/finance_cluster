@@ -303,6 +303,14 @@ unsigned short ClusterMgr::rebuild_cluster()
 		WRITE_FORMAT_ERROR("The cluster map in Follower[%s] is empty", local_ip);
 		return RET_FAILURE_RUNTIME;
 	}
+// Pops up the first node: Leader
+	int first_node_id;
+	std::string first_node_ip;
+	ret = cluster_map.get_first_node(first_node_id, first_node_ip);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	string cluster_ip_string(cluster_ip);
+	assert(strcmp(first_node_ip.c_str(), cluster_ip) == 0 && "The first node in cluster should be Leader");
 // Get the node ID from the follower
 	int node_id;
     ret = cluster_node->get(PARAM_NODE_ID, (void*)&node_id);
@@ -323,6 +331,7 @@ unsigned short ClusterMgr::rebuild_cluster()
         	WRITE_ERROR("Fails to get the candidate of the Leader");
         	return ret;
         }
+        // fprintf(stderr, "ID: %d candidate: id: %d, ip: %s\n", node_id, leader_candidate_node_id, leader_candidate_node_ip.c_str());
         if (leader_candidate_node_id == node_id)
         {
 // Leader
@@ -560,6 +569,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 // Asynchronous event:
       	case NOTIFY_NODE_DIE:
     	{
+     		assert(node_type == FOLLOWER && "node type should be FOLLOWER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		if (notify_cfg == NULL)
@@ -567,6 +577,8 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
+    		// string leader_ip((char*)notify_cfg->get_notify_param());
+    		WRITE_FORMAT_WARN("The leader[%s] dies, try to re-build the cluster", cluster_ip);
     		ret = notify_thread->add_event(notify_cfg);
     	}
 		break;
@@ -592,9 +604,8 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     {
       	case NOTIFY_NODE_DIE:
     	{
-    		assert (node_type == FOLLOWER && "node type should be FOLLOWER");
-    		string leader_ip((char*)notify_cfg->get_notify_param());
-    		WRITE_FORMAT_WARN("The leader[%s] dies, try to re-build the cluster", leader_ip.c_str());
+    		// string leader_ip((char*)notify_cfg->get_notify_param());
+    		WRITE_DEBUG("Start to re-build the cluster......");
     		ret = rebuild_cluster();
     	}
     	break;

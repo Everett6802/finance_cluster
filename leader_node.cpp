@@ -124,7 +124,7 @@ since they will inherit that state from the listening socket.
 	}
 
 	WRITE_FORMAT_INFO("Node[%s] is a Leader", local_ip);
-	// printf("Node[%s] is a leader !!!\n", local_ip);
+	printf("Node[%s] is a Leader !!!\n", local_ip);
 
 	return ret;
 }
@@ -395,7 +395,7 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 	if (cnt < MAX_KEEPALIVE_CNT)
 		node_keepalive_map[message_data]++;
 	pthread_mutex_unlock(&node_channel_mtx);
-	fprintf(stderr, "Recv Check-Keepalive: %s:%d\n", message_data.c_str(), node_keepalive_map[message_data]);
+	// fprintf(stderr, "Recv Check-Keepalive: %s:%d\n", message_data.c_str(), node_keepalive_map[message_data]);
 	return RET_SUCCESS;
 }
 
@@ -471,6 +471,7 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&node_channel_mtx);
 	string cluster_map_msg(cluster_map.to_string());
+	// fprintf(stderr, "Leader: %s\n", cluster_map.to_string());
 	pthread_mutex_unlock(&node_channel_mtx);
 // Update the cluster map to Followers
 	if (CHECK_FAILURE(ret))
@@ -747,6 +748,7 @@ void LeaderNode::listen_thread_cleanup_handler_internal()
 		{
 			node_channel->deinitialize();
 			delete node_channel;
+			node_channel = NULL;
 		}
 	}
 	node_channel_map.clear();

@@ -382,7 +382,7 @@ unsigned short ClusterMap::copy(const ClusterMap& another_cluster_map)
 	if (CHECK_FAILURE(ret))
 		return ret;
 	list<ClusterNode*>::const_iterator iter = another_cluster_map.cluster_map.begin();
-	while (iter != cluster_map.end())
+	while (iter != another_cluster_map.cluster_map.end())
 	{
 		ClusterNode* cluster_node = (ClusterNode*)*iter;
 		iter++;
@@ -585,7 +585,7 @@ unsigned short ClusterMap::from_string(const char* cluster_map_str)
 	char* cluster_map_str_ptr = cluster_map_str_tmp;
 	char* cluster_map_str_rest;
 	char* cluster_node_id_ip;
-	while((cluster_node_id_ip=strtok_r(cluster_map_str_ptr, ";", &cluster_map_str_rest)) != NULL)
+	while((cluster_node_id_ip=strtok_r(cluster_map_str_ptr, ",", &cluster_map_str_rest)) != NULL)
 	{
 		char* cluster_node_str_rest;
 		char* cluster_node_id = strtok_r(cluster_node_id_ip, ":", &cluster_node_str_rest);
@@ -756,9 +756,9 @@ unsigned short NotifyThread::notify_thread_handler_internal()
 // Clean-up the container
 			notify_buffer_vector.clear();
 		}
-		new_notify_trigger = 0;
+		new_notify_trigger = false;
 		pthread_mutex_unlock(&notify_mtx);
-
+	
 		int notify_execute_vector_size = notify_execute_vector.size();
 		if (notify_execute_vector_size > 0)
 		{

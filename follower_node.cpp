@@ -261,10 +261,7 @@ unsigned short FollowerNode::deinitialize()
 	{
 		ret = node_channel->deinitialize();
 		if (CHECK_FAILURE(ret))
-		{
-			WRITE_FORMAT_ERROR("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
-			return ret;
-		}
+			WRITE_FORMAT_WARN("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
 		delete node_channel;
 		node_channel = NULL;
 	}
@@ -350,7 +347,9 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 // EventType | Payload: Cluster map string| EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&cluster_map_mtx);
+	// fprintf(stderr, "Follower: %s\n", message_data.c_str());
 	ret = cluster_map.from_string(message_data.c_str());
+	// fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
@@ -365,7 +364,6 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
 			goto OUT;
 		}
-
     }
 OUT:
 	pthread_mutex_unlock(&cluster_map_mtx);
