@@ -190,7 +190,6 @@ unsigned short LeaderNode::remove_follower(const string& node_ip)
 {
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&node_channel_mtx);
-	// fprintf(stderr, "Recv20: Send Cheek Keepalive\n");
 	map<string, PNODE_CHANNEL>::iterator iter = node_channel_map.find(node_ip);
 	if (iter == node_channel_map.end())
 	{
@@ -222,7 +221,7 @@ unsigned short LeaderNode::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
 // Initialize the worker thread for handling events
-	notify_thread = new NotifyThread(this);
+	notify_thread = new NotifyThread(this, "Leader Notify Thread");
 	if (notify_thread == NULL)
 		throw bad_alloc();
 	ret = notify_thread->initialize();

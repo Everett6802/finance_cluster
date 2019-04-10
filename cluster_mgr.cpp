@@ -445,12 +445,13 @@ unsigned short ClusterMgr::initialize()
 		}
 	}
 // Initialize the worker thread for handling events
-	notify_thread = new NotifyThread(this);
+	notify_thread = new NotifyThread(this, "ClusterMgr Notify Thread");
 	if (notify_thread == NULL)
 		throw bad_alloc();
 	ret = notify_thread->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
+	sleep(1);
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
 	if (cluster_ip != NULL)

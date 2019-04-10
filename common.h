@@ -394,7 +394,7 @@ public:
 class NotifyThread
 {
 	DECLARE_MSG_DUMPER()
-	static const char* notify_thread_tag;
+	static const char* default_notify_thread_tag;
 
 private:
 	PINOTIFY notify_observer;
@@ -403,6 +403,7 @@ private:
 	pthread_t notify_tid;
 	volatile unsigned short notify_thread_ret;
 	bool new_notify_trigger;
+	char* notify_thread_tag;
 
 	std::vector<PNOTIFY_CFG> notify_buffer_vector;
 	std::vector<PNOTIFY_CFG> notify_execute_vector;
@@ -416,7 +417,7 @@ private:
 	void notify_thread_cleanup_handler_internal();
 
 public:
-	NotifyThread(PINOTIFY observer);
+	NotifyThread(PINOTIFY observer, const char* thread_tag=NULL);
 	~NotifyThread();
 
 	unsigned short initialize();

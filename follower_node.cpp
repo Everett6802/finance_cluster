@@ -202,7 +202,7 @@ unsigned short FollowerNode::initialize()
 // Try to find the follower node
 	unsigned short ret = RET_SUCCESS;
 // Initialize the worker thread for handling events
-	notify_thread = new NotifyThread(this);
+	notify_thread = new NotifyThread(this, "Follower Notify Thread");
 	if (notify_thread == NULL)
 		throw bad_alloc();
 	ret = notify_thread->initialize();

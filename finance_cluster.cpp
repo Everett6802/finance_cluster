@@ -203,14 +203,14 @@ int main(int argc, char** argv)
 		printf("SND: %s\n", msg);
 		cluster_mgr.transmit_text(msg);
 		getchar();	
-		msg = "This is a test 2";
-		printf("SND: %s\n", msg);
-		cluster_mgr.transmit_text(msg);
-		getchar();
-		msg = "This is a test 3";
-		printf("SND: %s\n", msg);
-		cluster_mgr.transmit_text(msg);
-		getchar();	
+		// msg = "This is a test 2";
+		// printf("SND: %s\n", msg);
+		// cluster_mgr.transmit_text(msg);
+		// getchar();
+		// msg = "This is a test 3";
+		// printf("SND: %s\n", msg);
+		// cluster_mgr.transmit_text(msg);
+		// getchar();	
 	}
 
 	// ret = cluster_mgr.wait_to_stop();
