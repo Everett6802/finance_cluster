@@ -48,7 +48,7 @@ private:
 	NodeChannel(PINODE node);
 	~NodeChannel();
 
-	unsigned short initialize(int socketfd, const char* ip);
+	unsigned short initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip);
 	unsigned short deinitialize();
 	void notify_exit();
 	const char* get_ip()const{return node_ip.c_str();}

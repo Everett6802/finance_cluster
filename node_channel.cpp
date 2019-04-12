@@ -33,16 +33,22 @@ NodeChannel::~NodeChannel()
 		observer = NULL;
 }
 
-unsigned short NodeChannel::initialize(int access_socket, const char* ip)
+unsigned short NodeChannel::initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip)
 {
-	if (ip == NULL)
+	if (channel_ip == NULL)
 	{
-		WRITE_ERROR("ip should NOT be NULL");
+		WRITE_ERROR("channel_ip should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	if (channel_remote_ip == NULL)
+	{
+		WRITE_ERROR("channel_remote_ip should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
-	node_socket = access_socket;
-	node_ip = string(ip);
+	node_socket = channel_socket;
+	node_ip = string(channel_ip);
+	remote_ip = string(channel_remote_ip);
 
 	mtx_buffer = PTHREAD_MUTEX_INITIALIZER;
 	cond_buffer = PTHREAD_COND_INITIALIZER;

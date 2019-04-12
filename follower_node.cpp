@@ -251,7 +251,7 @@ unsigned short FollowerNode::initialize()
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	return node_channel->initialize(socketfd, local_ip);
+	return node_channel->initialize(socketfd, local_ip, cluster_ip);
 }
 
 unsigned short FollowerNode::deinitialize()

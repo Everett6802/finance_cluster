@@ -678,7 +678,7 @@ const void* NotifyCfg::get_notify_param()const{return notify_param;}
 NotifyNodeDieCfg::NotifyNodeDieCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_NODE_DIE, param, param_size)
 {
-
+	// fprintf(stderr, "NotifyNodeDieCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 }
 
 NotifyNodeDieCfg::~NotifyNodeDieCfg()
