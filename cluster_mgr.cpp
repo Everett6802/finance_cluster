@@ -125,11 +125,12 @@ unsigned short ClusterMgr::find_local_ip()
 }
 
 ClusterMgr::ClusterMgr() :
+	notify_thread(NULL),
 	local_ip(NULL),
 	cluster_ip(NULL),
 	node_type(NONE),
 	cluster_node(NULL),
-	notify_thread(NULL)
+	interactive_server(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -470,12 +471,25 @@ unsigned short ClusterMgr::initialize()
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
 		return ret;
-
+// Initialize the session server
+	interactive_server = new InteractiveServer(this);
+	if (interactive_server == NULL)
+		throw bad_alloc();
+	ret = interactive_server->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
 	return ret;
 }
 
 unsigned short ClusterMgr::deinitialize()
 {
+// Deinitialize the session server
+	if (interactive_server != NULL)
+	{
+		interactive_server->deinitialize();
+		delete interactive_server;
+		interactive_server = NULL;	
+	}
 // Stop a keep-alive timer
 	stop_keepalive_timer();
 // Close the connection
@@ -555,6 +569,39 @@ unsigned short ClusterMgr::transmit_text(const char* data, const char* remote_ip
 	return cluster_node->send(MSG_TRANSMIT_TEXT, (void*)data, (void*)remote_ip);
 }
 
+unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(param_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
 
 unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 {

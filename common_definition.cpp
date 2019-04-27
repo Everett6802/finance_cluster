@@ -106,7 +106,8 @@ const int MAX_CONNECTED_CLIENT = 5;
 
 const char* CONF_FODLERNAME = "conf";
 const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
-const int PORT_NO = 6802;
+const int CLUSTER_PORT_NO = 6802;
+const int SESSION_PORT_NO = CLUSTER_PORT_NO + 1;
 const int RECV_BUF_SIZE = 512;
 
 const char* CONFIG_FOLDER_NAME = "conf";

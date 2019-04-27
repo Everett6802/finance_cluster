@@ -129,7 +129,8 @@ extern const int MAX_CONNECTED_CLIENT;
 
 extern const char* CONF_FODLERNAME;
 extern const char* FINANCE_CLUSTER_CONF_FILENAME;
-extern const int PORT_NO;
+extern const int CLUSTER_PORT_NO;
+extern const int SESSION_PORT_NO;
 extern const int RECV_BUF_SIZE;
 
 extern const char* CONFIG_FOLDER_NAME;
@@ -161,6 +162,7 @@ enum ParamType{
 enum NotifyType{
 	NOTIFY_CHECK_KEEPALIVE,
 	NOTIFY_NODE_DIE,
+	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_SIZE
 };
@@ -231,6 +233,12 @@ public:
 };
 typedef INode* PINODE;
 
+class IManager : public IParam, public INotify
+{
+public:
+	virtual ~IManager(){}
+};
+typedef IManager* PIMANAGER;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class
@@ -387,6 +395,15 @@ class NotifyNodeDieCfg : public NotifyCfg
 public:
 	NotifyNodeDieCfg(const void* param=NULL, size_t param_size=0);
 	virtual ~NotifyNodeDieCfg();
+};
+
+///////////////////////////
+
+class NotifySessionExitCfg : public NotifyCfg
+{
+public:
+	NotifySessionExitCfg(const void* param=NULL, size_t param_size=0);
+	virtual ~NotifySessionExitCfg();
 };
 
 ///////////////////////////////////////////////////

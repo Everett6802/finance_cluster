@@ -91,7 +91,7 @@ since they will inherit that state from the listening socket.
 	memset(&server_address, 0x0, sizeof(struct sockaddr_in));
 	server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_address.sin_port = htons(PORT_NO);
+	server_address.sin_port = htons(CLUSTER_PORT_NO);
 	server_len = sizeof(server_address);
 	if (bind(listen_sd, (struct sockaddr*)&server_address, server_len) == -1)
 	{
@@ -658,19 +658,20 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		int res = select(socketfd + 1, &sock_set, NULL, NULL, &tv);
 		if (res < 0 && errno != EINTR)
 		{
-			WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
+			WRITE_FORMAT_ERROR("[%s] select() fails, due to: %s", listen_thread_tag, strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 		else if (res == 0)
 		{
 			// WRITE_DEBUG("Accept timeout");
+			usleep(100000);
 			continue;
 		}		
 // Follower connect to Leader
 		int client_socketfd = accept(socketfd, &client_addr, (socklen_t*)&client_addr_len);
 		if (client_socketfd < 0)
 		{
-			WRITE_FORMAT_ERROR("accept() fails, due to: %s", strerror(errno));
+			WRITE_FORMAT_ERROR("[%s] accept() fails, due to: %s", listen_thread_tag, strerror(errno));
 			return RET_FAILURE_SYSTEM_API;
 		}
 		// deal with both IPv4 and IPv6:
@@ -681,11 +682,11 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		inet_ntop(AF_INET, &client_s->sin_addr, client_ip, sizeof(client_ip));
 		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", listen_thread_tag, client_ip);
 		// PRINT("Follower[%s] connects to the Leader\n", ip);
-// Initialize a new thread for data transfer between follower
+// Initialize a channel for data transfer between follower
 		PNODE_CHANNEL node_channel = new NodeChannel(this);
 		if (node_channel == NULL)
 		{
-			WRITE_ERROR("Fail to allocate memory: node_channel");
+			WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: node_channel", listen_thread_tag);
 			// pthread_mutex_unlock(&node_channel_mtx);
 			return RET_FAILURE_INSUFFICIENT_MEMORY;
 		}
@@ -706,18 +707,18 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		ret = cluster_map.add_node(++cluster_node_cnt, client_ip);
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_ERROR("Fail to allocate memory: node_channel");
+			WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: node_channel", listen_thread_tag);
 			pthread_mutex_unlock(&node_channel_mtx);
 			return ret;
 		}
 		string cluster_map_msg(cluster_map.to_string());
 		pthread_mutex_unlock(&node_channel_mtx);
-		PRINT("The Channel between Follower[%s] and Leader is Established......\n", client_ip);
+		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_ip);
 // Update the cluster map to Followers
 		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Fail to send the message of updating the cluster map, due to: %s", GetErrorDescription(ret));
+			WRITE_FORMAT_ERROR("[%s] Fail to send the message of updating the cluster map, due to: %s", listen_thread_tag, GetErrorDescription(ret));
 			return ret;
 		}
 		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", listen_thread_tag, client_ip);

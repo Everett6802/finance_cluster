@@ -691,6 +691,24 @@ NotifyNodeDieCfg::~NotifyNodeDieCfg()
 	}
 }
 
+///////////////////////////
+
+NotifySessionExitCfg::NotifySessionExitCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_SESSION_EXIT, param, param_size)
+{
+	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+}
+
+NotifySessionExitCfg::~NotifySessionExitCfg()
+{
+	if(notify_param != NULL)
+	{
+		int* notify_session_exit_param = (int*)notify_param;
+		free(notify_session_exit_param);
+		notify_param = NULL;
+	}
+}
+
 //////////////////////////////////////////////////////////
 
 const char* NotifyThread::default_notify_thread_tag = "Notify Thread";

@@ -16,7 +16,6 @@ class LeaderNode : public INode
 
 private:
 	static const char* listen_thread_tag;
-	// static const char* notify_thread_tag;
 	static const int WAIT_CONNECTION_TIMEOUT;
 
 	PINOTIFY observer;

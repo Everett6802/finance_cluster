@@ -5,11 +5,10 @@
 #include <list>
 #include <string>
 #include "common.h"
+#include "interactive_server.h"
 
 
-// class NodeBase;
-
-class ClusterMgr : public INotify
+class ClusterMgr : public IManager
 {
 	enum NodeType{LEADER, FOLLOWER, NONE};
 	DECLARE_MSG_DUMPER()
@@ -23,15 +22,14 @@ private:
 	std::string cluster_network;
 	int cluster_netmask_digits;
 
+	PNOTIFY_THREAD notify_thread;
 	char* local_ip;
-// Only for the follower
-	char* cluster_ip;
+	char* cluster_ip; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;
-	PNOTIFY_THREAD notify_thread;
+	InteractiveServer* interactive_server;
 
 	unsigned short parse_config();
-
 	unsigned short find_local_ip();
 	void set_keepalive_timer_interval(int delay=0, int period=0);
 	unsigned short start_keepalive_timer();
@@ -53,8 +51,11 @@ public:
 	unsigned short transmit_text(const char* data, const char* remote_ip=NULL);
 
 	bool is_leader()const{return node_type == LEADER;}
-	// unsigned short start();
-	// unsigned short wait_to_stop();
+// Interface
+// IParam
+    virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);
+    virtual unsigned short get(ParamType param_type, void* param1=NULL, void* param2=NULL);
+
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);
 	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
