@@ -469,6 +469,7 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 // EventType | cluster map string | EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&node_channel_mtx);
+	// fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 	string cluster_map_msg(cluster_map.to_string());
 	// fprintf(stderr, "Leader: %s\n", cluster_map.to_string());
 	pthread_mutex_unlock(&node_channel_mtx);
@@ -522,6 +523,19 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_CLUSTER_MAP:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
+            pthread_mutex_lock(&node_channel_mtx);
+            ret = cluster_map_param.copy(cluster_map);
+            pthread_mutex_unlock(&node_channel_mtx);
+    	}
+    	break;
       	case PARAM_NODE_ID:
     	{
     		if (param1 == NULL)
@@ -715,6 +729,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		pthread_mutex_unlock(&node_channel_mtx);
 		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_ip);
 // Update the cluster map to Followers
+		// fprintf(stderr, "LeaderNode::listen_thread_handler_internal %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{

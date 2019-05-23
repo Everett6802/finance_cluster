@@ -10,7 +10,6 @@
 
 class ClusterMgr : public IManager
 {
-	enum NodeType{LEADER, FOLLOWER, NONE};
 	DECLARE_MSG_DUMPER()
 
 	static const char* SERVER_LIST_CONF_FILENAME;

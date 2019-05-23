@@ -112,16 +112,10 @@ const char* GetErrorDescription(unsigned short ret);
 
 extern bool SHOW_CONSOLE;
 
-// extern const char* CHECK_KEEPALIVE_TAG;
-// extern const std::string CHECK_SERVER_CANDIDATE_TAG;
-// extern const int CHECK_KEEPALIVE_TAG_LEN;
-// extern const int CHECK_SERVER_CANDIDATE_TAG_LEN;
-
 extern const int MESSAGE_TYPE_LEN;
 extern const std::string END_OF_MESSAGE;
 extern const int END_OF_MESSAGE_LEN;
 
-// extern const char* END_OF_PACKET;
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
 extern const int MAX_KEEPALIVE_CNT;
@@ -137,12 +131,15 @@ extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
 extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 
-//extern const unsigned short NOTIFY_DEAD_CLIENT;
-//extern const unsigned short NOTIFY_CHECK_KEEPALIVE;
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
+
+enum NodeType{
+	LEADER, 
+	FOLLOWER, 
+	NONE
+};
 
 enum MessageType{
 	MSG_CAN_NOT_USE = 0, // 0 can NOT use, due to serialization/deserialization
@@ -156,6 +153,7 @@ enum ParamType{
 	PARAM_CLUSTER_MAP,
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
+	PARAM_CLUSTER_DETAIL,
 	PARAM_SIZE
 };
 
@@ -286,7 +284,7 @@ class NodeMessageParser
 private:
 	bool full_message_found;
 	std::string data_buffer;
-	size_t data_beg_pos;
+	size_t data_end_pos;
 	MessageType message_type;
 
 public:
@@ -319,6 +317,7 @@ public:
     // bool operator== (const ClusterNode* p1, const ClusterNode* p2);	
 };
 typedef ClusterNode* PCLUSTER_NODE;
+typedef std::list<ClusterNode*>::iterator CLUSTER_NODE_ITER;
 
 // bool operator== (const ClusterNode &n1, const ClusterNode &n2); 
 // bool operator== (const ClusterNode* p1, const ClusterNode* p2);
@@ -337,6 +336,23 @@ public:
 	ClusterMap();
 	~ClusterMap();
 
+	class const_iterator
+	{
+	private:
+		CLUSTER_NODE_ITER iter;
+
+	public:
+		const_iterator(CLUSTER_NODE_ITER iterator);
+		const_iterator operator++();
+		bool operator==(const const_iterator& another);
+		bool operator!=(const const_iterator& another);
+		const ClusterNode* operator->();
+		const ClusterNode& operator*();
+	};
+
+	const_iterator begin();
+	const_iterator end();
+
     bool is_empty()const;
     unsigned short copy(const ClusterMap& another_cluster_map);
 	unsigned short add_node(int node_id, std::string node_ip);
@@ -352,6 +368,8 @@ public:
 	const char* to_string();
 	unsigned short from_string(const char* cluster_map_str);
 	// unsigned short from_object(const ClusterMap& cluster_map_obj);
+
+
 };
 
 ///////////////////////////////////////////////////
@@ -370,6 +388,22 @@ public:
 	unsigned short deinitialize();
 	unsigned short trigger();
 };
+
+///////////////////////////////////////////////////
+
+class ClusterDetailParam
+{
+public:
+	NodeType node_type;
+	int node_id;
+	char local_ip[16];
+	char cluster_ip[16];
+	ClusterMap cluster_map;
+
+	ClusterDetailParam();
+	~ClusterDetailParam();
+};
+typedef ClusterDetailParam* PCLUSTER_DETAIL_PARAM;
 
 ///////////////////////////////////////////////////
 

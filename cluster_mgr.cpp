@@ -591,6 +591,32 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_CLUSTER_DETAIL:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		PCLUSTER_DETAIL_PARAM cluster_detail_param = (PCLUSTER_DETAIL_PARAM)param1;
+    		assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+		    ret = cluster_node->get(PARAM_NODE_ID, (void*)&cluster_detail_param->node_id);
+			if (CHECK_FAILURE(ret))
+				return ret;
+		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_detail_param->cluster_map);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			cluster_detail_param->node_type = node_type;
+			assert(local_ip != NULL && "local_ip should NOT be NULL");
+			strcpy(cluster_detail_param->local_ip, local_ip);
+			if (node_type == NONE)
+			{
+    			WRITE_FORMAT_ERROR("The node_type[%d] is NOT defined", node_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;				
+			}
+			strcpy(cluster_detail_param->cluster_ip, (node_type == LEADER ? local_ip : cluster_ip));
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

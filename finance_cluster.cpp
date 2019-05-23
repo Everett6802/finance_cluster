@@ -125,9 +125,27 @@ unsigned short setup_param(ClusterMgr& cluster_mgr)
 	return RET_SUCCESS;
 }
 
-
+#include <string>
 int main(int argc, char** argv)
 {
+	// const int RSP_BUF_VERY_SHORT_SIZE = 32;
+	// const int RSP_BUF_SIZE = 256;
+	// char buf[RSP_BUF_SIZE];
+	// int node_id = 1;
+	// bool is_local_node = true;
+	// std::string node_ip("10.206.24.219");
+	// char cluster_node_ip[RSP_BUF_VERY_SHORT_SIZE];
+	// snprintf(cluster_node_ip, RSP_BUF_VERY_SHORT_SIZE, "%s", node_ip.c_str());
+	// fprintf(stderr, "%s %d\n", cluster_node_ip, strlen(cluster_node_ip));
+	// snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s *\n" : "%d %s\n"), node_id, cluster_node_ip);
+	// fprintf(stderr, "%s\n", buf);
+
+	// std::string my_str("0123456789");
+	// std::string my_tag("89");
+	// size_t pos = my_str.find(my_tag);
+	// fprintf(stderr, "%s\n", my_str.substr(1, pos-1).c_str());
+	// exit(0);
+
 	// char* message = NULL;
 	// int buf_size = MESSAGE_TYPE_LEN + (message != NULL ? strlen(message) : 0) + END_OF_MESSAGE_LEN + 1;
 	// MessageType message_type = (MessageType)257; //MSG_CHECK_KEEPALIVE;

@@ -255,8 +255,8 @@ unsigned short NodeMessageParser::parse(const char* new_message)
 
 	data_buffer += string(new_message);
 // Check if the data is completely sent from the remote site
-	data_beg_pos = data_buffer.find(END_OF_MESSAGE);
-	if (data_beg_pos == string::npos)
+	data_end_pos = data_buffer.find(END_OF_MESSAGE);
+	if (data_end_pos == string::npos)
 		return RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
 // Parse the content of the full message
 	message_type = (MessageType)data_buffer.front();
@@ -280,7 +280,7 @@ unsigned short NodeMessageParser::remove_old()
 		PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
-	data_buffer = data_buffer.substr(data_beg_pos + END_OF_MESSAGE_LEN);
+	data_buffer = data_buffer.substr(data_end_pos + END_OF_MESSAGE_LEN);
 	full_message_found = false;
 	return RET_SUCCESS;
 }
@@ -303,7 +303,7 @@ const char* NodeMessageParser::get_message()const
 	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
 	// 	return RET_FAILURE_INCORRECT_OPERATION;
 	// }
-	return data_buffer.substr(1, data_beg_pos).c_str();
+	return data_buffer.substr(1, data_end_pos - 1).c_str();
 }
 
 MessageType NodeMessageParser::get_message_type()const
@@ -349,6 +349,41 @@ bool ClusterNode::operator== (const ClusterNode *p)
 // 	return operator== 	(*p1, *p2);
 // }
 
+
+ClusterMap::const_iterator::const_iterator(CLUSTER_NODE_ITER iterator) : iter(iterator){}
+
+ClusterMap::const_iterator ClusterMap::const_iterator::operator++()
+{
+	++iter;
+	return *this;
+}
+
+bool ClusterMap::const_iterator::operator==(const const_iterator& another)
+{
+	if (this == &another)
+		return true;
+	return iter == another.iter;
+}
+
+
+bool ClusterMap::const_iterator::operator!=(const const_iterator& another)
+{
+	// if (this == &another)
+	// 	return true;
+	// return iter == another.iter;
+	return !this->operator==(another);
+}
+
+const ClusterNode* ClusterMap::const_iterator::operator->()
+{
+	return (PCLUSTER_NODE)(*iter);
+}
+
+const ClusterNode& ClusterMap::const_iterator::operator*()
+{
+	return *((PCLUSTER_NODE)(*iter));
+}
+
 void ClusterMap::reset_cluster_map_str()
 {
 	if (cluster_map_str != NULL)
@@ -370,6 +405,16 @@ ClusterMap::~ClusterMap()
 	reset_cluster_map_str();
 }
 
+ClusterMap::const_iterator ClusterMap::begin() 
+{
+	return const_iterator(cluster_map.begin());
+}
+
+ClusterMap::const_iterator ClusterMap::end() 
+{
+	return const_iterator(cluster_map.end());
+}
+
 bool ClusterMap::is_empty()const
 {
 	return cluster_map.empty();
@@ -386,6 +431,7 @@ unsigned short ClusterMap::copy(const ClusterMap& another_cluster_map)
 	{
 		ClusterNode* cluster_node = (ClusterNode*)*iter;
 		iter++;
+		// fprintf(stderr, "id: %d, ip: %s, %d\n", cluster_node->node_id, cluster_node->node_ip.c_str(), strlen(cluster_node->node_ip.c_str()));
 		ret = add_node(cluster_node->node_id, cluster_node->node_ip);
 		if (CHECK_FAILURE(ret))
 			break;
@@ -582,6 +628,7 @@ unsigned short ClusterMap::from_string(const char* cluster_map_str)
 	if (CHECK_FAILURE(ret))
 		return ret;
 	char* cluster_map_str_tmp = strdup(cluster_map_str);
+	// fprintf(stderr, "ClusterMap::from_string %s, %d\n", cluster_map_str_tmp, strlen(cluster_map_str_tmp));
 	char* cluster_map_str_ptr = cluster_map_str_tmp;
 	char* cluster_map_str_rest;
 	char* cluster_node_id_ip;
@@ -590,6 +637,7 @@ unsigned short ClusterMap::from_string(const char* cluster_map_str)
 		char* cluster_node_str_rest;
 		char* cluster_node_id = strtok_r(cluster_node_id_ip, ":", &cluster_node_str_rest);
 		char* cluster_node_ip = strtok_r(NULL, ":", &cluster_node_str_rest);
+		// fprintf(stderr, "ClusterMap::from_string id: %d, ip: %s, %d\n", cluster_node_id, cluster_node_ip, strlen(cluster_node_ip));
 		ret = add_node(atoi(cluster_node_id), string(cluster_node_ip));
 		if (CHECK_FAILURE(ret))
 			return ret;
@@ -642,6 +690,12 @@ unsigned short KeepaliveTimerTask::trigger()
 		return notify_observer->notify(NOTIFY_CHECK_KEEPALIVE);
 	return RET_FAILURE_INCORRECT_OPERATION;
 }
+
+//////////////////////////////////////////////////////////
+
+ClusterDetailParam::ClusterDetailParam(){}
+ClusterDetailParam::~ClusterDetailParam(){}
+
 
 //////////////////////////////////////////////////////////
 

@@ -16,13 +16,15 @@ enum InteractiveSessionCommandType
 {
 	InteractiveSessionCommand_Help,
 	InteractiveSessionCommand_Exit,
+	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommandSize
 };
 
 static const char *interactive_session_command[InteractiveSessionCommandSize] = 
 {
 	"help",
-	"exit"
+	"exit",
+	"get_cluster_detail",
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
@@ -382,7 +384,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 	static handle_command_func_ptr handle_command_func_array[] =
 	{
 		&InteractiveSession::handle_help_command,
-		&InteractiveSession::handle_exit_command
+		&InteractiveSession::handle_exit_command,
+		&InteractiveSession::handle_get_cluster_detail_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -398,6 +401,8 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	string usage_string;
 	usage_string += string("====================== Usage ======================\n");
 	usage_string += string("* help\n Description: The usage\n");
+	usage_string += string("* exit\n Description: Exit the session\n");
+	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
 	usage_string += string("===================================================\n");
 
 	ret = print_to_console(usage_string);
@@ -416,5 +421,38 @@ unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 // Notify the event
 	WRITE_FORMAT_WARN("[%s] The session is closed......", session_tag);
 	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, char **argv)
+{
+	static const char* CLUSTER_DETAIL_TITLE = "\n====================== Cluster Info ======================\n";
+	static const char* NODE_TYPE_LIST[] = {"Leader","Follower"};
+	assert(manager != NULL && "manager should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	// int node_id;
+	ClusterDetailParam cluster_detail_param;
+    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
+	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
+	char cluster_node_ip[RSP_BUF_VERY_SHORT_SIZE];
+	while(iter != cluster_detail_param.cluster_map.end())
+	{
+		const ClusterNode& cluster_node = *iter;
+		// snprintf(cluster_node_ip, RSP_BUF_VERY_SHORT_SIZE, "%s", cluster_node.node_ip.c_str());
+		strcpy(cluster_node_ip, cluster_node.node_ip.c_str());
+		// strcpy(cluster_node_ip, "10.206.24.219");
+		int node_type_index = (strcmp(cluster_node_ip, cluster_detail_param.cluster_ip) == 0 ? LEADER : FOLLOWER);
+		bool is_local_node = (cluster_detail_param.node_id == cluster_node.node_id ? true : false);
+		char buf[RSP_BUF_SIZE];
+		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_ip, NODE_TYPE_LIST[node_type_index]);
+		++iter;
+		cluster_detail_string += string(buf);
+
+	}
+
+	ret = print_to_console(cluster_detail_string);
 	return RET_SUCCESS;
 }
