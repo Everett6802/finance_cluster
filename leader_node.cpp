@@ -391,10 +391,19 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
+	const string& follower_ip = message_data;
+	// fprintf(stderr, "KeepAlive follower_ip: %s\n", follower_ip.c_str());
 	pthread_mutex_lock(&node_channel_mtx);
-	int cnt = node_keepalive_map[message_data];
+	map<string, int>::iterator iter = node_keepalive_map.find(follower_ip);
+	if (iter == node_keepalive_map.end())
+	{
+		WRITE_FORMAT_ERROR("The Follower[%s] does NOT exist", follower_ip.c_str());
+		return RET_FAILURE_INTERNAL_ERROR;
+	}
+	int cnt = node_keepalive_map[follower_ip];
 	if (cnt < MAX_KEEPALIVE_CNT)
-		node_keepalive_map[message_data]++;
+		node_keepalive_map[follower_ip]++;
+	// fprintf(stderr, "KeepAlive[%s] Recv to counter: %d\n", follower_ip.c_str(), node_keepalive_map[follower_ip]);
 	pthread_mutex_unlock(&node_channel_mtx);
 	// fprintf(stderr, "Recv Check-Keepalive: %s:%d\n", message_data.c_str(), node_keepalive_map[message_data]);
 	return RET_SUCCESS;
@@ -430,18 +439,23 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 // Check if nodes in cluster are dead
 	pthread_mutex_lock(&node_channel_mtx);
 	// fprintf(stderr, "Recv20: Send Cheek Keepalive\n");
+	// fprintf(stderr, "KeepAlive, Before Check...\n");
+	// dump_node_channel_map();
+	// dump_node_keepalive_map();
+	// fprintf(stderr, "KeepAlive, Before Check...END\n");
 	map<string, int>::iterator iter = node_keepalive_map.begin();
 	while (iter != node_keepalive_map.end())
 	{
 		string node_ip = (string)iter->first;
 		if ((int)iter->second == 0)
 		{
+			// fprintf(stderr, "KeepAlive[%s]: counter is 0!\n", node_ip.c_str());
 // Remove the node
 			PNODE_CHANNEL node_channel = node_channel_map[node_ip];
 			WRITE_FORMAT_WARN("The Follower[%s] is dead", node_channel->get_remote_ip());
 			node_channel->deinitialize();
 			node_channel_map.erase(node_ip);
-			node_keepalive_map.erase(iter++);
+			node_keepalive_map.erase(iter);
 
 			ret = cluster_map.delete_node_by_ip(node_ip);
 			if (CHECK_FAILURE(ret))
@@ -455,9 +469,15 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 		else
 		{
 			node_keepalive_map[node_ip]--;
-			iter++;
+			// fprintf(stderr, "KeepAlive[%s]: counter: %d\n", node_ip.c_str(), node_keepalive_map[node_ip]);
 		}
+		iter++;
 	}
+	// fprintf(stderr, "KeepAlive, After Check...\n");
+	// dump_node_channel_map();
+	// dump_node_keepalive_map();
+	// fprintf(stderr, "KeepAlive, After Check...END\n");
+
 	char* cluster_map_msg = NULL;
 	if (follower_dead_found)
 		cluster_map_msg = strdup(cluster_map.to_string());
@@ -663,6 +683,18 @@ void LeaderNode::dump_node_channel_map()const
 	}
 }
 
+void LeaderNode::dump_node_keepalive_map()const
+{
+	map<std::string, int>::const_iterator iter = node_keepalive_map.begin();
+	while (iter != node_keepalive_map.end())
+	{
+		string node_ip = (string)(iter->first);
+		int keepalive_counter = (int)(iter->second);
+		fprintf(stderr, "%s %d\n", node_ip.c_str(), keepalive_counter);
+		iter++;
+	}
+}
+
 void* LeaderNode::listen_thread_handler(void* pvoid)
 {
 	LeaderNode* pthis = (LeaderNode*)pvoid;
@@ -758,8 +790,12 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 // Add a channel of the new follower
 		pthread_mutex_lock(&node_channel_mtx);
 		// node_channel_deque.push_back(node_channel);
+		// dump_node_channel_map();
+		// dump_node_keepalive_map();
 		node_channel_map[client_ip] = node_channel;
 		node_keepalive_map[client_ip] = MAX_KEEPALIVE_CNT;
+		// dump_node_channel_map();
+		// dump_node_keepalive_map();
 // Update the cluster map in Leader
 		ret = cluster_map.add_node(++cluster_node_cnt, client_ip);
 		if (CHECK_FAILURE(ret))

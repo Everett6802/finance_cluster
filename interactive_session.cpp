@@ -325,7 +325,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 // Show warning if error occurs while executing the command and then exit
 					WRITE_ERROR(rsp_buf);
 					print_to_console(string(rsp_buf));
-					return ret;				
+					// return ret;				
 				}
 				else if (CHECK_WARN(ret))
 				{
@@ -334,6 +334,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 // Show warning if warn occurs while executing the command
 					WRITE_WARN(rsp_buf);
 					print_to_console(string(rsp_buf));
+					goto OUT;
 					// return ret;	
 				}
 			}
@@ -347,7 +348,24 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 			print_prompt_to_console();
 		}
 	}
-	return RET_SUCCESS;
+OUT:
+	if (sock_fp != NULL)
+	{
+		fclose(sock_fp);
+		sock_fp = NULL;
+	}
+
+	if (CHECK_FAILURE(ret))
+	{
+// Notify the parent to close the session
+		size_t notify_param_size = sizeof(int);
+		PNOTIFY_CFG notify_cfg = new NotifySessionExitCfg((void*)&session_id, notify_param_size);
+		if (notify_cfg == NULL)
+			throw bad_alloc();
+		WRITE_FORMAT_WARN("[%s] The session is closed due to error: %s", session_tag, GetErrorDescription(ret));
+		observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
+	}
+	return ret;
 }
 
 unsigned short InteractiveSession::print_to_console(string response)const

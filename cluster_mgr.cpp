@@ -421,6 +421,19 @@ void ClusterMgr::check_keepalive()
 	}
 }
 
+void ClusterMgr::dump_interactive_session_data_list(int session_id)const
+{
+	fprintf(stderr, "The interactive session[%d] data:\n", session_id);
+	const std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_data_list[session_id];
+	std::list<PNOTIFY_CFG>::const_iterator iter = interactive_session_data.begin();
+	while (iter != interactive_session_data.end())
+	{
+		PNOTIFY_CFG nodify_cfg = (PNOTIFY_CFG)*iter;
+		fprintf(stderr, "NotifyType: %d\n", nodify_cfg->get_notify_type());
+		++iter;
+	}
+}
+
 unsigned short ClusterMgr::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
@@ -677,6 +690,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				bool found = false;
 				pthread_mutex_lock(&interactive_session_mtx[system_info_param->session_id]);
 				pthread_cond_wait(&interactive_session_cond[system_info_param->session_id], &interactive_session_mtx[system_info_param->session_id]);
+				// dump_interactive_session_data_list(system_info_param->session_id);
 				std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_data_list[system_info_param->session_id];
 				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 				while (iter != interactive_session_data.end())
@@ -786,8 +800,11 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	{
     		PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
 			int session_id = notify_system_info_cfg->get_session_id();
+			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_mtx[session_id]);
 			interactive_session_data_list[session_id].push_back(notify_system_info_cfg);
+// It's required to sleep for a while before notifying to accessing the list in another thread
+			usleep(1000); // A MUST
 			pthread_cond_signal(&interactive_session_cond[session_id]);
 			pthread_mutex_unlock(&interactive_session_mtx[session_id]);
     	}

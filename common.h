@@ -110,6 +110,7 @@ extern const unsigned short RET_FAILURE_INCORRECT_PATH;
 extern const unsigned short RET_FAILURE_IO_OPERATION;
 extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
+extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
 extern const unsigned short RET_FAILURE_END;
 
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;

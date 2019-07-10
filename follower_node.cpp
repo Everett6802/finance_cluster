@@ -339,6 +339,7 @@ unsigned short FollowerNode::recv_check_keepalive(const std::string& message_dat
 	pthread_mutex_lock(&node_channel_mtx);
 	if (keepalive_cnt < MAX_KEEPALIVE_CNT)
 		keepalive_cnt++;
+	// fprintf(stderr, "KeepAlive Recv to counter: %d\n", keepalive_cnt);
 	pthread_mutex_unlock(&node_channel_mtx);
 	// fprintf(stderr, "Recv Check-Keepalive: %d\n", keepalive_cnt);
 	return RET_SUCCESS;
@@ -395,16 +396,18 @@ unsigned short FollowerNode::recv_query_system_info(const std::string& message_d
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
 // Message format:
-// EventType | EOD
+// EventType | payload: local_ip | EOD
 	// fprintf(stderr, "Recv30: Send Cheek Keepalive\n");
 	if (keepalive_cnt == 0)
 	{
+		// fprintf(stderr, "KeepAlive counter is 0!\n");
 // The leader die !!!
 		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%s]", local_ip, cluster_ip);
 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 	}
 
-	return send_data(MSG_CHECK_KEEPALIVE);
+	// fprintf(stderr, "KeepAlive Sent\n");
+	return send_data(MSG_CHECK_KEEPALIVE, local_ip);
 	// char msg = (char)MSG_CHECK_KEEPALIVE;
 	// return send_data(&msg);
 }
@@ -442,6 +445,7 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 // Serialize: convert the type of session id from integer to string  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT, *(int*)param1);
+
 // Combine the payload
 	string system_info_data = string(session_id_buf);
 	string system_info;

@@ -44,6 +44,7 @@ private:
 	unsigned short stop_connection();
 	unsigned short rebuild_cluster();
 	void check_keepalive();
+	void dump_interactive_session_data_list(int session_id)const;
 
 public:
 	ClusterMgr();
