@@ -232,9 +232,6 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
-// Initialize the synchronization object
-	node_channel_mtx = PTHREAD_MUTEX_INITIALIZER;
-	// mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
 // Create worker thread
 	if (pthread_create(&listen_tid, NULL, listen_thread_handler, this))
 	{
@@ -357,6 +354,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_check_keepalive,
 		&LeaderNode::recv_update_cluster_map,
 		&LeaderNode::recv_transmit_text,
+		&LeaderNode::recv_query_system_info
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -374,7 +372,8 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		NULL,
 		&LeaderNode::send_check_keepalive,
 		&LeaderNode::send_update_cluster_map,
-		&LeaderNode::send_transmit_text
+		&LeaderNode::send_transmit_text,
+		&LeaderNode::send_query_system_info
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -403,6 +402,19 @@ unsigned short LeaderNode::recv_update_cluster_map(const std::string& message_da
 unsigned short LeaderNode::recv_transmit_text(const std::string& message_data)
 {
 	printf("Recv Text: %s\n", message_data.c_str());
+	return RET_SUCCESS;
+}
+
+unsigned short LeaderNode::recv_query_system_info(const std::string& message_data)
+{
+// Message format:
+// EventType | playload: (session ID|system info) | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+	observer->notify(NOTIFY_SYSTEM_INFO, notify_cfg);
 	return RET_SUCCESS;
 }
 
@@ -499,6 +511,21 @@ unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* 
 	const char* remote_ip = (const char*)param2;
 
 	return send_data(MSG_TRANSMIT_TEXT, text_data, remote_ip);
+}
+
+unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// param2: remote ip
+// Message format:
+// EventType | session ID | EOD
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int session_id = *(int*)param1;
+	const char* remote_ip = (const char*)param2;
+	char buf[BUF_SIZE];
+	snprintf(buf, BUF_SIZE, "%d", session_id);
+	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
 }
 
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)

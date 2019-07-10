@@ -131,3 +131,69 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 {
 	return read_config_file_lines_ex(conf_line_list, config_filename, "r", config_folderpath);
 }
+
+unsigned short get_linux_platform(string& linux_platform)
+{
+	static const char* cmd = "lsb_release -a | grep Description";
+	unsigned short ret = RET_SUCCESS;
+	FILE *fp = popen(cmd, "r");
+	char *line = NULL;
+	size_t line_len = 0;
+    char* token; 
+    char* rest = NULL;
+    char* line_tmp = NULL; 
+    char* token_ptr = NULL;
+	if (getline(&line, &line_len, fp) == -1)
+	{
+		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	line_tmp = line;
+	token = strtok_r(line_tmp, ":", &rest);
+	token = strtok_r(NULL, ":", &rest);
+	if (token == NULL)
+	{
+		STATIC_WRITE_FORMAT_ERROR("Fail to parse the line: %s", line);
+		ret = RET_FAILURE_RUNTIME;
+		goto OUT;		
+	}
+	token_ptr = token;
+	while (isspace(*token_ptr)) token_ptr++;
+	linux_platform = string(token_ptr);
+	// printf("res:%s\n", linux_platform.c_str());
+OUT:
+	if (line != NULL)
+	{
+		free(line);
+		line = NULL;
+	}
+	pclose(fp);
+	return ret;
+}
+
+unsigned short get_system_info(string& system_info)
+{
+	static const char* LINUX_PLATFORM = "Linux Platform";
+	static const int SYSTEM_INFO_BUF_SIZE = 256;
+	unsigned short ret = RET_SUCCESS;
+	char system_info_buf[SYSTEM_INFO_BUF_SIZE];
+// Get Linux platform
+	string linux_platform;
+	ret = get_linux_platform(linux_platform);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	snprintf(system_info_buf, SYSTEM_INFO_BUF_SIZE, "%s: %s\n", LINUX_PLATFORM, linux_platform.c_str());
+	system_info += string(system_info_buf);
+	return RET_SUCCESS;
+}
+
+bool check_string_is_number(const char* input)
+{
+	assert(input != NULL && "input should NOT be NULL");
+    char *next;
+// Get value with failure detection.
+	/*long val = */strtol(input, &next, 10);
+// Check for empty string and characters left after conversion.
+	return ((next == input) || (*next != '\0')) ? false : true;
+}

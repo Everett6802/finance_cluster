@@ -19,6 +19,62 @@ const int InteractiveServer::WAIT_CONNECTION_TIMEOUT = 60; // 68 seconds
 // const int InteractiveServer::INTERACTIVE_SERVER_PORT = SESSION_PORT_NO;
 const int InteractiveServer::INTERACTIVE_SERVER_BACKLOG = 5;
 
+//////////////////////////////////////////////////////////////
+
+int InteractiveServer::InteractiveSessionIDAssigner::hash_function(int hash_key, int hash_offset)const
+{
+	return (hash_key + hash_offset) % hash_table_size;
+}
+
+InteractiveServer::InteractiveSessionIDAssigner::InteractiveSessionIDAssigner(int session_id_hash_table_size) :
+	hash_table_size(session_id_hash_table_size)
+{
+	assert(hash_table_size != 0 && "hash_table_size should NOT be 0");
+	hash_table = new bool[hash_table_size];
+	if (hash_table == NULL)
+		throw bad_alloc();
+	memset(hash_table, 0x0, sizeof(bool) * hash_table_size);
+}
+
+InteractiveServer::InteractiveSessionIDAssigner::~InteractiveSessionIDAssigner()
+{
+	if (hash_table != NULL)
+	{
+		delete[] hash_table;
+		hash_table = NULL;	
+	}
+}
+
+int InteractiveServer::InteractiveSessionIDAssigner::get_session_id(int hash_key)const
+{
+	assert(hash_table != NULL && "hash_table should NOT be NULL");
+	int hash_value = -1;
+	bool found = false;
+	for(int i = 0 ; i < hash_table_size ; i++)
+	{
+		hash_value = hash_function(hash_key, i);
+		if (hash_table[hash_value]) // collision
+			hash_key = hash_value;
+		else
+		{
+			hash_table[hash_value] = true;
+			found = true;
+			break;
+		}
+
+	}
+	return (found ? hash_value : -1);
+}
+
+void InteractiveServer::InteractiveSessionIDAssigner::reset_session_id(int session_id)
+{
+	assert(session_id >= 0 && "session_id should be greater than/equal to 0");
+	assert(session_id < hash_table_size && "session_id should be less than hash_table_size");
+	hash_table[session_id] = false;
+}
+
+//////////////////////////////////////////////////////////////
+
 InteractiveServer::const_iterator::const_iterator(INTERACTIVE_SESSION_ITER iterator) : iter(iterator){}
 
 InteractiveServer::const_iterator InteractiveServer::const_iterator::operator++()
@@ -54,6 +110,7 @@ const InteractiveSession& InteractiveServer::const_iterator::operator*()
 ///////////////////////////////////////////////////////////////////////////////////////
 
 InteractiveServer::InteractiveServer(PIMANAGER mgr) : 
+	interactive_session_id_assigner(NULL),
 	server_fd(0),
 	notify_thread(NULL),
 	manager(mgr),
@@ -62,6 +119,9 @@ InteractiveServer::InteractiveServer(PIMANAGER mgr) :
 	listen_thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
+	interactive_session_id_assigner = new InteractiveSessionIDAssigner(MAX_INTERACTIVE_SESSION);
+	if (interactive_session_id_assigner == NULL)
+		throw bad_alloc();
 }
 
 InteractiveServer::~InteractiveServer()
@@ -73,6 +133,11 @@ InteractiveServer::~InteractiveServer()
 		char errmsg[ERRMSG_SIZE];
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in InteractiveServer::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(string(errmsg));
+	}
+	if (interactive_session_id_assigner != NULL)
+	{
+		delete interactive_session_id_assigner;
+		interactive_session_id_assigner = NULL;
 	}
 	RELEASE_MSG_DUMPER()
 }
@@ -153,6 +218,7 @@ unsigned short InteractiveServer::remove_session(int session_id)
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 	interactive_session_map.erase(session_id);
+	interactive_session_id_assigner->reset_session_id(session_id);
 	pthread_mutex_unlock(&session_mtx);
 
 	InteractiveSession* interactive_session = (InteractiveSession*)iter->second;
@@ -395,7 +461,8 @@ unsigned short InteractiveServer::listen_thread_handler_internal()
 		if (res < 0 && errno != EINTR)
 		{
 			WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
-			return RET_FAILURE_SYSTEM_API;
+			ret = RET_FAILURE_SYSTEM_API;
+			break;
 		}
 		else if (res == 0)
 		{
@@ -416,30 +483,51 @@ unsigned short InteractiveServer::listen_thread_handler_internal()
 		if (client_socketfd == -1)
 		{
 			WRITE_FORMAT_ERROR("accept() fails, due to: %s", strerror(errno));
-			return RET_FAILURE_SYSTEM_API;
+			ret = RET_FAILURE_SYSTEM_API;
+			break;
 		}
 		WRITE_FORMAT_DEBUG("Session Connection request from %s:%d", inet_ntoa(client_addr.sin_addr), htons(client_addr.sin_port));
-
-// Initialize a session ......
-		PINTERACTIVE_SESSION interactive_session = new InteractiveSession(this, manager, client_socketfd, client_addr, session_cnt);
-		if (interactive_session == NULL)
-		{
-			WRITE_ERROR("Fail to allocate memory: interactive_session");
-			return RET_FAILURE_INSUFFICIENT_MEMORY;
-		}
-		ret = interactive_session->initialize();
-		if (CHECK_FAILURE(ret))
-		{
-			delete interactive_session;
-			interactive_session = NULL;
-			return ret;
-		}
-// Add a session into the container
+// Establish the object for the session
 		pthread_mutex_lock(&session_mtx);
-		interactive_session_map[session_cnt] = interactive_session;
+// Get Session ID
+		// assert(interactive_session_id_assigner != NULL && "interactive_session_id_assigner should NOT be NULL");
+		int session_id = interactive_session_id_assigner->get_session_id(session_cnt);
+		if (session_id == -1)
+		{
+			WRITE_ERROR("Fails to get session ID");
+			ret = RET_FAILURE_UNKNOWN;
+		}
+		else
+		{
+			PINTERACTIVE_SESSION interactive_session = new InteractiveSession(this, manager, client_socketfd, client_addr, session_id);
+			if (interactive_session == NULL)
+			{
+				WRITE_ERROR("Fail to allocate memory: interactive_session");
+				ret = RET_FAILURE_INSUFFICIENT_MEMORY;
+			}
+			else
+			{
+// Initialize a session ......
+				ret = interactive_session->initialize();
+				if (CHECK_FAILURE(ret))
+				{
+					delete interactive_session;
+					interactive_session = NULL;
+					// break;
+				}
+				else
+				{
+// Add a session into the container				
+					// WRITE_FORMAT_DEBUG("The Session[%s] is instantiated", interactive_session->get_session_tag());
+					interactive_session_map[session_id] = interactive_session;
+				// PRINT("The Session[%s:%d] is Established......\n", inet_ntoa(client_addr.sin_addr), htons(client_addr.sin_port));
+					PRINT("The Session[%s] is Established......\n", interactive_session->get_session_tag());
+				}
+			}	
+		}
 		pthread_mutex_unlock(&session_mtx);
-		// PRINT("The Session[%s:%d] is Established......\n", inet_ntoa(client_addr.sin_addr), htons(client_addr.sin_port));
-		PRINT("The Session[%s] is Established......\n", interactive_session->get_session_tag());
+		if (CHECK_FAILURE(ret))
+			break;
 		session_cnt++;
 	}
 

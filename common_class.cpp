@@ -584,7 +584,6 @@ unsigned short ClusterMap::get_node_id(const std::string& node_ip, int& node_id)
 	return RET_SUCCESS;
 }
 
-
 unsigned short ClusterMap::get_last_node_id(int& node_id)
 {
 	// unsigned short ret = RET_SUCCESS;
@@ -594,6 +593,26 @@ unsigned short ClusterMap::get_last_node_id(int& node_id)
     ClusterNode* cluster_node = (ClusterNode*)*iter;
     assert(cluster_node != NULL && "cluster_node should NOT be NULL");
     node_id = cluster_node->node_id;
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::get_node_ip(int node_id, std::string& node_ip)
+{
+	bool found = false;
+	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_id == node_id)
+		{
+			node_ip = cluster_node->node_ip;
+			found = true;
+			break;
+		}
+		iter_find++;
+	}
+	if (!found)
+		return RET_FAILURE_NOT_FOUND;
 	return RET_SUCCESS;
 }
 
@@ -696,6 +715,14 @@ unsigned short KeepaliveTimerTask::trigger()
 ClusterDetailParam::ClusterDetailParam(){}
 ClusterDetailParam::~ClusterDetailParam(){}
 
+///////////////////
+// const int SystemInfoParam::NODE_IP_BUF_SIZE = 16;
+
+SystemInfoParam::SystemInfoParam()
+{
+	memset(node_ip_buf, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
+}
+SystemInfoParam::~SystemInfoParam(){}
 
 //////////////////////////////////////////////////////////
 
@@ -761,6 +788,45 @@ NotifySessionExitCfg::~NotifySessionExitCfg()
 		free(notify_session_exit_param);
 		notify_param = NULL;
 	}
+}
+
+///////////////////////////
+
+NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_SYSTEM_INFO, param, param_size)
+{
+	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+	static int SESSION_ID_BUF_SIZE = sizeof(int) + 1;
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, param, sizeof(int));
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)param;
+	system_info = (char*)(param_char + sizeof(int));
+	if (strlen(system_info) == 0)
+		system_info = NULL;
+}
+
+NotifySystemInfoCfg::~NotifySystemInfoCfg()
+{
+	if(notify_param != NULL)
+	{
+		char* notify_system_info_param = (char*)notify_param;
+		free(notify_system_info_param);
+		notify_param = NULL;
+	}
+}
+
+int NotifySystemInfoCfg::get_session_id()const
+{
+	return session_id;
+}
+
+const char* NotifySystemInfoCfg::get_system_info()const
+{
+	return system_info;
 }
 
 //////////////////////////////////////////////////////////

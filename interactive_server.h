@@ -16,12 +16,28 @@ class InteractiveServer : public INotify
 {
 	DECLARE_MSG_DUMPER()
 
+	class InteractiveSessionIDAssigner
+	{
+	private:
+		int hash_table_size;
+		bool* hash_table;
+
+		int hash_function(int hash_key, int hash_offset)const;
+
+	public:
+		InteractiveSessionIDAssigner(int session_id_hash_table_size);
+		~InteractiveSessionIDAssigner();
+		int get_session_id(int hash_key)const;
+		void reset_session_id(int session_id);
+	};
+
 private:
 	static const char* listen_thread_tag;
 	static const int WAIT_CONNECTION_TIMEOUT;
 	// static const int INTERACTIVE_SERVER_PORT;
 	static const int INTERACTIVE_SERVER_BACKLOG;
 
+	InteractiveSessionIDAssigner* interactive_session_id_assigner;
 	int server_fd;
 	INTERACTIVE_SESSION_MAP interactive_session_map;
 	PNOTIFY_THREAD notify_thread;

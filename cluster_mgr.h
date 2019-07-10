@@ -26,7 +26,12 @@ private:
 	char* cluster_ip; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;
+
+// parameters related to session
 	InteractiveServer* interactive_server;
+	pthread_mutex_t interactive_session_mtx[MAX_INTERACTIVE_SESSION];
+	pthread_cond_t interactive_session_cond[MAX_INTERACTIVE_SESSION];
+	std::list<PNOTIFY_CFG> interactive_session_data_list[MAX_INTERACTIVE_SESSION];
 
 	unsigned short parse_config();
 	unsigned short find_local_ip();

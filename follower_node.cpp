@@ -300,7 +300,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		NULL,
 		&FollowerNode::recv_check_keepalive,
 		&FollowerNode::recv_update_cluster_map,
-		&FollowerNode::recv_transmit_text
+		&FollowerNode::recv_transmit_text,
+		&FollowerNode::recv_query_system_info
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -318,7 +319,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		NULL,
 		&FollowerNode::send_check_keepalive,
 		&FollowerNode::send_update_cluster_map,
-		&FollowerNode::send_transmit_text
+		&FollowerNode::send_transmit_text,
+		&FollowerNode::send_query_system_info
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -373,8 +375,20 @@ OUT:
 
 unsigned short FollowerNode::recv_transmit_text(const std::string& message_data)
 {
+// Message format:
+// EventType | text string| EOD
 	printf("Recv Text: %s\n", message_data.c_str());
 	return RET_SUCCESS;
+}
+
+unsigned short FollowerNode::recv_query_system_info(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int session_id = atoi(message_data.c_str());
+	ret = send_query_system_info((void*)&session_id);
+	return ret;
 }
 
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
@@ -394,23 +408,48 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 	// return send_data(&msg);
 }
 
-unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
+unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 
 unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void* param3)
 {
 // Parameters:
 // param1: text data
 // Message format:
-// EventType | text | EOD
+// EventType | payload: text | EOD
 	if (param1 == NULL)
 	{
 		WRITE_ERROR("param1 should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
-
 	const char* text_data = (const char*)param1;
-
 	return send_data(MSG_TRANSMIT_TEXT, text_data);
+}
+
+unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: The sessin id
+// Message format:
+// EventType | playload: (session ID|system info) | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	static int SESSION_ID_BUF_SIZE = sizeof(int) + 1;
+    unsigned short ret = RET_SUCCESS;
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	int session_id = *(int*)param1;
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, "%d", session_id);
+	string system_info_data = string(session_id_buf);
+	string system_info;
+	ret = get_system_info(system_info);
+	if (CHECK_FAILURE(ret))
+		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+	else
+		system_info_data += system_info;
+
+	return send_data(MSG_QUERY_SYSTEM_INFO, system_info_data.c_str());
 }
 
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)

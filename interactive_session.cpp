@@ -17,6 +17,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_Help,
 	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommand_GetClusterDetail,
+	InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommandSize
 };
 
@@ -25,13 +26,14 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"help",
 	"exit",
 	"get_cluster_detail",
+	"get_node_system_info",
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
 typedef COMMAND_MAP::iterator COMMAND_MAP_ITER;
 
 static const char* INTERACTIVE_PROMPT = "FC> ";
-static const char* INCORRECT_COMMAND_ARGUMENT_FORMAT = "Incorrect command[%s] argument: %s";
+// static const char* INCORRECT_COMMAND_ARGUMENT_FORMAT = "Incorrect command[%s] argument: %s";
 
 static string welcome_phrases = "\n************** Welcome to Finance Cluster CLI **************\n\n";
 static string incomplete_command_phrases = "\nIncomplete Command\n\n";
@@ -325,15 +327,15 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 					print_to_console(string(rsp_buf));
 					return ret;				
 				}
-// 				else if (CHECK_WARN(ret))
-// 				{
-// 					static char rsp_buf[RSP_BUF_SIZE];
-// 					snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
-// // Show warning if warn occurs while executing the command
-// 					WRITE_WARN(rsp_buf);
-// 					print_to_console(string(rsp_buf));
-// 					// return ret;	
-// 				}
+				else if (CHECK_WARN(ret))
+				{
+					static char rsp_buf[RSP_BUF_SIZE];
+					snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+// Show warning if warn occurs while executing the command
+					WRITE_WARN(rsp_buf);
+					print_to_console(string(rsp_buf));
+					// return ret;	
+				}
 			}
 			if (command_line_outer != NULL)
 				command_line_outer = NULL;
@@ -385,7 +387,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 	{
 		&InteractiveSession::handle_help_command,
 		&InteractiveSession::handle_exit_command,
-		&InteractiveSession::handle_get_cluster_detail_command
+		&InteractiveSession::handle_get_cluster_detail_command,
+		&InteractiveSession::handle_get_node_system_info_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -395,14 +398,22 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 
 unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 {
-	// static const int BUF_SIZE = 256;
-	// static char buf[BUF_SIZE];
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
 	unsigned short ret = RET_SUCCESS;
 	string usage_string;
 	usage_string += string("====================== Usage ======================\n");
 	usage_string += string("* help\n Description: The usage\n");
 	usage_string += string("* exit\n Description: Exit the session\n");
 	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
+	usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
+	usage_string += string("  Format 1: Node ID: (ex. 1)\n");
+	usage_string += string("  Format 2: Node IP: (ex. 10.206.24.219)\n");
 	usage_string += string("===================================================\n");
 
 	ret = print_to_console(usage_string);
@@ -411,6 +422,13 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 
 unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 {
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
 // Send message to the user
 	print_to_console(string("Bye bye !!!"));
 // Notify the parent
@@ -429,12 +447,22 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 	static const char* CLUSTER_DETAIL_TITLE = "\n====================== Cluster Info ======================\n";
 	static const char* NODE_TYPE_LIST[] = {"Leader","Follower"};
 	assert(manager != NULL && "manager should NOT be NULL");
+
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
 	unsigned short ret = RET_SUCCESS;
 	// int node_id;
+// Get the data
 	ClusterDetailParam cluster_detail_param;
     ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
 	if (CHECK_FAILURE(ret))
 		return ret;
+// Print data in cosole
 	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
 	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
 	char cluster_node_ip[RSP_BUF_VERY_SHORT_SIZE];
@@ -450,9 +478,40 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_ip, NODE_TYPE_LIST[node_type_index]);
 		++iter;
 		cluster_detail_string += string(buf);
-
 	}
 
 	ret = print_to_console(cluster_detail_string);
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
+{
+	static const char* NODE_SYSTEM_INFO_TITLE = "\n====================== Node System Info ======================\n";
+	assert(manager != NULL && "manager should NOT be NULL");
+
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	// int node_id;
+// Get the data
+	SystemInfoParam system_info_param;
+	system_info_param.session_id = session_id;
+	snprintf(system_info_param.node_ip_buf, VERY_SHORT_STRING_SIZE, "%s", argv[1]);
+    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
+	if (CHECK_FAILURE(ret))
+		return ret;
+// Print data in cosole
+	string node_system_info_string(NODE_SYSTEM_INFO_TITLE);
+	char cluster_node[RSP_BUF_VERY_SHORT_SIZE];
+	snprintf(cluster_node,  RSP_BUF_VERY_SHORT_SIZE, "Node %s\n", system_info_param.node_ip_buf);
+	node_system_info_string += string(cluster_node);
+	node_system_info_string += system_info_param.system_info;
+	node_system_info_string += string("\n");
+	ret = print_to_console(node_system_info_string);
 	return RET_SUCCESS;
 }

@@ -7,41 +7,49 @@
 
 using namespace std;
 
+const unsigned short VERY_SHORT_STRING_SIZE = DEF_VERY_SHORT_STRING_SIZE;
 const unsigned short SHORT_STRING_SIZE = DEF_SHORT_STRING_SIZE;
 const unsigned short STRING_SIZE = DEF_STRING_SIZE;
 const unsigned short LONG_STRING_SIZE = DEF_LONG_STRING_SIZE;
-const unsigned short EX_LONG_STRING_SIZE = DEF_EX_LONG_STRING_SIZE;
+const unsigned short VERY_LONG_STRING_SIZE = DEF_VERY_LONG_STRING_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Return values
 const unsigned short RET_SUCCESS = 0;
 
-const unsigned short RET_FAILURE_UNKNOWN = 1;
-const unsigned short RET_FAILURE_RUNTIME = 2;
-const unsigned short RET_FAILURE_INVALID_ARGUMENT = 3;
-const unsigned short RET_FAILURE_INVALID_POINTER = 4;
-const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY = 5;
-const unsigned short RET_FAILURE_INCORRECT_OPERATION = 6;
-const unsigned short RET_FAILURE_OPEN_FILE = 7;
-const unsigned short RET_FAILURE_NOT_FOUND = 8;
-const unsigned short RET_FAILURE_INCORRECT_CONFIG = 9;
-const unsigned short RET_FAILURE_INCORRECT_PATH = 10;
-const unsigned short RET_FAILURE_IO_OPERATION = 11;
-const unsigned short RET_FAILURE_HANDLE_THREAD = 12;
-const unsigned short RET_FAILURE_SYSTEM_API = 13;
+const unsigned short RET_FAILURE_BASE = 1;
+const unsigned short RET_FAILURE_UNKNOWN = RET_FAILURE_BASE + 0;
+const unsigned short RET_FAILURE_RUNTIME = RET_FAILURE_BASE + 1;
+const unsigned short RET_FAILURE_INVALID_ARGUMENT = RET_FAILURE_BASE + 2;
+const unsigned short RET_FAILURE_INVALID_POINTER = RET_FAILURE_BASE + 3;
+const unsigned short RET_FAILURE_INSUFFICIENT_MEMORY = RET_FAILURE_BASE + 4;
+const unsigned short RET_FAILURE_INCORRECT_OPERATION = RET_FAILURE_BASE + 5;
+const unsigned short RET_FAILURE_OPEN_FILE = RET_FAILURE_BASE + 6;
+const unsigned short RET_FAILURE_NOT_FOUND = RET_FAILURE_BASE + 7;
+const unsigned short RET_FAILURE_INCORRECT_CONFIG = RET_FAILURE_BASE + 8;
+const unsigned short RET_FAILURE_INCORRECT_PATH = RET_FAILURE_BASE + 9;
+const unsigned short RET_FAILURE_IO_OPERATION = RET_FAILURE_BASE + 10;
+const unsigned short RET_FAILURE_HANDLE_THREAD = RET_FAILURE_BASE + 11;
+const unsigned short RET_FAILURE_SYSTEM_API = RET_FAILURE_BASE + 12;
+const unsigned short RET_FAILURE_END = 0xFF;
 
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
-const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 1;
-const unsigned short RET_FAILURE_CONNECTION_TRY_FAIL = RET_FAILURE_CONNECTION_BASE + 2;
-const unsigned short RET_FAILURE_CONNECTION_CLOSE = RET_FAILURE_CONNECTION_BASE + 3;
-const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 4;
-const unsigned short RET_FAILURE_CONNECTION_NO_SERVER = RET_FAILURE_CONNECTION_BASE + 5;
-const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE = RET_FAILURE_CONNECTION_BASE + 6;
-const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE = RET_FAILURE_CONNECTION_BASE + 7;
+const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 0;
+const unsigned short RET_FAILURE_CONNECTION_TRY_FAIL = RET_FAILURE_CONNECTION_BASE + 1;
+const unsigned short RET_FAILURE_CONNECTION_CLOSE = RET_FAILURE_CONNECTION_BASE + 2;
+const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 3;
+const unsigned short RET_FAILURE_CONNECTION_NO_SERVER = RET_FAILURE_CONNECTION_BASE + 4;
+const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE = RET_FAILURE_CONNECTION_BASE + 5;
+const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE = RET_FAILURE_CONNECTION_BASE + 6;
+const unsigned short RET_FAILURE_CONNECTION_END = 0x1FF;
+
+const unsigned short RET_WARN_BASE = 0x200;
+const unsigned short RET_WARN_INTERACTIVE_COMMAND = RET_WARN_BASE + 0;
+const unsigned short RET_WARN_END = 0x2FF;
 
 const char *GetErrorDescription(unsigned short ret)
 {
-	static const char *ret_description[] =
+	static const char *ret_failure_description[] =
 	{
 		"Success",
 		"Failure Unknown",
@@ -58,9 +66,9 @@ const char *GetErrorDescription(unsigned short ret)
 		"Failure Handle Thread",
 		"Failure System API"
 	};
-	static const char *connection_ret_description[] =
+	static const char *connection_ret_failure_description[] =
 	{
-		"ConnectionFailure Base",
+		// "ConnectionFailure Base",
 		"ConnectionFailure Try Timeout",
 		"ConnectionFailure Try Fail",
 		"ConnectionFailure Close",
@@ -69,19 +77,31 @@ const char *GetErrorDescription(unsigned short ret)
 		"ConnectionFailure Already in Use",
 		"ConnectionFailure Message Incomplete"
 	};
-	static int ret_description_len = sizeof(ret_description) / sizeof(ret_description[0]);
-	static int connection_ret_description_len = sizeof(connection_ret_description) / sizeof(connection_ret_description[0]);
+	static const char *ret_warn_description[] =
+	{
+		// "Warn Base",
+		"Warn Interactive Command"
+	};
+	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
+	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);
+	static int ret_warn_description_len = sizeof(ret_warn_description) / sizeof(ret_warn_description[0]);
 
-	if (ret >= RET_FAILURE_CONNECTION_BASE)
+	if (ret >= RET_WARN_BASE)
+	{
+		ret -= RET_WARN_BASE;
+		if (ret >= 0 && ret < ret_warn_description_len)
+			return ret_warn_description[ret];
+	}
+	else if (ret >= RET_FAILURE_CONNECTION_BASE)
 	{
 		ret -= RET_FAILURE_CONNECTION_BASE;
-		if (ret >= 0 && ret < connection_ret_description_len)
-			return connection_ret_description[ret];
+		if (ret >= 0 && ret < connection_ret_failure_description_len)
+			return connection_ret_failure_description[ret];
 	}
 	else
 	{
-		if (ret >= 0 && ret < ret_description_len)
-			return ret_description[ret];
+		if (ret >= 0 && ret < ret_failure_description_len)
+			return ret_failure_description[ret];
 	}
 
 	static char buf[STRING_SIZE];
@@ -103,11 +123,13 @@ const int KEEPALIVE_DELAY_TIME = 30;
 const int KEEPALIVE_PERIOD = 60;
 const int MAX_KEEPALIVE_CNT = 3;
 const int MAX_CONNECTED_CLIENT = 5;
+// const int MAX_INTERACTIVE_SESSION = 5;
 
 const char* CONF_FODLERNAME = "conf";
 const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
-const int CLUSTER_PORT_NO = 6802;
-const int SESSION_PORT_NO = CLUSTER_PORT_NO + 1;
+const int BASE_PORT_NO = 5888;
+const int CLUSTER_PORT_NO = BASE_PORT_NO + 0;
+const int SESSION_PORT_NO = BASE_PORT_NO + 1;
 const int RECV_BUF_SIZE = 512;
 
 const char* CONFIG_FOLDER_NAME = "conf";

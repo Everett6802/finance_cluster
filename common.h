@@ -21,17 +21,26 @@
 // Macro
 
 // This constant is used for allocating array size
+#define DEF_VERY_SHORT_STRING_SIZE 		16U
 #define DEF_SHORT_STRING_SIZE 			32U
 #define DEF_STRING_SIZE 				64U
 #define DEF_LONG_STRING_SIZE			256U
-#define DEF_EX_LONG_STRING_SIZE		LONG_STRING_SIZE * 2
+#define DEF_VERY_LONG_STRING_SIZE		LONG_STRING_SIZE * 2
 
 #ifndef CHECK_SUCCESS
 #define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
 #endif
 
 #ifndef CHECK_FAILURE
-#define CHECK_FAILURE(X) !CHECK_SUCCESS(X)
+#define CHECK_FAILURE(X) (X >= RET_FAILURE_BASE && X <= RET_FAILURE_END ? true : false)
+#endif
+
+#ifndef CHECK_FAILURE_CONNECTION
+#define CHECK_FAILURE_CONNECTION(X) (X >= RET_FAILURE_CONNECTION_BASE && X <= RET_FAILURE_CONNECTION_END ? true : false)
+#endif
+
+#ifndef CHECK_WARN
+#define CHECK_WARN(X) (X > RET_WARN_BASE && X < RET_WARN_BASE ? true : false)
 #endif
 
 #ifndef IS_TRY_CONNECTION_TIMEOUT
@@ -73,17 +82,21 @@ do{\
 }while(0);
 #endif
 
+#define MAX_INTERACTIVE_SESSION 5U
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 
+extern const unsigned short VERY_SHORT_STRING_SIZE;
 extern const unsigned short SHORT_STRING_SIZE;
 extern const unsigned short STRING_SIZE;
 extern const unsigned short LONG_STRING_SIZE;
-extern const unsigned short EX_LONG_STRING_SIZE;
+extern const unsigned short VERY_LONG_STRING_SIZE;
 
 // Return values
 extern const unsigned short RET_SUCCESS;
 
+extern const unsigned short RET_FAILURE_BASE;
 extern const unsigned short RET_FAILURE_UNKNOWN;
 extern const unsigned short RET_FAILURE_RUNTIME;
 extern const unsigned short RET_FAILURE_INVALID_ARGUMENT;
@@ -97,6 +110,7 @@ extern const unsigned short RET_FAILURE_INCORRECT_PATH;
 extern const unsigned short RET_FAILURE_IO_OPERATION;
 extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
+extern const unsigned short RET_FAILURE_END;
 
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT;
@@ -106,7 +120,11 @@ extern const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_NO_SERVER;
 extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
 extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
+extern const unsigned short RET_FAILURE_CONNECTION_END;
 
+extern const unsigned short RET_WARN_BASE;
+extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
+extern const unsigned short RET_WARN_END;
 
 const char* GetErrorDescription(unsigned short ret);
 
@@ -120,6 +138,7 @@ extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
 extern const int MAX_KEEPALIVE_CNT;
 extern const int MAX_CONNECTED_CLIENT;
+// extern const int MAX_INTERACTIVE_SESSION;
 
 extern const char* CONF_FODLERNAME;
 extern const char* FINANCE_CLUSTER_CONF_FILENAME;
@@ -146,6 +165,7 @@ enum MessageType{
 	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
+	MSG_QUERY_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_SIZE
 };
 
@@ -154,6 +174,7 @@ enum ParamType{
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
+	PARAM_SYSTEM_INFO,
 	PARAM_SIZE
 };
 
@@ -162,6 +183,7 @@ enum NotifyType{
 	NOTIFY_NODE_DIE,
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
+	NOTIFY_SYSTEM_INFO,
 	NOTIFY_SIZE
 };
 
@@ -194,7 +216,9 @@ unsigned short get_file_line_count(unsigned int &line_count, const char* filepat
 unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character=',');
 unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
-
+unsigned short get_linux_platform(std::string& linux_distribution);
+unsigned short get_system_info(std::string& system_info);
+bool check_string_is_number(const char* input);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -365,11 +389,10 @@ public:
 	unsigned short get_first_node_ip(std::string& first_node_ip, bool peek_only=false);
 	unsigned short get_node_id(const std::string& node_ip, int& node_id);
 	unsigned short get_last_node_id(int& node_id);
+	unsigned short get_node_ip(int node_id, std::string& node_ip);
 	const char* to_string();
 	unsigned short from_string(const char* cluster_map_str);
 	// unsigned short from_object(const ClusterMap& cluster_map_obj);
-
-
 };
 
 ///////////////////////////////////////////////////
@@ -405,6 +428,18 @@ public:
 };
 typedef ClusterDetailParam* PCLUSTER_DETAIL_PARAM;
 
+class SystemInfoParam
+{
+public:
+	int session_id;
+	char node_ip_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node ip or id
+	std::string system_info;
+
+	SystemInfoParam();
+	~SystemInfoParam();
+};
+typedef SystemInfoParam* PSYSTEM_INFO_PARAM;
+
 ///////////////////////////////////////////////////
 
 class NotifyCfg
@@ -430,6 +465,7 @@ public:
 	NotifyNodeDieCfg(const void* param=NULL, size_t param_size=0);
 	virtual ~NotifyNodeDieCfg();
 };
+typedef NotifyNodeDieCfg* PNOTIFY_NODE_DIE_CFG;
 
 ///////////////////////////
 
@@ -439,6 +475,24 @@ public:
 	NotifySessionExitCfg(const void* param=NULL, size_t param_size=0);
 	virtual ~NotifySessionExitCfg();
 };
+typedef NotifySessionExitCfg* PNOTIFY_SESSION_EXIT_CFG;
+
+///////////////////////////
+
+class NotifySystemInfoCfg : public NotifyCfg
+{
+private:
+	int session_id;
+	char* system_info;
+
+public:
+	NotifySystemInfoCfg(const void* param=NULL, size_t param_size=0);
+	virtual ~NotifySystemInfoCfg();
+
+	int get_session_id()const;
+	const char* get_system_info()const;
+};
+typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
 
 ///////////////////////////////////////////////////
 

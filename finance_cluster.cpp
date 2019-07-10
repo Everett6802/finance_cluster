@@ -163,6 +163,10 @@ int main(int argc, char** argv)
 	// fprintf(stderr, "assemble message: %s, assemble message length: %d\n", full_message_buf, strlen(full_message_buf));
 	// fprintf(stderr, "parser, message type: %d\n", GET_MSG_TYPE(full_message_buf));
 
+	// std::string system_info;
+	// get_system_info(system_info);
+	// printf("system info:%s\n", system_info.c_str());
+
 	// exit(0);
 
 	// ClusterMap cluster_map;

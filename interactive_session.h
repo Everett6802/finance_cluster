@@ -53,6 +53,7 @@ private:
 	unsigned short handle_help_command(int argc, char **argv);
 	unsigned short handle_exit_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
+	unsigned short handle_get_node_system_info_command(int argc, char **argv);
 	unsigned short print_to_console(std::string response)const;
 	unsigned short print_prompt_to_console()const;
 
