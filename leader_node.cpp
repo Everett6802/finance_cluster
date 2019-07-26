@@ -145,6 +145,8 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 	pthread_mutex_lock(&node_channel_mtx);
 	if (remote_ip != NULL)
 	{
+		// fprintf(stderr, "remote_ip: %s\n", remote_ip);
+		// dump_node_channel_map();
 // Send to single node
 		PNODE_CHANNEL node_channel = node_channel_map[remote_ip];
 		assert(node_channel != NULL && "node_channel should NOT be NULL");
@@ -361,6 +363,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		WRITE_FORMAT_ERROR("Unknown Message Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
+	// fprintf(stderr, "Leader[%s] recv Message from remote: type: %d, data: %s\n", local_ip, message_type, message_data.c_str());
 	return (this->*(recv_func_array[message_type]))(message_data);
 }
 
@@ -408,7 +411,7 @@ unsigned short LeaderNode::recv_transmit_text(const std::string& message_data)
 unsigned short LeaderNode::recv_query_system_info(const std::string& message_data)
 {
 // Message format:
-// EventType | playload: (session ID|system info) | EOD
+// EventType | playload: (session ID[2 digits]|system info) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
 	size_t notify_param_size = strlen(message_data.c_str()) + 1;
 	PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data.c_str(), notify_param_size);
@@ -523,6 +526,7 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 	static const int BUF_SIZE = sizeof(int) + 1;
 	int session_id = *(int*)param1;
 	const char* remote_ip = (const char*)param2;
+	// fprintf(stderr, "remote_ip: %s\n", remote_ip);
 	char buf[BUF_SIZE];
 	snprintf(buf, BUF_SIZE, "%d", session_id);
 	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
@@ -645,6 +649,18 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     	break;
     }
     return ret;
+}
+
+void LeaderNode::dump_node_channel_map()const
+{
+	map<std::string, PNODE_CHANNEL>::const_iterator iter = node_channel_map.begin();
+	while (iter != node_channel_map.end())
+	{
+		string node_ip = (string)(iter->first);
+		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
+		fprintf(stderr, "%s %p\n", node_ip.c_str(), (void*)node_channel);
+		iter++;
+	}
 }
 
 void* LeaderNode::listen_thread_handler(void* pvoid)

@@ -194,6 +194,16 @@ void NodeChannel::notify_exit()
 	pthread_mutex_unlock(&mtx_buffer);
 }
 
+const char* NodeChannel::get_ip()const
+{
+	return node_ip.c_str();
+}
+
+const char* NodeChannel::get_remote_ip()const
+{
+	return remote_ip.c_str();
+}
+
 unsigned short NodeChannel::send_msg(const char* msg_data)
 {
 	assert(msg_data != NULL && "msg_data should NOT be NULL");

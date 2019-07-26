@@ -150,6 +150,8 @@ extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
 extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 
+extern const int PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS;
+extern const char* PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration

@@ -143,6 +143,9 @@ unsigned short get_linux_platform(string& linux_platform)
     char* rest = NULL;
     char* line_tmp = NULL; 
     char* token_ptr = NULL;
+    char* token_ptr_end = NULL;
+    size_t linux_platform_pos = 0;
+    size_t linux_platform_len = 0;
 	if (getline(&line, &line_len, fp) == -1)
 	{
 		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
@@ -158,10 +161,17 @@ unsigned short get_linux_platform(string& linux_platform)
 		ret = RET_FAILURE_RUNTIME;
 		goto OUT;		
 	}
+// Find the start index of the linux platform
 	token_ptr = token;
-	while (isspace(*token_ptr)) token_ptr++;
-	linux_platform = string(token_ptr);
-	// printf("res:%s\n", linux_platform.c_str());
+	while (isspace(*token_ptr) && *token_ptr != '\0') token_ptr++;
+	linux_platform_pos = token_ptr - token;
+// Find the string length of the linux platform
+	token_ptr_end = token_ptr;
+	while (*token_ptr_end != '\r' && *token_ptr_end != '\n' && *token_ptr_end != '\0') token_ptr_end++;
+	linux_platform_len = token_ptr_end - token_ptr;
+// Get the correct string of linux platform
+	linux_platform = string(token).substr(linux_platform_pos, linux_platform_len);
+	// printf("get_linux_platform: %s\n", linux_platform.c_str());
 OUT:
 	if (line != NULL)
 	{

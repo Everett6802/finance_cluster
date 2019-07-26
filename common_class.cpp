@@ -795,18 +795,21 @@ NotifySessionExitCfg::~NotifySessionExitCfg()
 NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_SYSTEM_INFO, param, param_size)
 {
+// session ID[2 digits]|system info
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
-	static int SESSION_ID_BUF_SIZE = sizeof(int) + 1;
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
-	memcpy(session_id_buf, param, sizeof(int));
+	memcpy(session_id_buf, param, sizeof(char) * PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
 	session_id = atoi(session_id_buf);
 
 	const char* param_char = (const char*)param;
-	system_info = (char*)(param_char + sizeof(int));
+	system_info = (char*)(param_char + PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
 	if (strlen(system_info) == 0)
 		system_info = NULL;
+	// fprintf(stderr, "NotifySystemInfoCfg, session id: %d, system_info: %s\n", session_id, system_info);
 }
 
 NotifySystemInfoCfg::~NotifySystemInfoCfg()

@@ -51,8 +51,8 @@ private:
 	unsigned short initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip);
 	unsigned short deinitialize();
 	void notify_exit();
-	const char* get_ip()const{return node_ip.c_str();}
-	const char* get_remote_ip()const{return remote_ip.c_str();}
+	const char* get_ip()const;
+	const char* get_remote_ip()const;
 
 	unsigned short send_msg(const char* msg_data);
 };

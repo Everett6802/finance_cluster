@@ -125,9 +125,16 @@ unsigned short setup_param(ClusterMgr& cluster_mgr)
 	return RET_SUCCESS;
 }
 
-#include <string>
+// #include <string>
 int main(int argc, char** argv)
 {
+	// static const int SESSION_ID_BUF_SIZE = sizeof(int) + 1;
+	// char session_id_buf[SESSION_ID_BUF_SIZE];
+	// int session_id = 1;
+	// snprintf(session_id_buf, SESSION_ID_BUF_SIZE, "%04d", session_id);
+	// printf("data: %s, len: %d, value: %d\n", session_id_buf, strlen(session_id_buf), atoi(session_id_buf));
+	// exit(0);
+
 	// const int RSP_BUF_VERY_SHORT_SIZE = 32;
 	// const int RSP_BUF_SIZE = 256;
 	// char buf[RSP_BUF_SIZE];

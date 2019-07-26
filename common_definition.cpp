@@ -136,5 +136,7 @@ const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";
 const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
 
+const int PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS = 2;
+const char* PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT = "%02d";
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;

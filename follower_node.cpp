@@ -177,7 +177,7 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(msg != NULL && "msg should NOT be NULL");
-
+	// fprintf(stderr, "Follower[%s] Message: type: %d, data: %s\n", local_ip, message_type, data);
 	NodeMessageAssembler node_message_assembler;
 	ret = node_message_assembler.assemble(message_type, data);
 	if (CHECK_FAILURE(ret))
@@ -193,6 +193,7 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 	if (CHECK_FAILURE(ret))
 		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
 	pthread_mutex_unlock(&node_channel_mtx);
+	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_ip, (node_message_assembler.get_full_message() + 1), (int)(*node_message_assembler.get_full_message()));
 	return ret;
 }
 
@@ -430,17 +431,18 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 // Parameters:
 // param1: The sessin id
 // Message format:
-// EventType | playload: (session ID|system info) | EOD
+// EventType | playload: (session ID[2 digits]|system info) | EOD
 	if (param1 == NULL)
 	{
 		WRITE_ERROR("param1 should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
-	static int SESSION_ID_BUF_SIZE = sizeof(int) + 1;
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS + 1;
     unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
-	int session_id = *(int*)param1;
-	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, "%d", session_id);
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Combine the payload
 	string system_info_data = string(session_id_buf);
 	string system_info;
 	ret = get_system_info(system_info);
@@ -448,7 +450,11 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
 	else
 		system_info_data += system_info;
-
+	// fprintf(stderr, "Follower[%s] send_query_system_info message: %s\n", local_ip, system_info_data.c_str());
+	// char session_id_str[3];
+	// memset(session_id_str, 0x0, sizeof(char) * 3);
+	// memcpy(session_id_str, system_info_data.c_str(), sizeof(char) * 2);
+	// fprintf(stderr, "Follower[%s] send_query_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_QUERY_SYSTEM_INFO, system_info_data.c_str());
 }
 

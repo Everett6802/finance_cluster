@@ -650,6 +650,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 	    			return ret;		
 				}
 			}
+			// fprintf(stderr, "node_ip: %s\n", node_ip.c_str());
 // Get the system info of the local node
     		if (strcmp(node_ip.c_str(), local_ip) == 0)
     		{
@@ -668,7 +669,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				}
 	    		assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 // Send the request
-			    ret = cluster_node->send(MSG_QUERY_SYSTEM_INFO, (void*)&system_info_param->session_id, (void*)&node_ip);
+			    ret = cluster_node->send(MSG_QUERY_SYSTEM_INFO, (void*)&system_info_param->session_id, (void*)node_ip.c_str());
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Receive the response
@@ -696,6 +697,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					return RET_FAILURE_NOT_FOUND;
 				}
 				PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
+				assert(system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
 				system_info_param->system_info = string(notify_system_info_cfg->get_system_info());
     		}
     	}

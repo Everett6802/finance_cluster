@@ -53,6 +53,8 @@ private:
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_query_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
+	void dump_node_channel_map()const;
+
 	static void* listen_thread_handler(void* pvoid);
 	unsigned short listen_thread_handler_internal();
 	static void listen_thread_cleanup_handler(void* pvoid);
