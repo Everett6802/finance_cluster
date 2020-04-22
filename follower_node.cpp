@@ -302,7 +302,9 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_check_keepalive,
 		&FollowerNode::recv_update_cluster_map,
 		&FollowerNode::recv_transmit_text,
-		&FollowerNode::recv_query_system_info
+		&FollowerNode::recv_query_system_info,
+		&FollowerNode::recv_control_fake_acspt,
+		&FollowerNode::recv_control_fake_usrept
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -321,7 +323,9 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_check_keepalive,
 		&FollowerNode::send_update_cluster_map,
 		&FollowerNode::send_transmit_text,
-		&FollowerNode::send_query_system_info
+		&FollowerNode::send_query_system_info,
+		&FollowerNode::send_control_fake_acspt,
+		&FollowerNode::send_control_fake_usrept
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -393,6 +397,40 @@ unsigned short FollowerNode::recv_query_system_info(const std::string& message_d
 	return ret;
 }
 
+unsigned short FollowerNode::recv_control_fake_acspt(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: simulator ap control type | EOD
+	unsigned short ret = RET_SUCCESS;
+	FakeAcsptControlType fake_acspt_control_type = (FakeAcsptControlType)atoi(message_data.c_str());
+	size_t notify_param_size = sizeof(FakeAcsptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+    observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
+unsigned short FollowerNode::recv_control_fake_usrept(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: simulator ue control type | EOD
+	unsigned short ret = RET_SUCCESS;
+	FakeUsreptControlType fake_usrept_control_type = (FakeUsreptControlType)atoi(message_data.c_str());
+	size_t notify_param_size = sizeof(FakeUsreptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+    observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
 // Message format:
@@ -412,7 +450,7 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 	// return send_data(&msg);
 }
 
-unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 
 unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void* param3)
 {
@@ -461,6 +499,10 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 	// fprintf(stderr, "Follower[%s] send_query_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_QUERY_SYSTEM_INFO, system_info_data.c_str());
 }
+
+unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
+
+unsigned short FollowerNode::send_control_fake_usrept(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_USREPT);}
 
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {
@@ -542,8 +584,11 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
 // Synchronous event:
       	case NOTIFY_NODE_DIE:
     	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
     		assert(observer != NULL && "observer should NOT be NULL");
-    		ret = observer->notify(notify_type, notify_param);
+    		ret = observer->notify(notify_type, notify_cfg);
     	}
     	break;
 // Asynchronous event:

@@ -84,6 +84,15 @@ do{\
 
 #define MAX_INTERACTIVE_SESSION 5U
 
+#ifndef SAFE_RELEASE
+#define SAFE_RELEASE(x)\
+if (x != NULL)\
+{\
+	x->release(__FILE__, __LINE__);\
+	x = NULL;\
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 
@@ -169,6 +178,8 @@ enum MessageType{
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_QUERY_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
+	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
 };
 
@@ -181,13 +192,28 @@ enum ParamType{
 	PARAM_SIZE
 };
 
+// Some NotifyType doesn't need to carry parameters
 enum NotifyType{
 	NOTIFY_CHECK_KEEPALIVE,
 	NOTIFY_NODE_DIE,
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_SYSTEM_INFO,
+	NOTIFY_CONTROL_FAKE_ACSPT,
+	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_SIZE
+};
+
+enum FakeAcsptControlType{
+	FAKE_ACSPT_START, 
+	FAKE_ACSPT_STOP, 
+	FAKE_ACSPT_CONTROL_SIZE
+};
+
+enum FakeUsreptControlType{
+	FAKE_USREPT_START, 
+	FAKE_USREPT_STOP, 
+	FAKE_USREPT_CONTROL_SIZE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +239,7 @@ typedef CHAR_LIST* PCHAR_LIST;
 // Functions
 
 unsigned short get_local_interface_ip(std::map<std::string, std::string>& interface_ip_map);
-bool check_file_exist(const char* filepath);
+bool check_file_exist(const char* filepath); // folder or file
 bool check_config_file_exist(const char* config_filename);
 unsigned short get_file_line_count(unsigned int &line_count, const char* filepath);
 unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character=',');
@@ -222,6 +248,7 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
 bool check_string_is_number(const char* input);
+const char *get_username();
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -450,10 +477,15 @@ class NotifyCfg
 protected:
 	NotifyType notify_type;
 	void* notify_param;
+	int ref_count;
 
 public:
 	NotifyCfg(NotifyType type, const void* param=NULL, size_t param_size=0);
 	virtual ~NotifyCfg();
+
+	int addref(const char* callable_file_name, unsigned long callable_line_no);
+	int release(const char* callable_file_name, unsigned long callable_line_no);
+	int getref()const;
 
 	NotifyType get_notify_type()const;
 	const void* get_notify_param()const;
@@ -464,9 +496,14 @@ typedef NotifyCfg* PNOTIFY_CFG;
 
 class NotifyNodeDieCfg : public NotifyCfg
 {
+private:
+	char* remote_ip;
+
 public:
-	NotifyNodeDieCfg(const void* param=NULL, size_t param_size=0);
+	NotifyNodeDieCfg(const void* param, size_t param_size);
 	virtual ~NotifyNodeDieCfg();
+
+	const char* get_remote_ip()const;
 };
 typedef NotifyNodeDieCfg* PNOTIFY_NODE_DIE_CFG;
 
@@ -474,9 +511,14 @@ typedef NotifyNodeDieCfg* PNOTIFY_NODE_DIE_CFG;
 
 class NotifySessionExitCfg : public NotifyCfg
 {
+private:
+	int session_id;
+
 public:
-	NotifySessionExitCfg(const void* param=NULL, size_t param_size=0);
+	NotifySessionExitCfg(const void* param, size_t param_size);
 	virtual ~NotifySessionExitCfg();
+
+	int get_session_id()const;
 };
 typedef NotifySessionExitCfg* PNOTIFY_SESSION_EXIT_CFG;
 
@@ -489,13 +531,43 @@ private:
 	char* system_info;
 
 public:
-	NotifySystemInfoCfg(const void* param=NULL, size_t param_size=0);
+	NotifySystemInfoCfg(const void* param, size_t param_size);
 	virtual ~NotifySystemInfoCfg();
 
 	int get_session_id()const;
 	const char* get_system_info()const;
 };
 typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifyFakeAcsptControlCfg : public NotifyCfg
+{
+private:
+	FakeAcsptControlType fake_acspt_control_type;
+
+public:
+	NotifyFakeAcsptControlCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeAcsptControlCfg();
+
+	FakeAcsptControlType get_fake_acspt_control_type()const;
+};
+typedef NotifyFakeAcsptControlCfg* PNOTIFY_FAKE_ACSPT_CONTROL_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifyFakeUsreptControlCfg : public NotifyCfg
+{
+private:
+	FakeUsreptControlType fake_usrept_control_type;
+
+public:
+	NotifyFakeUsreptControlCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeUsreptControlCfg();
+
+	FakeUsreptControlType get_fake_usrept_control_type()const;
+};
+typedef NotifyFakeUsreptControlCfg* PNOTIFY_FAKE_USREPT_CONTROL_CFG;
 
 ///////////////////////////////////////////////////
 

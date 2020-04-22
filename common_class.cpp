@@ -728,26 +728,65 @@ SystemInfoParam::~SystemInfoParam(){}
 
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
-	notify_param(NULL)
+	notify_param(NULL),
+	ref_count(0)
 {
+	// printf("NotifyCfg()\n");
+	addref(__FILE__, __LINE__);
 	if (param != NULL)
 	{
+		// printf("NotifyCfg()::malloc\n");
 		assert(param_size != 0 && "param_size should NOT be 0");
 		notify_param = malloc(param_size);
 		if (notify_param == NULL)
 			throw bad_alloc();
 		memcpy(notify_param, param, param_size);
+		// printf("param: %d, notify_param: %d\n", *(FakeAcsptControlType*)param, *(FakeAcsptControlType*)notify_param);
 	}
 }
 
 NotifyCfg::~NotifyCfg()
 {
+	// printf("~NotifyCfg()\n");
 	// assert(notify_param != NULL && "notify_param should be NULL");
 	if (notify_param != NULL)
 	{
+		// printf("~NotifyCfg():free\n");
+/*
+When allocating memory, the runtime library keeps track of 
+the size of each allocation. When you call free(), 
+it looks up the address, and if it finds an allocation for that 
+address, the correct amount of memory is freed 
+*/
 		free(notify_param);
 		notify_param = NULL;
 	}
+}
+
+int NotifyCfg::addref(const char* callable_file_name, unsigned long callable_line_no)
+{
+	__sync_fetch_and_add(&ref_count, 1);
+	// printf("addref() in [%s:%ld %d], ref_count: %d\n", callable_file_name, callable_line_no, notify_type, ref_count);
+	return ref_count;
+}
+
+int NotifyCfg::release(const char* callable_file_name, unsigned long callable_line_no)
+{
+	__sync_fetch_and_sub(&ref_count, 1);
+	// printf("release() in [%s:%ld %d], ref_count: %d\n", callable_file_name, callable_line_no, notify_type, ref_count);
+	assert(ref_count >= 0 && "ref_count should NOT be smaller than 0");
+	if (ref_count == 0)
+	{
+		delete this;
+		return 0;
+	}
+
+	return ref_count;
+}
+
+int NotifyCfg::getref()const
+{
+	return ref_count;
 }
 
 NotifyType NotifyCfg::get_notify_type()const{return notify_type;}
@@ -759,17 +798,27 @@ const void* NotifyCfg::get_notify_param()const{return notify_param;}
 NotifyNodeDieCfg::NotifyNodeDieCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_NODE_DIE, param, param_size)
 {
+	// printf("NotifyNodeDieCfg()\n");
 	// fprintf(stderr, "NotifyNodeDieCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	remote_ip = (char*)notify_param;
 }
 
 NotifyNodeDieCfg::~NotifyNodeDieCfg()
 {
-	if(notify_param != NULL)
-	{
-		char* notify_node_die_param = (char*)notify_param;
-		free(notify_node_die_param);
-		notify_param = NULL;
-	}
+	remote_ip = NULL;
+	// printf("~NotifyNodeDieCfg()\n");
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_node_die_param = (char*)notify_param;
+	// 	free(notify_node_die_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+const char* NotifyNodeDieCfg::get_remote_ip()const
+{
+	return remote_ip;
 }
 
 ///////////////////////////
@@ -778,16 +827,24 @@ NotifySessionExitCfg::NotifySessionExitCfg(const void* param, size_t param_size)
 	NotifyCfg(NOTIFY_SESSION_EXIT, param, param_size)
 {
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+	session_id = *(int*)notify_param;
 }
 
 NotifySessionExitCfg::~NotifySessionExitCfg()
 {
-	if(notify_param != NULL)
-	{
-		int* notify_session_exit_param = (int*)notify_param;
-		free(notify_session_exit_param);
-		notify_param = NULL;
-	}
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	int* notify_session_exit_param = (int*)notify_param;
+	// 	free(notify_session_exit_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+int NotifySessionExitCfg::get_session_id()const
+{
+	return session_id;
 }
 
 ///////////////////////////
@@ -802,10 +859,10 @@ NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
 // De-Serialize: convert the type of session id from string to integer  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
-	memcpy(session_id_buf, param, sizeof(char) * PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
 	session_id = atoi(session_id_buf);
 
-	const char* param_char = (const char*)param;
+	const char* param_char = (const char*)notify_param;
 	system_info = (char*)(param_char + PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
 	if (strlen(system_info) == 0)
 		system_info = NULL;
@@ -814,12 +871,13 @@ NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
 
 NotifySystemInfoCfg::~NotifySystemInfoCfg()
 {
-	if(notify_param != NULL)
-	{
-		char* notify_system_info_param = (char*)notify_param;
-		free(notify_system_info_param);
-		notify_param = NULL;
-	}
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_system_info_param = (char*)notify_param;
+	// 	free(notify_system_info_param);
+	// 	notify_param = NULL;
+	// }
 }
 
 int NotifySystemInfoCfg::get_session_id()const
@@ -830,6 +888,66 @@ int NotifySystemInfoCfg::get_session_id()const
 const char* NotifySystemInfoCfg::get_system_info()const
 {
 	return system_info;
+}
+
+///////////////////////////
+
+NotifyFakeAcsptControlCfg::NotifyFakeAcsptControlCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_CONTROL_FAKE_ACSPT, param, param_size)
+{
+	// printf("NotifyFakeAcsptControlCfg()\n");
+	// fprintf(stderr, "NotifyFakeAcsptControlCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+// De-Serialize: convert the type of session id from string to integer  
+	fake_acspt_control_type = *(FakeAcsptControlType*)notify_param;
+	// printf("NotifyFakeAcsptControlCfg::fake_acspt_control_type: %d\n", fake_acspt_control_type);
+}
+
+NotifyFakeAcsptControlCfg::~NotifyFakeAcsptControlCfg()
+{
+	// printf("~NotifyFakeAcsptControlCfg()\n");
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_fake_acspt_control_param = (char*)notify_param;
+	// 	free(notify_fake_acspt_control_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+FakeAcsptControlType NotifyFakeAcsptControlCfg::get_fake_acspt_control_type()const
+{
+	return fake_acspt_control_type;
+}
+
+///////////////////////////
+
+NotifyFakeUsreptControlCfg::NotifyFakeUsreptControlCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_CONTROL_FAKE_USREPT, param, param_size)
+{
+	// printf("NotifyFakeAcsptControlCfg()\n");
+	// fprintf(stderr, "NotifyFakeAcsptControlCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+// De-Serialize: convert the type of session id from string to integer  
+	fake_usrept_control_type = *(FakeUsreptControlType*)notify_param;
+	// printf("NotifyFakeAcsptControlCfg::fake_acspt_control_type: %d\n", fake_acspt_control_type);
+}
+
+NotifyFakeUsreptControlCfg::~NotifyFakeUsreptControlCfg()
+{
+	// printf("~NotifyFakeAcsptControlCfg()\n");
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_fake_acspt_control_param = (char*)notify_param;
+	// 	free(notify_fake_acspt_control_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+FakeUsreptControlType NotifyFakeUsreptControlCfg::get_fake_usrept_control_type()const
+{
+	return fake_usrept_control_type;
 }
 
 //////////////////////////////////////////////////////////
@@ -920,7 +1038,8 @@ unsigned short NotifyThread::notify_thread_handler_internal()
 				WRITE_FORMAT_DEBUG("Handle asynchronous event: %d", notify_cfg->get_notify_type());
 				ret = notify_observer->async_handle(notify_cfg);
 // Remove the old notification
-				delete notify_cfg;				
+				// delete notify_cfg;
+				SAFE_RELEASE(notify_cfg);			
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_DEBUG("Thread[%s]=> Fail to execute event, due to %d", notify_thread_tag, ret);
@@ -930,6 +1049,7 @@ unsigned short NotifyThread::notify_thread_handler_internal()
 			notify_execute_vector.clear();
 		}	
 	}
+
 
 	WRITE_FORMAT_INFO("[%s] The worker thread of notifying socket is dead", notify_thread_tag);
 	return ret;
@@ -1063,6 +1183,7 @@ unsigned short NotifyThread::add_event(const PNOTIFY_CFG notify_cfg)
 {
 	// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Write message [severity: %d, message: %s]", severity, msg);
 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+	notify_cfg->addref(__FILE__, __LINE__);
 	pthread_mutex_lock(&notify_mtx);
 	notify_buffer_vector.push_back(notify_cfg);
 // Wake up waiting thread with condition variable, if it is called before this function

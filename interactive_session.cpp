@@ -18,6 +18,10 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetNodeSystemInfo,
+	InteractiveSessionCommand_StartFakeAcspt,
+	InteractiveSessionCommand_StopFakeAcspt,
+	InteractiveSessionCommand_StartFakeUsrept,
+	InteractiveSessionCommand_StopFakeUsrept,
 	InteractiveSessionCommandSize
 };
 
@@ -27,6 +31,10 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"exit",
 	"get_cluster_detail",
 	"get_node_system_info",
+	"start_fake_acspt",
+	"stop_fake_acspt",
+	"start_fake_usrept",
+	"stop_fake_usrept",
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
@@ -84,13 +92,16 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	session_tid(0),
 	session_thread_ret(RET_SUCCESS),
 	sock_fd(client_fd),
-	session_id(interactive_session_id)
+	session_id(interactive_session_id),
+	is_root(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 	init_command_map();
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
 	memset(session_tag, 0x0, sizeof(char) * 64);
 	snprintf(session_tag, 64, "%d (%s:%d)", session_id, inet_ntoa(sock_addr.sin_addr), htons(sock_addr.sin_port));
+	is_root = ((strcmp(get_username(), "root") == 0) ? true : false);
+	// printf("is_root: %s\n", (is_root ? "True" : "False"));
 }
 	
 InteractiveSession::~InteractiveSession()
@@ -198,6 +209,24 @@ unsigned short InteractiveSession::deinitialize()
 const char* InteractiveSession::get_session_tag()const
 {
 	return session_tag;
+}
+
+bool InteractiveSession::is_privilege_user_command(int command_type)
+{
+	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
+	{
+		InteractiveSessionCommand_StartFakeAcspt,
+		InteractiveSessionCommand_StopFakeAcspt,
+		InteractiveSessionCommand_StartFakeUsrept,
+		InteractiveSessionCommand_StopFakeUsrept
+	};
+	static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
+	for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
+	{
+		if (command_type == PRIVILEGE_USER_COMMAND_LIST[i])
+			return true;
+	}
+	return false;
 }
 
 void* InteractiveSession::session_thread_handler(void* pvoid)
@@ -309,7 +338,18 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						break;
 					}
 					else
-						WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
+					{
+// Some commmands require privilege user
+						if (is_privilege_user_command((int)iter->second))
+						{
+							if (!is_root)
+							{
+								can_execute = false;
+								WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
+							}
+						}
+						
+					}
 					command_line_inner = NULL;
 				}
 				cur_argc_inner++;
@@ -317,6 +357,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 // Handle command
 			if (can_execute)
 			{
+				WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
 				ret = handle_command(cur_argc_inner, argv_inner);
 				if (CHECK_FAILURE(ret))
 				{
@@ -363,7 +404,9 @@ OUT:
 		if (notify_cfg == NULL)
 			throw bad_alloc();
 		WRITE_FORMAT_WARN("[%s] The session is closed due to error: %s", session_tag, GetErrorDescription(ret));
+// Asynchronous event
 		observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
+		SAFE_RELEASE(notify_cfg)
 	}
 	return ret;
 }
@@ -406,7 +449,11 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_help_command,
 		&InteractiveSession::handle_exit_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
-		&InteractiveSession::handle_get_node_system_info_command
+		&InteractiveSession::handle_get_node_system_info_command,
+		&InteractiveSession::handle_start_fake_acspt_command,
+		&InteractiveSession::handle_stop_fake_acspt_command,
+		&InteractiveSession::handle_start_fake_usrept_command,
+		&InteractiveSession::handle_stop_fake_usrept_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -432,6 +479,13 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
 	usage_string += string("  Format 1: Node ID: (ex. 1)\n");
 	usage_string += string("  Format 2: Node IP: (ex. 10.206.24.219)\n");
+	if (is_root)
+	{
+		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
+		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
+		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
+		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts in the cluster\n");
+	}
 	usage_string += string("===================================================\n");
 
 	ret = print_to_console(usage_string);
@@ -440,6 +494,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 
 unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 {
+	assert(observer != NULL && "observer should NOT be NULL");
 	if (argc != 1)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
@@ -456,7 +511,9 @@ unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 		throw bad_alloc();
 // Notify the event
 	WRITE_FORMAT_WARN("[%s] The session is closed......", session_tag);
+// Asynchronous event
 	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
 
@@ -531,5 +588,101 @@ unsigned short InteractiveSession::handle_get_node_system_info_command(int argc,
 	node_system_info_string += system_info_param.system_info;
 	node_system_info_string += string("\n");
 	ret = print_to_console(node_system_info_string);
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Start FakeAcspts in the cluster..."));
+// Notify the parent
+	FakeAcsptControlType fake_acspt_control_type = FAKE_ACSPT_START;
+	size_t notify_param_size = sizeof(FakeAcsptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_stop_fake_acspt_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Stop FakeAcspts in the cluster..."));
+// Notify the parent
+	FakeAcsptControlType fake_acspt_control_type = FAKE_ACSPT_STOP;
+	size_t notify_param_size = sizeof(FakeAcsptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_start_fake_usrept_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Start FakeAcspts in the cluster..."));
+// Notify the parent
+	FakeUsreptControlType fake_usrept_control_type = FAKE_USREPT_START;
+	size_t notify_param_size = sizeof(FakeUsreptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_stop_fake_usrept_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Stop FakeAcspts in the cluster..."));
+// Notify the parent
+	FakeUsreptControlType fake_usrept_control_type = FAKE_USREPT_STOP;
+	size_t notify_param_size = sizeof(FakeUsreptControlType);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }

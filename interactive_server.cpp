@@ -356,16 +356,36 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     switch(notify_type)
     {
 // Synchronous event:
+      	case NOTIFY_CONTROL_FAKE_ACSPT:
+      	case NOTIFY_CONTROL_FAKE_USREPT:
+    	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(manager != NULL && "manager should NOT be NULL");
+    		// PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		// if (notify_cfg == NULL)
+    		// {
+    		// 	WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
+    		// 	return RET_FAILURE_INVALID_ARGUMENT;
+    		// }
+    		ret = manager->notify(notify_type, notify_cfg);
+    	}
+    	break;
 // Asynchronous event:
       	case NOTIFY_SESSION_EXIT:
     	{
-    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		if (notify_cfg == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		// PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		// if (notify_cfg == NULL)
+    		// {
+    		// 	WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
+    		// 	return RET_FAILURE_INVALID_ARGUMENT;
+    		// }
+// Asynchronous event for Leader; Synchronous event for Follower
     		ret = notify_thread->add_event(notify_cfg);
     	}
     	break;
@@ -390,7 +410,8 @@ unsigned short InteractiveServer::async_handle(NotifyCfg* notify_cfg)
     {
       	case NOTIFY_SESSION_EXIT:
     	{
-    		int session_id = *((int*)notify_cfg->get_notify_param());
+    		// int session_id = *((int*)notify_cfg->get_notify_param());
+			int session_id = ((PNOTIFY_SESSION_EXIT_CFG)notify_cfg)->get_session_id();
 			WRITE_FORMAT_DEBUG("Session[%d] notify the parent to exit", session_id);
 			ret = remove_session(session_id);
     	}

@@ -130,7 +130,8 @@ ClusterMgr::ClusterMgr() :
 	cluster_ip(NULL),
 	node_type(NONE),
 	cluster_node(NULL),
-	interactive_server(NULL)
+	interactive_server(NULL),
+	simulator_handler(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -491,11 +492,25 @@ unsigned short ClusterMgr::initialize()
 	ret = interactive_server->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
+// Initialize the simulator handler
+	simulator_handler = new SimulatorHandler(this);
+	if (simulator_handler == NULL)
+		throw bad_alloc();
+	ret = simulator_handler->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
 	return ret;
 }
 
 unsigned short ClusterMgr::deinitialize()
 {
+// Deinitialize the simulator handler
+	if (simulator_handler != NULL)
+	{
+		simulator_handler->deinitialize();
+		delete simulator_handler;
+		simulator_handler = NULL;	
+	}
 // Deinitialize the session server
 	if (interactive_server != NULL)
 	{
@@ -713,6 +728,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
 				assert(system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
 				system_info_param->system_info = string(notify_system_info_cfg->get_system_info());
+    			SAFE_RELEASE(notify_system_info_cfg)
     		}
     	}
     	break;
@@ -731,40 +747,97 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 {
     unsigned short ret = RET_SUCCESS;
+    // PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    // printf("notify_type: %d\n", notify_type);
+    // assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 	switch (notify_type)
 	{
 // Synchronous event
 		case NOTIFY_CHECK_KEEPALIVE:
 		{
+// Cautin: Don't carray any parameters, no need to pass PNOTIFY_XXX_CFG object
 			check_keepalive();
+		}
+		break;
+		case NOTIFY_CONTROL_FAKE_ACSPT:
+		{
+     		assert(node_type != NONE && "node type should be NONE");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			PNOTIFY_FAKE_ACSPT_CONTROL_CFG notify_fake_acspt_control_cfg = (PNOTIFY_FAKE_ACSPT_CONTROL_CFG)notify_param;
+			assert(notify_fake_acspt_control_cfg != NULL && "notify_fake_acspt_control_cfg should NOT be NULL");
+			FakeAcsptControlType fake_acspt_control_type = notify_fake_acspt_control_cfg->get_fake_acspt_control_type();
+			switch(fake_acspt_control_type)
+			{
+				case FAKE_ACSPT_START:
+				{
+					ret = simulator_handler->start_fake_acspt();
+				}
+				break;
+				case FAKE_ACSPT_STOP:
+				{
+					ret = simulator_handler->stop_fake_acspt();
+				}
+				break;
+				default:
+				{
+		    		static const int BUF_SIZE = 256;
+		    		char buf[BUF_SIZE];
+		    		snprintf(buf, BUF_SIZE, "Unknown simulator ap control type: %d", fake_acspt_control_type);
+		    		throw std::invalid_argument(buf);
+				}
+				break;
+			}
+		}
+		break;
+		case NOTIFY_CONTROL_FAKE_USREPT:
+		{
+     		assert(node_type != NONE && "node type should be NONE");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			PNOTIFY_FAKE_USREPT_CONTROL_CFG notify_fake_usrept_control_cfg = (PNOTIFY_FAKE_USREPT_CONTROL_CFG)notify_param;
+			assert(notify_fake_usrept_control_cfg != NULL && "notify_fake_usrept_control_cfg should NOT be NULL");
+			FakeUsreptControlType fake_usrept_control_type = notify_fake_usrept_control_cfg->get_fake_usrept_control_type();
+			switch(fake_usrept_control_type)
+			{
+				case FAKE_USREPT_START:
+				{
+					ret = simulator_handler->start_fake_usrept();
+				}
+				break;
+				case FAKE_USREPT_STOP:
+				{
+					ret = simulator_handler->stop_fake_usrept();
+				}
+				break;
+				default:
+				{
+		    		static const int BUF_SIZE = 256;
+		    		char buf[BUF_SIZE];
+		    		snprintf(buf, BUF_SIZE, "Unknown simulator ue control type: %d", fake_usrept_control_type);
+		    		throw std::invalid_argument(buf);
+				}
+				break;
+			}
 		}
 		break;
 // Asynchronous event:
       	case NOTIFY_NODE_DIE:
     	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
      		assert(node_type == FOLLOWER && "node type should be FOLLOWER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
-    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		if (notify_cfg == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
-    		// string leader_ip((char*)notify_cfg->get_notify_param());
     		WRITE_FORMAT_WARN("The leader[%s] dies, try to re-build the cluster", cluster_ip);
     		ret = notify_thread->add_event(notify_cfg);
     	}
 		break;
 		case NOTIFY_SYSTEM_INFO:
 		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
      		assert(node_type == LEADER && "node type should be LEADER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
-    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		if (notify_cfg == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
     		WRITE_DEBUG("Receive the system info for session......");
     		ret = notify_thread->add_event(notify_cfg);
 		}
@@ -799,6 +872,9 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	case NOTIFY_SYSTEM_INFO:
     	{
     		PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
+			// assert(notify_system_info_cfg != NULL && "notify_system_info_cfg should NOT be NULL");ri
+// Caution: Required to add reference count, since another thread will access it
+			notify_system_info_cfg->addref(__FILE__, __LINE__);
 			int session_id = notify_system_info_cfg->get_session_id();
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_mtx[session_id]);

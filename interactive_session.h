@@ -42,6 +42,9 @@ private:
 	sockaddr_in sock_addr;
 	char session_tag[64];
 	int session_id;
+	bool is_root;
+
+	static bool is_privilege_user_command(int command_type);
 
 	static void* session_thread_handler(void* void_tr);
 	unsigned short session_thread_handler_internal();
@@ -54,6 +57,10 @@ private:
 	unsigned short handle_exit_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_node_system_info_command(int argc, char **argv);
+	unsigned short handle_start_fake_acspt_command(int argc, char **argv);
+	unsigned short handle_stop_fake_acspt_command(int argc, char **argv);
+	unsigned short handle_start_fake_usrept_command(int argc, char **argv);
+	unsigned short handle_stop_fake_usrept_command(int argc, char **argv);
 	unsigned short print_to_console(std::string response)const;
 	unsigned short print_prompt_to_console()const;
 

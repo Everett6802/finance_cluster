@@ -6,6 +6,7 @@
 #include <string>
 #include "common.h"
 #include "interactive_server.h"
+#include "simulator_handler.h"
 
 
 class ClusterMgr : public IManager
@@ -32,6 +33,8 @@ private:
 	pthread_mutex_t interactive_session_mtx[MAX_INTERACTIVE_SESSION];
 	pthread_cond_t interactive_session_cond[MAX_INTERACTIVE_SESSION];
 	std::list<PNOTIFY_CFG> interactive_session_data_list[MAX_INTERACTIVE_SESSION];
+
+	SimulatorHandler* simulator_handler;
 
 	unsigned short parse_config();
 	unsigned short find_local_ip();

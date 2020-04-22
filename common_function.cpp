@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <pwd.h>
+#include <stdexcept>
 #include "common.h"
 
 
@@ -52,7 +54,21 @@ bool check_file_exist(const char* filepath)
 {
 	assert(filepath != NULL && "filepath should NOT be NULL");
 	struct stat dummy;
-	return (stat(filepath, &dummy) == 0);
+	if (stat(filepath, &dummy) != 0)
+	{
+		if (errno == ENOENT)
+			return false;
+		else
+		{
+			static const int ERR_BUF_SIZE = 256;
+			char err_buf[ERR_BUF_SIZE];
+			memset(err_buf, 0x0, sizeof(char) * ERR_BUF_SIZE);
+			snprintf(err_buf, ERR_BUF_SIZE, "stat() fails, due to: %s", strerror(errno));
+			throw runtime_error(err_buf);			
+		}
+	}
+
+	return true;
 }
 
 bool check_config_file_exist(const char* config_filename)
@@ -206,4 +222,13 @@ bool check_string_is_number(const char* input)
 	/*long val = */strtol(input, &next, 10);
 // Check for empty string and characters left after conversion.
 	return ((next == input) || (*next != '\0')) ? false : true;
+}
+
+const char *get_username()
+{
+  	uid_t uid = geteuid();
+  	struct passwd *pw = getpwuid(uid);
+  	if (pw != NULL)
+    	return pw->pw_name;
+  	return NULL;
 }

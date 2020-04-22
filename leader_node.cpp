@@ -356,7 +356,9 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_check_keepalive,
 		&LeaderNode::recv_update_cluster_map,
 		&LeaderNode::recv_transmit_text,
-		&LeaderNode::recv_query_system_info
+		&LeaderNode::recv_query_system_info,
+		&LeaderNode::recv_control_fake_acspt,
+		&LeaderNode::recv_control_fake_usrept
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -376,7 +378,9 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_check_keepalive,
 		&LeaderNode::send_update_cluster_map,
 		&LeaderNode::send_transmit_text,
-		&LeaderNode::send_query_system_info
+		&LeaderNode::send_query_system_info,
+		&LeaderNode::send_control_fake_acspt,
+		&LeaderNode::send_control_fake_usrept
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -426,9 +430,15 @@ unsigned short LeaderNode::recv_query_system_info(const std::string& message_dat
 	PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data.c_str(), notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
+// Asynchronous event
 	observer->notify(NOTIFY_SYSTEM_INFO, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
+
+unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
+
+unsigned short LeaderNode::recv_control_fake_usrept(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_USREPT);}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -438,11 +448,8 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 	bool follower_dead_found = false;
 // Check if nodes in cluster are dead
 	pthread_mutex_lock(&node_channel_mtx);
-	// fprintf(stderr, "Recv20: Send Cheek Keepalive\n");
-	// fprintf(stderr, "KeepAlive, Before Check...\n");
 	// dump_node_channel_map();
 	// dump_node_keepalive_map();
-	// fprintf(stderr, "KeepAlive, Before Check...END\n");
 	map<string, int>::iterator iter = node_keepalive_map.begin();
 	while (iter != node_keepalive_map.end())
 	{
@@ -552,6 +559,26 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
 }
 
+unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: simulator ap control type
+// Message format:
+// EventType | simulator ap control type | EOD
+	const char* fake_acspt_control_type = (const char*)param1;
+	return send_data(MSG_CONTROL_FAKE_ACSPT, fake_acspt_control_type);
+}
+
+unsigned short LeaderNode::send_control_fake_usrept(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: simulator ue control type
+// Message format:
+// EventType | simulator ue control type | EOD
+	const char* fake_usrept_control_type = (const char*)param1;
+	return send_data(MSG_CONTROL_FAKE_USREPT, fake_usrept_control_type);
+}
+
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -623,13 +650,10 @@ unsigned short LeaderNode::notify(NotifyType notify_type, void* notify_param)
 // Asynchronous event:
       	case NOTIFY_NODE_DIE:
     	{
-    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		if (notify_cfg == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		ret = notify_thread->add_event(notify_cfg);
     	}
     	break;
@@ -654,7 +678,8 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     {
       	case NOTIFY_NODE_DIE:
     	{
-    		string follower_ip((char*)notify_cfg->get_notify_param());
+    		// string follower_ip((char*)notify_cfg->get_notify_param());
+    		string follower_ip(((PNOTIFY_NODE_DIE_CFG)notify_cfg)->get_remote_ip());
     		WRITE_FORMAT_WARN("The follower[%s] dies, remove the node from the cluster", follower_ip.c_str());
     		ret = remove_follower(follower_ip);
     	}
