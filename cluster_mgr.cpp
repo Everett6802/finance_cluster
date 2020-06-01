@@ -770,7 +770,9 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			{
 				case FAKE_ACSPT_START:
 				{
+// Control simulator in the local node
 					ret = simulator_handler->start_fake_acspt();
+
 				}
 				break;
 				case FAKE_ACSPT_STOP:
@@ -786,6 +788,11 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		    		throw std::invalid_argument(buf);
 				}
 				break;
+			}
+			if (CHECK_SUCCESS(ret) && node_type == LEADER)
+			{
+				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+				ret = cluster_node->send(MSG_CONTROL_FAKE_ACSPT, (void*)&fake_acspt_control_type);
 			}
 		}
 		break;
@@ -816,6 +823,11 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		    		throw std::invalid_argument(buf);
 				}
 				break;
+			}
+			if (CHECK_SUCCESS(ret) && node_type == LEADER)
+			{
+				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+				ret = cluster_node->send(MSG_CONTROL_FAKE_USREPT, (void*)&fake_usrept_control_type);
 			}
 		}
 		break;

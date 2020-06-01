@@ -67,6 +67,27 @@ unsigned short LeaderNode::become_leader()
 		return RET_FAILURE_SYSTEM_API;
 	}
 // Allow socket descriptor to be reuseable
+// Bind failed: Address already in use: 
+// I faced the same issue when I closed the server program with client program still running. This put the socket into TIME_WAIT stat
+/*
+What exactly does SO_REUSEADDR do?
+This socket option tells the kernel that even if 
+this port is busy (in the TIME_WAIT state), go ahead and 
+reuse it anyway. If it is busy, but with another state, 
+you will still get an address already in use error. 
+It is useful if your server has been shut down, and then 
+restarted right away while sockets are still active on its port. 
+
+*** How do I remove a CLOSE_WAIT socket connection ***
+CLOSE_WAIT means your program is still running, and hasn't 
+closed the socket (and the kernel is waiting for it to do so). 
+Add -p to netstat to get the pid, and then kill it more 
+forcefully (with SIGKILL if needed). 
+That should get rid of your CLOSE_WAIT sockets. 
+You can also use ps to find the pid.
+
+SO_REUSEADDR is for servers and TIME_WAIT sockets, so doesn't apply here.
+*/
    if (setsockopt(listen_sd, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on)) < 0)
    {
       WRITE_FORMAT_ERROR("setsockopt() fails, due to: %s", strerror(errno));
@@ -555,6 +576,7 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 	const char* remote_ip = (const char*)param2;
 	// fprintf(stderr, "remote_ip: %s\n", remote_ip);
 	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
 	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
 }
@@ -562,21 +584,31 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: simulator ap control type
+// param1: fake access point control type
 // Message format:
-// EventType | simulator ap control type | EOD
-	const char* fake_acspt_control_type = (const char*)param1;
-	return send_data(MSG_CONTROL_FAKE_ACSPT, fake_acspt_control_type);
+// EventType | fake access point control type | EOD
+	// const char* fake_acspt_control_type = (const char*)param1;
+	static const int BUF_SIZE = sizeof(int) + 1;
+	FakeAcsptControlType fake_acspt_control_type = (FakeAcsptControlType)*(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", fake_acspt_control_type);
+	return send_data(MSG_CONTROL_FAKE_ACSPT, buf);
 }
 
 unsigned short LeaderNode::send_control_fake_usrept(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: simulator ue control type
+// param1: fake user endpoint control type
 // Message format:
-// EventType | simulator ue control type | EOD
-	const char* fake_usrept_control_type = (const char*)param1;
-	return send_data(MSG_CONTROL_FAKE_USREPT, fake_usrept_control_type);
+// EventType | fake user endpoint control type | EOD
+	// const char* fake_usrept_control_type = (const char*)param1;
+	static const int BUF_SIZE = sizeof(int) + 1;
+	FakeUsreptControlType fake_usrept_control_type = (FakeUsreptControlType)*(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", fake_usrept_control_type);
+	return send_data(MSG_CONTROL_FAKE_USREPT, buf);
 }
 
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)

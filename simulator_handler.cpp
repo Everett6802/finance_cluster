@@ -99,13 +99,13 @@ unsigned short SimulatorHandler::start_fake_acspt(bool need_reset)
 	// system("fake_acspt.sh clean");
 	if (need_reset)
 	{
-		snprintf(cmd, BUF_SIZE, "%s clean", get_fake_acspt_control_script_filepath());
+		snprintf(cmd, BUF_SIZE, "%s stop", get_fake_acspt_control_script_filepath());
 		system(cmd);
 		sleep(3);	
 	}
 
 	// system("fake_acspt.sh up");
-	snprintf(cmd, BUF_SIZE, "%s up", get_fake_acspt_control_script_filepath());
+	snprintf(cmd, BUF_SIZE, "%s start", get_fake_acspt_control_script_filepath());
 	system(cmd);
 	return RET_SUCCESS;
 }
@@ -117,7 +117,7 @@ unsigned short SimulatorHandler::stop_fake_acspt()
 	memset(cmd, 0x0, sizeof(cmd)/sizeof(cmd[0]));
 
 	// system("fake_acspt.sh clean");
-	snprintf(cmd, BUF_SIZE, "%s clean", get_fake_acspt_control_script_filepath());
+	snprintf(cmd, BUF_SIZE, "%s stop", get_fake_acspt_control_script_filepath());
 	system(cmd);
 	return RET_SUCCESS;
 }
