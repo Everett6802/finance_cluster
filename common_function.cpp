@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pwd.h>
+#include <time.h>
 #include <stdexcept>
 #include "common.h"
 
@@ -231,4 +232,11 @@ const char *get_username()
   	if (pw != NULL)
     	return pw->pw_name;
   	return NULL;
+}
+
+void print_curtime(const char* title)
+{
+  time_t t = time(NULL);
+  struct tm tm = *localtime(&t);
+  printf("%s: %d-%02d-%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }

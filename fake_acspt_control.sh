@@ -34,7 +34,7 @@ start_fake_acspt()
 	./$FAKE_ACSPT_SCRIPT_FILENAME up
 }
 
-stop_fake_acsept()
+stop_fake_acspt()
 {
 	cd $SIMULATOR_SCRIPT_FOLDERPATH
 	./$FAKE_ACSPT_SCRIPT_FILENAME clean

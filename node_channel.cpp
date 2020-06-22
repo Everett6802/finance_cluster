@@ -73,7 +73,8 @@ unsigned short NodeChannel::deinitialize()
 	unsigned short ret = RET_SUCCESS;
 	// int kill_ret;
 	__sync_fetch_and_add(&exit, 1);
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 
 	bool thread_alive = false;
 // Check send thread alive
@@ -127,7 +128,8 @@ unsigned short NodeChannel::deinitialize()
 			thread_alive = true;
 		}
 	}
-	if (thread_alive) sleep(1);
+	// if (thread_alive) sleep(1);
+	if (thread_alive) usleep(100000);
 // Wait for send thread's death
 	WRITE_DEBUG("Wait for the worker thread of sending message's death...");
 // Should NOT check the thread status in this way.

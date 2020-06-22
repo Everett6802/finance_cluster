@@ -55,7 +55,8 @@ static void signal_handler(int signo)
 		// }
 		// break;
 	}
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 	exit(EXIT_SUCCESS);
 }
 
@@ -239,7 +240,7 @@ int main(int argc, char** argv)
 		print_errmsg_and_exit("Fail to de-initialize...");
 	}
 
-	getchar();
+	// getchar();
 	printf("The Node is Stopped......\n");
 
 	exit(EXIT_SUCCESS);

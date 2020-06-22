@@ -265,7 +265,8 @@ unsigned short InteractiveServer::deinitialize()
 	unsigned short ret = RET_SUCCESS;
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&listen_exit, 1);
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 // Check listen thread alive
 	// bool listen_thread_alive = false;
 	if (listen_tid != 0)
@@ -287,7 +288,8 @@ unsigned short InteractiveServer::deinitialize()
 // Kill the thread
 		    if (pthread_cancel(listen_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of listening, due to: %s", strerror(errno));
-			sleep(1);
+			// sleep(1);
+			usleep(100000);
 		}
 	}
 

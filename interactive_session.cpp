@@ -137,7 +137,8 @@ unsigned short InteractiveSession::deinitialize()
 	unsigned short ret = RET_SUCCESS;
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&session_exit, 1);
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 // Check interactive session thread alive
 	// bool session_thread_alive = false;
 	if (session_tid != 0)
@@ -159,7 +160,8 @@ unsigned short InteractiveSession::deinitialize()
 // Kill the thread
 		    if (pthread_cancel(session_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
-			sleep(1);
+			// sleep(1);
+			usleep(100000);
 		}
 	}
 

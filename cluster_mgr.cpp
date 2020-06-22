@@ -466,7 +466,8 @@ unsigned short ClusterMgr::initialize()
 	ret = notify_thread->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
 	if (cluster_ip != NULL)

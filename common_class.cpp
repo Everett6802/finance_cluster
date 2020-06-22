@@ -1136,7 +1136,8 @@ unsigned short NotifyThread::deinitialize()
 	// void* status;
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&notify_exit, 1);
-	sleep(1);
+	// sleep(1);
+	usleep(100000);
 // Check notify thread alive
 	// bool notify_thread_alive = false;
 	if (notify_tid != 0)
@@ -1161,7 +1162,8 @@ unsigned short NotifyThread::deinitialize()
 // Kill the thread
 		    if (pthread_cancel(notify_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
-			sleep(1);
+			// sleep(1);
+			usleep(100000);
 		}
 	}
 

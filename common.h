@@ -249,6 +249,7 @@ unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
 bool check_string_is_number(const char* input);
 const char *get_username();
+void print_curtime(const char* title=NULL);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
