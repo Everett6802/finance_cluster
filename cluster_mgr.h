@@ -35,6 +35,7 @@ private:
 	std::list<PNOTIFY_CFG> interactive_session_data_list[MAX_INTERACTIVE_SESSION];
 
 	SimulatorHandler* simulator_handler;
+	bool simulator_installed;
 
 	unsigned short parse_config();
 	unsigned short find_local_ip();

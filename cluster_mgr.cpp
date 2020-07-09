@@ -131,7 +131,8 @@ ClusterMgr::ClusterMgr() :
 	node_type(NONE),
 	cluster_node(NULL),
 	interactive_server(NULL),
-	simulator_handler(NULL)
+	simulator_handler(NULL),
+	simulator_installed(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
@@ -500,6 +501,9 @@ unsigned short ClusterMgr::initialize()
 	ret = simulator_handler->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
+	simulator_installed = simulator_handler->is_simulator_installed();
+	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
+
 	return ret;
 }
 
@@ -760,8 +764,32 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			check_keepalive();
 		}
 		break;
+		case NOTIFY_INSTALL_SIMULATOR:
+		{
+     		assert(node_type != NONE && "node type should be NONE");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			PNOTIFY_SIMULATOR_INSTALL_CFG notify_simulator_install_cfg = (PNOTIFY_SIMULATOR_INSTALL_CFG)notify_param;
+			assert(notify_simulator_install_cfg != NULL && "notify_simulator_install_cfg should NOT be NULL");
+			const char* simulator_package_filepath = notify_simulator_install_cfg->get_simulator_package_filepath();
+			ret = simulator_handler->install_simulator(simulator_package_filepath);
+			if (CHECK_SUCCESS(ret))
+			{
+				simulator_installed = true;
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					ret = cluster_node->send(MSG_INSTALL_SIMULATOR, (void*)simulator_package_filepath);
+				}
+			}
+		}
+		break;
 		case NOTIFY_CONTROL_FAKE_ACSPT:
 		{
+			if (!simulator_installed)
+			{
+				WRITE_INFO("The simulator is NOT installed");
+				return RET_WARN_SIMULATOR_NOT_INSTALLED;
+			}
      		assert(node_type != NONE && "node type should be NONE");
 			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
 			PNOTIFY_FAKE_ACSPT_CONTROL_CFG notify_fake_acspt_control_cfg = (PNOTIFY_FAKE_ACSPT_CONTROL_CFG)notify_param;
@@ -773,7 +801,6 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				{
 // Control simulator in the local node
 					ret = simulator_handler->start_fake_acspt();
-
 				}
 				break;
 				case FAKE_ACSPT_STOP:
@@ -799,6 +826,11 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		break;
 		case NOTIFY_CONTROL_FAKE_USREPT:
 		{
+			if (!simulator_installed)
+			{
+				WRITE_INFO("The simulator is NOT installed");
+				return RET_WARN_SIMULATOR_NOT_INSTALLED;
+			}
      		assert(node_type != NONE && "node type should be NONE");
 			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
 			PNOTIFY_FAKE_USREPT_CONTROL_CFG notify_fake_usrept_control_cfg = (PNOTIFY_FAKE_USREPT_CONTROL_CFG)notify_param;

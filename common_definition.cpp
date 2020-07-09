@@ -46,6 +46,7 @@ const unsigned short RET_FAILURE_CONNECTION_END = 0x1FF;
 
 const unsigned short RET_WARN_BASE = 0x200;
 const unsigned short RET_WARN_INTERACTIVE_COMMAND = RET_WARN_BASE + 0;
+const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 1;
 const unsigned short RET_WARN_END = 0x2FF;
 
 const char *GetErrorDescription(unsigned short ret)
@@ -82,12 +83,14 @@ const char *GetErrorDescription(unsigned short ret)
 	static const char *ret_warn_description[] =
 	{
 		// "Warn Base",
-		"Warn Interactive Command"
+		"Warn Interactive Command",
+		"Warn Simulator Not Installed"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
 	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);
 	static int ret_warn_description_len = sizeof(ret_warn_description) / sizeof(ret_warn_description[0]);
 
+	unsigned short orig_ret = ret;
 	if (ret >= RET_WARN_BASE)
 	{
 		ret -= RET_WARN_BASE;
@@ -100,14 +103,15 @@ const char *GetErrorDescription(unsigned short ret)
 		if (ret >= 0 && ret < connection_ret_failure_description_len)
 			return connection_ret_failure_description[ret];
 	}
-	else
+	else if (ret >= RET_FAILURE_BASE)
 	{
 		if (ret >= 0 && ret < ret_failure_description_len)
 			return ret_failure_description[ret];
 	}
 
-	static char buf[STRING_SIZE];
-	snprintf(buf, STRING_SIZE, "Unsupported Error Description: %d", ret);
+	static char buf[STRING_SIZE + 1];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, STRING_SIZE, "Unsupported Error Description: %d", orig_ret);
 	return buf;
 }
 
@@ -129,7 +133,7 @@ const int MAX_CONNECTED_CLIENT = 5;
 
 const char* CONF_FODLERNAME = "conf";
 const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
-const int BASE_PORT_NO = 5889;
+const int BASE_PORT_NO = 5888;
 const int CLUSTER_PORT_NO = BASE_PORT_NO + 0;
 const int SESSION_PORT_NO = BASE_PORT_NO + 1;
 const int RECV_BUF_SIZE = 512;

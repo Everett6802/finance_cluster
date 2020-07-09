@@ -234,6 +234,11 @@ const char *get_username()
   	return NULL;
 }
 
+bool is_root_user()
+{
+	return ((strcmp(get_username(), "root") == 0) ? true : false);
+}
+
 void print_curtime(const char* title)
 {
   time_t t = time(NULL);

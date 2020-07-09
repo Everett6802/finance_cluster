@@ -18,6 +18,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetNodeSystemInfo,
+	InteractiveSessionCommand_InstallSimulator,
 	InteractiveSessionCommand_StartFakeAcspt,
 	InteractiveSessionCommand_StopFakeAcspt,
 	InteractiveSessionCommand_StartFakeUsrept,
@@ -31,6 +32,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"exit",
 	"get_cluster_detail",
 	"get_node_system_info",
+	"install_simulator",
 	"start_fake_acspt",
 	"stop_fake_acspt",
 	"start_fake_usrept",
@@ -100,7 +102,7 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
 	memset(session_tag, 0x0, sizeof(char) * 64);
 	snprintf(session_tag, 64, "%d (%s:%d)", session_id, inet_ntoa(sock_addr.sin_addr), htons(sock_addr.sin_port));
-	is_root = ((strcmp(get_username(), "root") == 0) ? true : false);
+	is_root = is_root_user();
 	// printf("is_root: %s\n", (is_root ? "True" : "False"));
 }
 	
@@ -217,6 +219,7 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 {
 	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
 	{
+		InteractiveSessionCommand_InstallSimulator,
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
@@ -361,23 +364,29 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 			{
 				WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
 				ret = handle_command(cur_argc_inner, argv_inner);
+				if (!CHECK_SUCCESS(ret))
+					WRITE_FORMAT_DEBUG("Execute the %s command, ret: %s", argv_inner[0], GetErrorDescription(ret));
 				if (CHECK_FAILURE(ret))
 				{
-					char rsp_buf[RSP_BUF_SIZE];
+					char rsp_buf[RSP_BUF_SIZE + 1];
+					memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
 					snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command, due to: %s\n Close the session: %s\n", argv_inner[0], GetErrorDescription(ret), session_tag);
 // Show warning if error occurs while executing the command and then exit
 					WRITE_ERROR(rsp_buf);
+					snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
 					print_to_console(string(rsp_buf));
 					// return ret;				
 				}
 				else if (CHECK_WARN(ret))
 				{
-					static char rsp_buf[RSP_BUF_SIZE];
+					char rsp_buf[RSP_BUF_SIZE + 1];
+					memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
 					snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
 					WRITE_WARN(rsp_buf);
+					snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
 					print_to_console(string(rsp_buf));
-					goto OUT;
+					// goto OUT;
 					// return ret;	
 				}
 			}
@@ -391,7 +400,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 			print_prompt_to_console();
 		}
 	}
-OUT:
+// OUT:
 	if (sock_fp != NULL)
 	{
 		fclose(sock_fp);
@@ -452,6 +461,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_exit_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_node_system_info_command,
+		&InteractiveSession::handle_install_simulator_command,
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
@@ -479,10 +489,13 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	usage_string += string("* exit\n Description: Exit the session\n");
 	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
 	usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
-	usage_string += string("  Format 1: Node ID: (ex. 1)\n");
-	usage_string += string("  Format 2: Node IP: (ex. 10.206.24.219)\n");
+	usage_string += string("  Param: Node ID/IP\n");
+	usage_string += string("    Format 1: Node ID: (ex. 1)\n");
+	usage_string += string("    Format 2: Node IP: (ex. 10.206.24.219)\n");
 	if (is_root)
 	{
+		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
+		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
@@ -593,6 +606,29 @@ unsigned short InteractiveSession::handle_get_node_system_info_command(int argc,
 	return RET_SUCCESS;
 }
 
+unsigned short InteractiveSession::handle_install_simulator_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Install Simulator in the cluster..."));
+// Notify the parent
+	size_t notify_param_size = strlen(argv[1]) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)argv[1], notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	unsigned short ret = observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
 unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, char **argv)
 {
 	assert(observer != NULL && "observer should NOT be NULL");
@@ -603,8 +639,6 @@ unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, cha
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
 
-// Send message to the user
-	// print_to_console(string("Start FakeAcspts in the cluster..."));
 // Notify the parent
 	FakeAcsptControlType fake_acspt_control_type = FAKE_ACSPT_START;
 	size_t notify_param_size = sizeof(FakeAcsptControlType);
@@ -612,9 +646,9 @@ unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, cha
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Synchronous event
-	observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
+	unsigned short ret = observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
     SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_stop_fake_acspt_command(int argc, char **argv)
@@ -636,9 +670,9 @@ unsigned short InteractiveSession::handle_stop_fake_acspt_command(int argc, char
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Synchronous event
-	observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
+	unsigned short ret = observer->notify(NOTIFY_CONTROL_FAKE_ACSPT, notify_cfg);
     SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_start_fake_usrept_command(int argc, char **argv)
@@ -660,9 +694,9 @@ unsigned short InteractiveSession::handle_start_fake_usrept_command(int argc, ch
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Synchronous event
-	observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
+	unsigned short ret = observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
     SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_stop_fake_usrept_command(int argc, char **argv)
@@ -684,7 +718,7 @@ unsigned short InteractiveSession::handle_stop_fake_usrept_command(int argc, cha
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Synchronous event
-	observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
+	unsigned short ret = observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
     SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
+	return ret;
 }

@@ -380,6 +380,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_update_cluster_map,
 		&LeaderNode::recv_transmit_text,
 		&LeaderNode::recv_query_system_info,
+		&LeaderNode::recv_install_simulator,
 		&LeaderNode::recv_control_fake_acspt,
 		&LeaderNode::recv_control_fake_usrept
 	};
@@ -402,6 +403,7 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_update_cluster_map,
 		&LeaderNode::send_transmit_text,
 		&LeaderNode::send_query_system_info,
+		&LeaderNode::send_install_simulator,
 		&LeaderNode::send_control_fake_acspt,
 		&LeaderNode::send_control_fake_usrept
 	};
@@ -458,6 +460,8 @@ unsigned short LeaderNode::recv_query_system_info(const std::string& message_dat
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
+
+unsigned short LeaderNode::recv_install_simulator(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_INSTALL_SIMULATOR);}
 
 unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
 
@@ -581,6 +585,20 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
 	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
+}
+
+unsigned short LeaderNode::send_install_simulator(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: simulator packge filepath
+// Message format:
+// EventType | simulator_packge_filepath | EOD
+	static const int BUF_SIZE = 256;
+	const char* simulator_packge_filepath = (const char*)param1;
+	char buf[BUF_SIZE + 1];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%s", simulator_packge_filepath);
+	return send_data(MSG_INSTALL_SIMULATOR, buf);
 }
 
 unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)

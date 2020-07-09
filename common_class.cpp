@@ -892,6 +892,25 @@ const char* NotifySystemInfoCfg::get_system_info()const
 
 ///////////////////////////
 
+NotifySimulatorInstallCfg::NotifySimulatorInstallCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_INSTALL_SIMULATOR, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+// De-Serialize:
+	simulator_package_filepath = (char*)notify_param;
+}
+
+NotifySimulatorInstallCfg::~NotifySimulatorInstallCfg()
+{
+}
+
+const char* NotifySimulatorInstallCfg::get_simulator_package_filepath()const
+{
+	return simulator_package_filepath;
+}
+
+///////////////////////////
+
 NotifyFakeAcsptControlCfg::NotifyFakeAcsptControlCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_CONTROL_FAKE_ACSPT, param, param_size)
 {

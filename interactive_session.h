@@ -57,6 +57,7 @@ private:
 	unsigned short handle_exit_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_node_system_info_command(int argc, char **argv);
+	unsigned short handle_install_simulator_command(int argc, char **argv);
 	unsigned short handle_start_fake_acspt_command(int argc, char **argv);
 	unsigned short handle_stop_fake_acspt_command(int argc, char **argv);
 	unsigned short handle_start_fake_usrept_command(int argc, char **argv);

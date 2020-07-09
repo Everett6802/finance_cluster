@@ -40,7 +40,7 @@
 #endif
 
 #ifndef CHECK_WARN
-#define CHECK_WARN(X) (X > RET_WARN_BASE && X < RET_WARN_BASE ? true : false)
+#define CHECK_WARN(X) (X >= RET_WARN_BASE && X <= RET_WARN_END ? true : false)
 #endif
 
 #ifndef IS_TRY_CONNECTION_TIMEOUT
@@ -134,6 +134,7 @@ extern const unsigned short RET_FAILURE_CONNECTION_END;
 
 extern const unsigned short RET_WARN_BASE;
 extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
+extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_END;
 
 const char* GetErrorDescription(unsigned short ret);
@@ -178,6 +179,7 @@ enum MessageType{
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_QUERY_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Followe
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
@@ -199,6 +201,7 @@ enum NotifyType{
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_SYSTEM_INFO,
+	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_SIZE
@@ -249,6 +252,7 @@ unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
 bool check_string_is_number(const char* input);
 const char *get_username();
+bool is_root_user();
 void print_curtime(const char* title=NULL);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -539,6 +543,21 @@ public:
 	const char* get_system_info()const;
 };
 typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifySimulatorInstallCfg : public NotifyCfg
+{
+private:
+	char* simulator_package_filepath;
+
+public:
+	NotifySimulatorInstallCfg(const void* param, size_t param_size);
+	virtual ~NotifySimulatorInstallCfg();
+
+	const char* get_simulator_package_filepath()const;
+};
+typedef NotifySimulatorInstallCfg* PNOTIFY_SIMULATOR_INSTALL_CFG;
 
 ///////////////////////////////////////////////////
 

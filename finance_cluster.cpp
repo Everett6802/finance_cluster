@@ -15,7 +15,7 @@ static char* param_join = NULL;
 static bool param_detach = false;
 
 static const int ERRMSG_SIZE = 256;
-static char errmsg[ERRMSG_SIZE];
+static char errmsg[ERRMSG_SIZE + 1];
 
 static ClusterMgr cluster_mgr;
 
@@ -193,7 +193,6 @@ int main(int argc, char** argv)
 	ret = setup_param(cluster_mgr);
 	if (CHECK_FAILURE(ret))
 	{
-		snprintf(errmsg, ERRMSG_SIZE, "setup_param() fails, due to: %s", GetErrorDescription(ret));
 		print_errmsg_and_exit(errmsg);
 	}
 
@@ -205,7 +204,9 @@ int main(int argc, char** argv)
 	{
 		// fprintf(stderr, "Fail to initialize...\n");
 		// exit(EXIT_FAILURE);
-		print_errmsg_and_exit("Fail to initialize...");
+		memset(errmsg, 0x0, sizeof(errmsg) / sizeof(errmsg[0]));
+		snprintf(errmsg, ERRMSG_SIZE, "Fail to initialize, due to: %s", GetErrorDescription(ret));
+		print_errmsg_and_exit(errmsg);
 	}
 
 	if (param_detach)

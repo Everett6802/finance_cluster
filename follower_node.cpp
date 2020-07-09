@@ -303,6 +303,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_update_cluster_map,
 		&FollowerNode::recv_transmit_text,
 		&FollowerNode::recv_query_system_info,
+		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept
 	};
@@ -324,6 +325,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_update_cluster_map,
 		&FollowerNode::send_transmit_text,
 		&FollowerNode::send_query_system_info,
+		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept
 	};
@@ -394,6 +396,23 @@ unsigned short FollowerNode::recv_query_system_info(const std::string& message_d
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
 	ret = send_query_system_info((void*)&session_id);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_install_simulator(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: simulator package filepath | EOD
+	unsigned short ret = RET_SUCCESS;
+	const char* simulator_package_filepath = (const char*)message_data.c_str();
+	size_t notify_param_size = strlen(simulator_package_filepath) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)simulator_package_filepath, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+    observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
 	return ret;
 }
 
@@ -499,6 +518,8 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 	// fprintf(stderr, "Follower[%s] send_query_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_QUERY_SYSTEM_INFO, system_info_data.c_str());
 }
+
+unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
 
 unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
 

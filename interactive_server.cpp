@@ -358,6 +358,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     switch(notify_type)
     {
 // Synchronous event:
+    	case NOTIFY_INSTALL_SIMULATOR:
       	case NOTIFY_CONTROL_FAKE_ACSPT:
       	case NOTIFY_CONTROL_FAKE_USREPT:
     	{
