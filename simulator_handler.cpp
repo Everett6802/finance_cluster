@@ -7,6 +7,8 @@ using namespace std;
 
 const char* SimulatorHandler::SIMULATOR_ROOT_FOLDER_PATH = "/simulator/BUILD";
 const char* SimulatorHandler::SIMULATOR_PACKAGE_FOLDER_PATH = "/dev/shm/simulator";
+const char* SimulatorHandler::SIMULATOR_VERSION_FILENAME = "VERSION";
+const char* SimulatorHandler::SIMULATOR_BUILD_FILENAME = "BUILD";
 const char* SimulatorHandler::SIMULATOR_INSTALL_SCRIPT_NAME = "simulator_install.sh";
 const char* SimulatorHandler::FAKE_ACSPT_CONTROL_SCRIPT_NAME = "fake_acspt_control.sh";
 const char* SimulatorHandler::FAKE_USREPT_CONTROL_SCRIPT_NAME = "fake_usrept_control.sh";
@@ -143,6 +145,42 @@ unsigned short SimulatorHandler::install_simulator(const char* simulator_filepat
 bool SimulatorHandler::is_simulator_installed()const
 {
 	return check_simulator_installed();	
+}
+
+unsigned short SimulatorHandler::get_simulator_version(char* simulator_version, int simulator_version_size)const
+{
+	assert(simulator_version != NULL && "simulator_version should NOT be NULL");
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	static const int FILEPATH_SIZE = 256;
+	char filepath[FILEPATH_SIZE + 1];
+	unsigned short ret = RET_SUCCESS;
+	// chdir(SIMULATOR_ROOT_FOLDER_PATH);
+// Get Version
+	memset(filepath, 0x0, sizeof(filepath) / sizeof(filepath[0]));
+	snprintf(filepath, FILEPATH_SIZE, "%s/%s", SIMULATOR_ROOT_FOLDER_PATH, SIMULATOR_VERSION_FILENAME);
+	list<string> line_list1;
+	ret = read_file_lines_ex(line_list1, filepath);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (line_list1.size() != 1)
+		return RET_FAILURE_INCORRECT_CONFIG;
+	list<string>::iterator iter1 = line_list1.begin();
+	string version_string = (string)*iter1;
+// Get Build
+	memset(filepath, 0x0, sizeof(filepath) / sizeof(filepath[0]));
+	snprintf(filepath, FILEPATH_SIZE, "%s/%s", SIMULATOR_ROOT_FOLDER_PATH, SIMULATOR_BUILD_FILENAME);
+	list<string> line_list2;
+	ret = read_file_lines_ex(line_list2, filepath);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (line_list2.size() != 1)
+		return RET_FAILURE_INCORRECT_CONFIG;
+	list<string>::iterator iter2 = line_list2.begin();
+	string build_string = (string)*iter2;
+// Assemble the simulator version
+	snprintf(simulator_version, simulator_version_size, "%s.%s", version_string.c_str(), build_string.c_str());
+	return ret;
 }
 
 unsigned short SimulatorHandler::start_fake_acspt(bool need_reset)

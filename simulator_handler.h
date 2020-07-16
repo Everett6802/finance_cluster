@@ -13,6 +13,8 @@ class SimulatorHandler : public INotify
 
 	static const char* SIMULATOR_ROOT_FOLDER_PATH;
 	static const char* SIMULATOR_PACKAGE_FOLDER_PATH;
+	static const char* SIMULATOR_VERSION_FILENAME;
+	static const char* SIMULATOR_BUILD_FILENAME;
 	static const char* SIMULATOR_INSTALL_SCRIPT_NAME;
 	static const char* FAKE_ACSPT_CONTROL_SCRIPT_NAME;
 	static const char* FAKE_USREPT_CONTROL_SCRIPT_NAME;
@@ -41,6 +43,7 @@ public:
 
 	unsigned short install_simulator(const char* simulator_filepath);
 	bool is_simulator_installed()const;
+	unsigned short get_simulator_version(char* simulator_version, int simulator_version_size)const;
 
 	unsigned short start_fake_acspt(bool need_reset=true);
 	unsigned short stop_fake_acspt();

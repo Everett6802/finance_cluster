@@ -722,7 +722,30 @@ SystemInfoParam::SystemInfoParam()
 {
 	memset(node_ip_buf, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
 }
+
 SystemInfoParam::~SystemInfoParam(){}
+
+//////////////////////////////////////////////////////////
+
+SimulatorVersionParam::SimulatorVersionParam(int buf_size) :
+	simulator_version_buf_size(buf_size),
+	simulator_version(NULL)
+{
+	simulator_version = new char[simulator_version_buf_size + 1];
+	if (simulator_version == NULL)
+		throw bad_alloc();
+	memset(simulator_version, 0x0, sizeof(char) * (simulator_version_buf_size + 1));
+}
+
+SimulatorVersionParam::~SimulatorVersionParam()
+{
+	if (simulator_version != NULL)
+	{
+		delete[] simulator_version;
+		simulator_version = NULL;
+	}
+	simulator_version_buf_size = 0;
+}
 
 //////////////////////////////////////////////////////////
 

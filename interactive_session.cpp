@@ -19,6 +19,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_InstallSimulator,
+	InteractiveSessionCommand_GetSimulatorVersion,
 	InteractiveSessionCommand_StartFakeAcspt,
 	InteractiveSessionCommand_StopFakeAcspt,
 	InteractiveSessionCommand_StartFakeUsrept,
@@ -33,6 +34,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"get_cluster_detail",
 	"get_node_system_info",
 	"install_simulator",
+	"get_simulator_version",
 	"start_fake_acspt",
 	"stop_fake_acspt",
 	"start_fake_usrept",
@@ -220,6 +222,7 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
 	{
 		InteractiveSessionCommand_InstallSimulator,
+		InteractiveSessionCommand_GetSimulatorVersion,
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
@@ -462,6 +465,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_install_simulator_command,
+		&InteractiveSession::handle_get_simulator_version_command,
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
@@ -496,6 +500,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	{
 		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
+		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
@@ -627,6 +632,39 @@ unsigned short InteractiveSession::handle_install_simulator_command(int argc, ch
 	unsigned short ret = observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
     SAFE_RELEASE(notify_cfg)
 	return ret;
+}
+
+unsigned short InteractiveSession::handle_get_simulator_version_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	// int node_id;
+// Get the data
+	PSIMULATOR_VERSION_PARAM simulator_version_param = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
+	if (simulator_version_param  == NULL)
+		throw bad_alloc();
+    ret = manager->get(PARAM_SIMULATOR_VERSION, (void*)simulator_version_param);
+	if (CHECK_SUCCESS(ret))
+	{
+// Print data in cosole
+		string simulator_version_string("simulator version  ");
+		simulator_version_string += string(simulator_version_param->simulator_version);
+		simulator_version_string += string("\n");
+		ret = print_to_console(simulator_version_string);
+	}
+	if (simulator_version_param != NULL)
+	{
+		delete simulator_version_param;
+		simulator_version_param = NULL;
+	}
+	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, char **argv)

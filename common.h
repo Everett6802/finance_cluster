@@ -191,6 +191,7 @@ enum ParamType{
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
 	PARAM_SYSTEM_INFO,
+	PARAM_SIMULATOR_VERSION,
 	PARAM_SIZE
 };
 
@@ -245,7 +246,7 @@ unsigned short get_local_interface_ip(std::map<std::string, std::string>& interf
 bool check_file_exist(const char* filepath); // folder or file
 bool check_config_file_exist(const char* config_filename);
 unsigned short get_file_line_count(unsigned int &line_count, const char* filepath);
-unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character=',');
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute="r", char data_seperate_character=',');
 unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
 unsigned short get_linux_platform(std::string& linux_distribution);
@@ -474,6 +475,18 @@ public:
 	~SystemInfoParam();
 };
 typedef SystemInfoParam* PSYSTEM_INFO_PARAM;
+
+class SimulatorVersionParam
+{
+public:
+	int simulator_version_buf_size;
+	char* simulator_version;
+
+	SimulatorVersionParam(int simulator_version_bufsize=DEF_VERY_SHORT_STRING_SIZE);
+	~SimulatorVersionParam();
+
+};
+typedef SimulatorVersionParam* PSIMULATOR_VERSION_PARAM;
 
 ///////////////////////////////////////////////////
 

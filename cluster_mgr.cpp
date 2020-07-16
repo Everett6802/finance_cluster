@@ -737,6 +737,32 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		}
     	}
     	break;
+    	case PARAM_SIMULATOR_VERSION:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			if (!simulator_installed)
+			{
+				WRITE_INFO("The simulator is NOT installed");
+				return RET_WARN_SIMULATOR_NOT_INSTALLED;
+			}
+    		PSIMULATOR_VERSION_PARAM simulator_version_param = (PSIMULATOR_VERSION_PARAM)param1;
+    		assert(simulator_version_param != NULL && "simulator_version_param should NOT be NULL");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			ret = simulator_handler->get_simulator_version(simulator_version_param->simulator_version, simulator_version_param->simulator_version_buf_size);
+			if (CHECK_SUCCESS(ret))
+			{
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					// ret = cluster_node->send(MSG_INSTALL_SIMULATOR, (void*)simulator_package_filepath);
+				}
+			}
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
