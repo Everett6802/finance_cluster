@@ -82,7 +82,7 @@ do{\
 }while(0);
 #endif
 
-#define MAX_INTERACTIVE_SESSION 5U
+#define MAX_INTERACTIVE_SESSION 5
 
 #ifndef SAFE_RELEASE
 #define SAFE_RELEASE(x)\
@@ -130,6 +130,7 @@ extern const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_NO_SERVER;
 extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
 extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
+extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_END;
 
 extern const unsigned short RET_WARN_BASE;
@@ -161,8 +162,10 @@ extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
 extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 
-extern const int PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS;
-extern const char* PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT;
+extern const int PAYLOAD_SESSION_ID_DIGITS;
+extern const char* PAYLOAD_SESSION_ID_STRING_FORMAT;
+extern const int PAYLOAD_CLUSTER_ID_DIGITS;
+extern const char* PAYLOAD_CLUSTER_ID_STRING_FORMAT;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
@@ -178,8 +181,9 @@ enum MessageType{
 	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
-	MSG_QUERY_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
-	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Followe
+	MSG_GET_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
+	MSG_GET_SIMULATOR_VERSION, // Uni-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
@@ -187,6 +191,7 @@ enum MessageType{
 
 enum ParamType{
 	PARAM_CLUSTER_MAP,
+	PARAM_CLUSTER_NODE_COUNT,
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
@@ -201,8 +206,9 @@ enum NotifyType{
 	NOTIFY_NODE_DIE,
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
-	NOTIFY_SYSTEM_INFO,
+	NOTIFY_GET_SYSTEM_INFO,
 	NOTIFY_INSTALL_SIMULATOR,
+	NOTIFY_GET_SIMULATOR_VERSION,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_SIZE
@@ -255,6 +261,7 @@ bool check_string_is_number(const char* input);
 const char *get_username();
 bool is_root_user();
 void print_curtime(const char* title=NULL);
+const char* pthread_cond_timedwait_err(int ret);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -413,6 +420,7 @@ public:
 	const_iterator begin();
 	const_iterator end();
 
+    size_t size()const;
     bool is_empty()const;
     unsigned short copy(const ClusterMap& another_cluster_map);
 	unsigned short add_node(int node_id, std::string node_ip);
@@ -484,9 +492,21 @@ public:
 
 	SimulatorVersionParam(int simulator_version_bufsize=DEF_VERY_SHORT_STRING_SIZE);
 	~SimulatorVersionParam();
-
 };
 typedef SimulatorVersionParam* PSIMULATOR_VERSION_PARAM;
+
+class ClusterSimulatorVersionParam
+{
+public:
+	int session_id;
+// (cluster id, simulator version)
+	std::map<int, std::string> clusuter_simulator_version_map;
+
+	ClusterSimulatorVersionParam();
+	~ClusterSimulatorVersionParam();
+
+};
+typedef ClusterSimulatorVersionParam* PCLUSTER_SIMULATOR_VERSION_PARAM;
 
 ///////////////////////////////////////////////////
 
@@ -571,6 +591,25 @@ public:
 	const char* get_simulator_package_filepath()const;
 };
 typedef NotifySimulatorInstallCfg* PNOTIFY_SIMULATOR_INSTALL_CFG;
+
+///////////////////////////
+
+class NotifySimulatorVersionCfg : public NotifyCfg
+{
+private:
+	int session_id;
+	int cluster_id;
+	char* simulator_version;
+
+public:
+	NotifySimulatorVersionCfg(const void* param, size_t param_size);
+	virtual ~NotifySimulatorVersionCfg();
+
+	int get_session_id()const;
+	int get_cluster_id()const;
+	const char* get_simulator_version()const;
+};
+typedef NotifySimulatorVersionCfg* PNOTIFY_SIMULATOR_VERSION_CFG;
 
 ///////////////////////////////////////////////////
 

@@ -415,6 +415,11 @@ ClusterMap::const_iterator ClusterMap::end()
 	return const_iterator(cluster_map.end());
 }
 
+size_t ClusterMap::size()const
+{
+	return cluster_map.size();
+}
+
 bool ClusterMap::is_empty()const
 {
 	return cluster_map.empty();
@@ -749,6 +754,16 @@ SimulatorVersionParam::~SimulatorVersionParam()
 
 //////////////////////////////////////////////////////////
 
+ClusterSimulatorVersionParam::ClusterSimulatorVersionParam() :
+	session_id(0)
+{
+
+}
+
+ClusterSimulatorVersionParam::~ClusterSimulatorVersionParam(){}
+
+//////////////////////////////////////////////////////////
+
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
 	notify_param(NULL),
@@ -873,20 +888,20 @@ int NotifySessionExitCfg::get_session_id()const
 ///////////////////////////
 
 NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_SYSTEM_INFO, param, param_size)
+	NotifyCfg(NOTIFY_GET_SYSTEM_INFO, param, param_size)
 {
 // session ID[2 digits]|system info
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
-	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS + 1;
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
 // De-Serialize: convert the type of session id from string to integer  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
-	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
 	session_id = atoi(session_id_buf);
 
 	const char* param_char = (const char*)notify_param;
-	system_info = (char*)(param_char + PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS);
+	system_info = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
 	if (strlen(system_info) == 0)
 		system_info = NULL;
 	// fprintf(stderr, "NotifySystemInfoCfg, session id: %d, system_info: %s\n", session_id, system_info);
@@ -930,6 +945,61 @@ NotifySimulatorInstallCfg::~NotifySimulatorInstallCfg()
 const char* NotifySimulatorInstallCfg::get_simulator_package_filepath()const
 {
 	return simulator_package_filepath;
+}
+
+///////////////////////////
+
+NotifySimulatorVersionCfg::NotifySimulatorVersionCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_GET_SIMULATOR_VERSION, param, param_size)
+{
+// session ID[2 digits]|system info
+	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+// De-Serialize: convert the type of cluster id from string to integer  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(char) * CLUSTER_ID_BUF_SIZE);
+	memcpy(cluster_id_buf, param_char + PAYLOAD_SESSION_ID_DIGITS, sizeof(char) * PAYLOAD_CLUSTER_ID_DIGITS);
+	cluster_id = atoi(cluster_id_buf);
+
+	simulator_version = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS);
+	if (strlen(simulator_version) == 0)
+		simulator_version = NULL;
+	// fprintf(stderr, "NotifySimulatorVersionCfg, session id: %d, system_info: %s\n", session_id, system_info);
+}
+
+NotifySimulatorVersionCfg::~NotifySimulatorVersionCfg()
+{
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_system_info_param = (char*)notify_param;
+	// 	free(notify_system_info_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+int NotifySimulatorVersionCfg::get_session_id()const
+{
+	return session_id;
+}
+
+int NotifySimulatorVersionCfg::get_cluster_id()const
+{
+	return cluster_id;
+}
+
+const char* NotifySimulatorVersionCfg::get_simulator_version()const
+{
+	return simulator_version;
 }
 
 ///////////////////////////

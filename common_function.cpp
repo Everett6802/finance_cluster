@@ -245,3 +245,20 @@ void print_curtime(const char* title)
   struct tm tm = *localtime(&t);
   printf("%s: %d-%02d-%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
+
+const char* pthread_cond_timedwait_err(int ret)
+{
+    // fprintf(stderr, "Conditional timed wait, failed.\n");
+    switch (ret)
+    {
+        case ETIMEDOUT:
+            return "wait timeout";
+        case EINVAL:
+            return "cond or mutex is invalid";
+        case EPERM:
+            return "mutex was not owned by the current thread at the time of the call";
+        default:
+            break;
+    }
+    return NULL;
+}

@@ -645,24 +645,42 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 	}
 
 	unsigned short ret = RET_SUCCESS;
-	// int node_id;
 // Get the data
-	PSIMULATOR_VERSION_PARAM simulator_version_param = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
-	if (simulator_version_param  == NULL)
-		throw bad_alloc();
-    ret = manager->get(PARAM_SIMULATOR_VERSION, (void*)simulator_version_param);
+	ClusterSimulatorVersionParam cluster_simulator_version_param; // = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
+	// if (simulator_version_param  == NULL)
+	// 	throw bad_alloc();
+    ret = manager->get(PARAM_SIMULATOR_VERSION, (void*)&cluster_simulator_version_param);
+ 	if (CHECK_FAILURE(ret))
+		return ret;
+    // SAFE_RELEASE(notify_cfg)
 	if (CHECK_SUCCESS(ret))
 	{
+		ClusterDetailParam cluster_detail_param;
+	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+		char buf[DEF_STRING_SIZE];
+		map<int, string>& clusuter_simulator_version_map = cluster_simulator_version_param.clusuter_simulator_version_map;
 // Print data in cosole
-		string simulator_version_string("simulator version  ");
-		simulator_version_string += string(simulator_version_param->simulator_version);
+		string simulator_version_string("simulator version\n");
+		map<int, string>::iterator iter = clusuter_simulator_version_map.begin();
+		while (iter != clusuter_simulator_version_map.end())
+		{
+			// simulator_version_string += string(simulator_version_param->simulator_version);
+			// simulator_version_string += string("\n");
+			int node_id = (int)iter->first;
+			string node_ip;
+			ret = cluster_map.get_node_ip(node_id, node_ip);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			simulator_version_string += string(buf);
+			++iter;
+		}
 		simulator_version_string += string("\n");
 		ret = print_to_console(simulator_version_string);
-	}
-	if (simulator_version_param != NULL)
-	{
-		delete simulator_version_param;
-		simulator_version_param = NULL;
 	}
 	return RET_SUCCESS;
 }

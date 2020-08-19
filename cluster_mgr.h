@@ -14,8 +14,18 @@ class ClusterMgr : public IManager
 	DECLARE_MSG_DUMPER()
 
 	static const char* SERVER_LIST_CONF_FILENAME;
-	static const int RETRY_WAIT_CONNECTION_TIME;
+	static const int WAIT_RETRY_CONNECTION_TIME;
 	static const int TRY_TIMES;
+	static const int WAIT_MESSAGE_RESPONSE_TIME;
+
+	struct InteractiveSessionConcurrentParam
+	{
+		pthread_mutex_t mtx;
+		pthread_cond_t cond;
+		std::list<PNOTIFY_CFG> data_list;
+		int event_count;
+		int follower_node_count;
+	};
 
 private:
 // config
@@ -30,9 +40,11 @@ private:
 
 // parameters related to session
 	InteractiveServer* interactive_server;
-	pthread_mutex_t interactive_session_mtx[MAX_INTERACTIVE_SESSION];
-	pthread_cond_t interactive_session_cond[MAX_INTERACTIVE_SESSION];
-	std::list<PNOTIFY_CFG> interactive_session_data_list[MAX_INTERACTIVE_SESSION];
+	// pthread_mutex_t interactive_session_mtx[MAX_INTERACTIVE_SESSION];
+	// pthread_cond_t interactive_session_cond[MAX_INTERACTIVE_SESSION];
+	// int interactive_session_event_count[MAX_INTERACTIVE_SESSION];
+	// std::list<PNOTIFY_CFG> interactive_session_data_list[MAX_INTERACTIVE_SESSION];
+	InteractiveSessionConcurrentParam interactive_session_param[MAX_INTERACTIVE_SESSION];
 
 	SimulatorHandler* simulator_handler;
 	bool simulator_installed;

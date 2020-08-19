@@ -18,11 +18,11 @@ private:
 	static const char* listen_thread_tag;
 	static const int WAIT_CONNECTION_TIMEOUT;
 
-	PINOTIFY observer;
+	PIMANAGER observer;
 	int socketfd;
 	char* local_ip;
 // Start from 1, 1 for leader, otherwise for follower
-	int cluster_node_id;
+	int cluster_id;
 	int cluster_node_cnt;
 	ClusterMap cluster_map;
 	PNOTIFY_THREAD notify_thread;
@@ -46,16 +46,18 @@ private:
 	unsigned short recv_check_keepalive(const std::string& message_data);
 	unsigned short recv_update_cluster_map(const std::string& message_data);
 	unsigned short recv_transmit_text(const std::string& message_data);
-	unsigned short recv_query_system_info(const std::string& message_data);
+	unsigned short recv_get_system_info(const std::string& message_data);
 	unsigned short recv_install_simulator(const std::string& message_data);
+	unsigned short recv_get_simulator_version(const std::string& message_data);
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
-	unsigned short send_query_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_simulator_version(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
@@ -68,7 +70,7 @@ private:
 	void listen_thread_cleanup_handler_internal();
 
 public:
-	LeaderNode(PINOTIFY notify, const char* ip);
+	LeaderNode(PIMANAGER parent, const char* ip);
 	virtual ~LeaderNode();
 
 // Interface

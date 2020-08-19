@@ -20,12 +20,12 @@ private:
 	static const int TOTAL_KEEPALIVE_PERIOD;
 
 	// CHAR_LIST server_list;
-	PINOTIFY observer;
+	PIMANAGER observer;
 	int socketfd;
 	char* local_ip;
 	char* cluster_ip;
 // Start from 1, 1 for leader, otherwise for follower
-	int cluster_node_id;
+	int cluster_id;
 	ClusterMap cluster_map;
 	int keepalive_cnt;
 	bool connection_retry;
@@ -43,21 +43,23 @@ private:
 	unsigned short recv_check_keepalive(const std::string& message_data);
 	unsigned short recv_update_cluster_map(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short recv_transmit_text(const std::string& message_data);
-	unsigned short recv_query_system_info(const std::string& message_data);
+	unsigned short recv_get_system_info(const std::string& message_data);
 	unsigned short recv_install_simulator(const std::string& message_data);
+	unsigned short recv_get_simulator_version(const std::string& message_data);
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
-	unsigned short send_query_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_simulator_version(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
-	FollowerNode(PINOTIFY notify, const char* server_ip, const char* ip);
+	FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip);
 	virtual ~FollowerNode();
 
 // Interface

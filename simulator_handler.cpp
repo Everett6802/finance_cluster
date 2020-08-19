@@ -110,20 +110,6 @@ unsigned short SimulatorHandler::run_script(SCRIPT_FILE_TYPE script_file_type, c
 	return RET_SUCCESS;
 }
 
-// const char* SimulatorHandler::get_fake_acspt_control_script_filepath()
-// {
-// 	if (fake_acspt_control_script_filepath == NULL)
-// 		assemble_script_filepath(&fake_acspt_control_script_filepath, FAKE_ACSPT_CONTROL_SCRIPT_NAME);
-// 	return fake_acspt_control_script_filepath;
-// }
-
-// const char* SimulatorHandler::get_fake_usrept_control_script_filepath()
-// {
-// 	if (fake_usrept_control_script_filepath == NULL)
-// 		assemble_script_filepath(&fake_usrept_control_script_filepath, FAKE_USREPT_CONTROL_SCRIPT_NAME);
-// 	return fake_usrept_control_script_filepath;
-// }
-
 unsigned short SimulatorHandler::initialize()
 {
 	// if (!check_simulator_installed())

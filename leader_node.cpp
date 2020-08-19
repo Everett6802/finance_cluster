@@ -16,11 +16,11 @@ using namespace std;
 const char* LeaderNode::listen_thread_tag = "Listen Thread";
 const int LeaderNode::WAIT_CONNECTION_TIMEOUT = 60; // 5 seconds
 
-LeaderNode::LeaderNode(PINOTIFY notify, const char* ip) :
-	observer(notify),
+LeaderNode::LeaderNode(PIMANAGER parent, const char* ip) :
+	observer(parent),
 	socketfd(0),
 	local_ip(NULL),
-	cluster_node_id(0),
+	cluster_id(0),
 	cluster_node_cnt(0),
 	notify_thread(NULL),
 	listen_exit(0),
@@ -129,7 +129,7 @@ since they will inherit that state from the listening socket.
 	}
 	socketfd = listen_sd;
 // Update the cluster map
-	cluster_node_id = 1;
+	cluster_id = 1;
 	cluster_node_cnt = 1;
 	ret = cluster_map.cleanup_node();
 	if (CHECK_FAILURE(ret))
@@ -137,7 +137,7 @@ since they will inherit that state from the listening socket.
 		WRITE_FORMAT_ERROR("Fails to cleanup node map, due to: %s", GetErrorDescription(ret));
 		return ret;
 	}
-	ret = cluster_map.add_node(cluster_node_id, local_ip);
+	ret = cluster_map.add_node(cluster_id, local_ip);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to add leader into node map, due to: %s", GetErrorDescription(ret));
@@ -379,8 +379,9 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_check_keepalive,
 		&LeaderNode::recv_update_cluster_map,
 		&LeaderNode::recv_transmit_text,
-		&LeaderNode::recv_query_system_info,
+		&LeaderNode::recv_get_system_info,
 		&LeaderNode::recv_install_simulator,
+		&LeaderNode::recv_get_simulator_version,
 		&LeaderNode::recv_control_fake_acspt,
 		&LeaderNode::recv_control_fake_usrept
 	};
@@ -402,8 +403,9 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_check_keepalive,
 		&LeaderNode::send_update_cluster_map,
 		&LeaderNode::send_transmit_text,
-		&LeaderNode::send_query_system_info,
+		&LeaderNode::send_get_system_info,
 		&LeaderNode::send_install_simulator,
+		&LeaderNode::send_get_simulator_version,
 		&LeaderNode::send_control_fake_acspt,
 		&LeaderNode::send_control_fake_usrept
 	};
@@ -446,7 +448,7 @@ unsigned short LeaderNode::recv_transmit_text(const std::string& message_data)
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_query_system_info(const std::string& message_data)
+unsigned short LeaderNode::recv_get_system_info(const std::string& message_data)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|system info) | EOD
@@ -456,12 +458,27 @@ unsigned short LeaderNode::recv_query_system_info(const std::string& message_dat
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
-	observer->notify(NOTIFY_SYSTEM_INFO, notify_cfg);
+	observer->notify(NOTIFY_GET_SYSTEM_INFO, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
 
 unsigned short LeaderNode::recv_install_simulator(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_INSTALL_SIMULATOR);}
+
+unsigned short LeaderNode::recv_get_simulator_version(const std::string& message_data)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|simulator_version) | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorVersionCfg((void*)message_data.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_GET_SIMULATOR_VERSION, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
 
 unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
 
@@ -570,7 +587,7 @@ unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* 
 	return send_data(MSG_TRANSMIT_TEXT, text_data, remote_ip);
 }
 
-unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, void* param3)
+unsigned short LeaderNode::send_get_system_info(void* param1, void* param2, void* param3)
 {
 // Parameters:
 // param1: session id
@@ -584,7 +601,7 @@ unsigned short LeaderNode::send_query_system_info(void* param1, void* param2, vo
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_QUERY_SYSTEM_INFO, buf, remote_ip);
+	return send_data(MSG_GET_SYSTEM_INFO, buf, remote_ip);
 }
 
 unsigned short LeaderNode::send_install_simulator(void* param1, void* param2, void* param3)
@@ -599,6 +616,20 @@ unsigned short LeaderNode::send_install_simulator(void* param1, void* param2, vo
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%s", simulator_packge_filepath);
 	return send_data(MSG_INSTALL_SIMULATOR, buf);
+}
+
+unsigned short LeaderNode::send_get_simulator_version(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// Message format:
+// EventType | session ID | EOD
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int session_id = *(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", session_id);
+	return send_data(MSG_GET_SIMULATOR_VERSION, buf);
 }
 
 unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)
@@ -666,6 +697,19 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
             pthread_mutex_unlock(&node_channel_mtx);
     	}
     	break;
+    	case PARAM_CLUSTER_NODE_COUNT:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		int& cluster_node_count_param = *(int*)param1;
+            pthread_mutex_lock(&node_channel_mtx);
+            cluster_node_count_param = cluster_map.size();
+            pthread_mutex_unlock(&node_channel_mtx);
+    	}
+    	break;
       	case PARAM_NODE_ID:
     	{
     		if (param1 == NULL)
@@ -673,12 +717,12 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-    		if (cluster_node_id == 0)
+    		if (cluster_id == 0)
     		{
-     			WRITE_ERROR("The cluster_node_id should NOT be 0");
+     			WRITE_ERROR("The cluster_id should NOT be 0");
     			return RET_FAILURE_RUNTIME;   			
     		}
-    		*(int*)param1 = cluster_node_id;
+    		*(int*)param1 = cluster_id;
     	}
     	break;
     	default:

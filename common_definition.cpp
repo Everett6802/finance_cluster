@@ -42,6 +42,7 @@ const unsigned short RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT = RET_FAILURE_CONN
 const unsigned short RET_FAILURE_CONNECTION_NO_SERVER = RET_FAILURE_CONNECTION_BASE + 4;
 const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE = RET_FAILURE_CONNECTION_BASE + 5;
 const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE = RET_FAILURE_CONNECTION_BASE + 6;
+const unsigned short RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT = RET_FAILURE_CONNECTION_BASE + 7;
 const unsigned short RET_FAILURE_CONNECTION_END = 0x1FF;
 
 const unsigned short RET_WARN_BASE = 0x200;
@@ -78,7 +79,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"ConnectionFailure Keepalive Timeout",
 		"ConnectionFailure No Server",
 		"ConnectionFailure Already in Use",
-		"ConnectionFailure Message Incomplete"
+		"ConnectionFailure Message Incomplete",
+		"ConnectionFailure Message Timeout"
 	};
 	static const char *ret_warn_description[] =
 	{
@@ -142,7 +144,9 @@ const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";
 const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
 
-const int PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS = 2;
-const char* PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT = "%02d";
+const int PAYLOAD_SESSION_ID_DIGITS = 2;
+const char* PAYLOAD_SESSION_ID_STRING_FORMAT = "%02d";
+const int PAYLOAD_CLUSTER_ID_DIGITS = 2;
+const char* PAYLOAD_CLUSTER_ID_STRING_FORMAT = "%02d";
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;

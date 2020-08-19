@@ -282,6 +282,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 		while (iter_access != send_access_list.end())
 		{
 			char* msg_data = (char*)*iter_access;
+			// printf("NodeChannel::send_thread_handler_internal(), message sent: %s\n", msg_data);
 			assert(msg_data != NULL && "msg_data should NOT be NULL in send_access_list");
 			int start_pos = 0;
 			int write_to_byte = strlen(msg_data);

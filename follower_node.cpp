@@ -15,12 +15,12 @@ const int FollowerNode::TRY_CONNECTION_SLEEP_TIMES = 15;
 const int FollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
 
-FollowerNode::FollowerNode(PINOTIFY notify, const char* server_ip, const char* ip) :
-	observer(notify),
+FollowerNode::FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip) :
+	observer(parent),
 	socketfd(0),
 	local_ip(NULL),
 	cluster_ip(NULL),
-	cluster_node_id(0),
+	cluster_id(0),
 	keepalive_cnt(0),
 	connection_retry(false),
 	node_channel(NULL),
@@ -302,8 +302,9 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_check_keepalive,
 		&FollowerNode::recv_update_cluster_map,
 		&FollowerNode::recv_transmit_text,
-		&FollowerNode::recv_query_system_info,
+		&FollowerNode::recv_get_system_info,
 		&FollowerNode::recv_install_simulator,
+		&FollowerNode::recv_get_simulator_version,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept
 	};
@@ -324,8 +325,9 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_check_keepalive,
 		&FollowerNode::send_update_cluster_map,
 		&FollowerNode::send_transmit_text,
-		&FollowerNode::send_query_system_info,
+		&FollowerNode::send_get_system_info,
 		&FollowerNode::send_install_simulator,
+		&FollowerNode::send_get_simulator_version,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept
 	};
@@ -366,10 +368,10 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
 		goto OUT;
 	}
-	if (cluster_node_id == 0)
+	if (cluster_id == 0)
 	{
 // New Follower get the Node ID from Leader
-	    ret = cluster_map.get_last_node_id(cluster_node_id);
+	    ret = cluster_map.get_last_node_id(cluster_id);
 		if (CHECK_FAILURE(ret))
 		{
 			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
@@ -389,13 +391,13 @@ unsigned short FollowerNode::recv_transmit_text(const std::string& message_data)
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv_query_system_info(const std::string& message_data)
+unsigned short FollowerNode::recv_get_system_info(const std::string& message_data)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
-	ret = send_query_system_info((void*)&session_id);
+	ret = send_get_system_info((void*)&session_id);
 	return ret;
 }
 
@@ -413,6 +415,16 @@ unsigned short FollowerNode::recv_install_simulator(const std::string& message_d
 // Synchronous event
     observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
+unsigned short FollowerNode::recv_get_simulator_version(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int session_id = atoi(message_data.c_str());
+	ret = send_get_simulator_version((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
@@ -486,7 +498,7 @@ unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void
 	return send_data(MSG_TRANSMIT_TEXT, text_data);
 }
 
-unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, void* param3)
+unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, void* param3)
 {
 // Parameters:
 // param1: The sessin id
@@ -497,11 +509,11 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 		WRITE_ERROR("param1 should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
-	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SYSTEM_INFO_SESSION_ID_DIGITS + 1;
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
     unsigned short ret = RET_SUCCESS;
 // Serialize: convert the type of session id from integer to string  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
-	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SYSTEM_INFO_SESSION_ID_STRING_FORMAT, *(int*)param1);
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
 
 // Combine the payload
 	string system_info_data = string(session_id_buf);
@@ -511,15 +523,62 @@ unsigned short FollowerNode::send_query_system_info(void* param1, void* param2, 
 		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
 	else
 		system_info_data += system_info;
-	// fprintf(stderr, "Follower[%s] send_query_system_info message: %s\n", local_ip, system_info_data.c_str());
+	// fprintf(stderr, "Follower[%s] send_get_system_info message: %s\n", local_ip, system_info_data.c_str());
 	// char session_id_str[3];
 	// memset(session_id_str, 0x0, sizeof(char) * 3);
 	// memcpy(session_id_str, system_info_data.c_str(), sizeof(char) * 2);
-	// fprintf(stderr, "Follower[%s] send_query_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
-	return send_data(MSG_QUERY_SYSTEM_INFO, system_info_data.c_str());
+	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
+	return send_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
 }
 
 unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
+
+unsigned short FollowerNode::send_get_simulator_version(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: The session id
+// param2: The cluster id
+// Message format:
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|simulator version) | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+    unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Serialize: convert the type of cluster id from integer to string  
+	char cluster_id_buf[SESSION_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, *(int*)param2);
+
+// Combine the payload
+	string simulator_version_data = string(session_id_buf) + string(cluster_id_buf);
+// Get the data
+	PSIMULATOR_VERSION_PARAM simulator_version_param = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
+	if (simulator_version_param  == NULL)
+		throw bad_alloc();
+    ret = observer->get(PARAM_SIMULATOR_VERSION, (void*)simulator_version_param);
+	if (CHECK_FAILURE(ret))
+		WRITE_FORMAT_ERROR("Fails to get simulaltor version in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+	else
+	{
+		string simulator_version(simulator_version_param->simulator_version);
+		simulator_version_data += simulator_version;
+	}
+	if (simulator_version_param != NULL)
+	{
+		delete simulator_version_param;
+		simulator_version_param = NULL;
+	}
+
+	return send_data(MSG_GET_SIMULATOR_VERSION, simulator_version_data.c_str());
+}
 
 unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
 
@@ -572,12 +631,12 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-    		if (cluster_node_id == 0)
+    		if (cluster_id == 0)
     		{
-     			WRITE_ERROR("The cluster_node_id should NOT be 0");
+     			WRITE_ERROR("The cluster_id should NOT be 0");
     			return RET_FAILURE_RUNTIME;   			
     		}
-    		*(int*)param1 = cluster_node_id;
+    		*(int*)param1 = cluster_id;
     	}
     	break;
     	case PARAM_CONNECTION_RETRY:
