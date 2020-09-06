@@ -732,6 +732,16 @@ SystemInfoParam::~SystemInfoParam(){}
 
 //////////////////////////////////////////////////////////
 
+ClusterSystemInfoParam::ClusterSystemInfoParam() :
+	session_id(0)
+{
+
+}
+
+ClusterSystemInfoParam::~ClusterSystemInfoParam(){}
+
+//////////////////////////////////////////////////////////
+
 SimulatorVersionParam::SimulatorVersionParam(int buf_size) :
 	simulator_version_buf_size(buf_size),
 	simulator_version(NULL)
@@ -890,10 +900,26 @@ int NotifySessionExitCfg::get_session_id()const
 NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_GET_SYSTEM_INFO, param, param_size)
 {
-// session ID[2 digits]|system info
+// // session ID[2 digits]|system info
+// 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+// 	assert(param != NULL && "param should NOT be NULL");
+// 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+// // De-Serialize: convert the type of session id from string to integer  
+// 	char session_id_buf[SESSION_ID_BUF_SIZE];
+// 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+// 	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+// 	session_id = atoi(session_id_buf);
+
+// 	const char* param_char = (const char*)notify_param;
+// 	system_info = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+// 	if (strlen(system_info) == 0)
+// 		system_info = NULL;
+// 	// fprintf(stderr, "NotifySystemInfoCfg, session id: %d, system_info: %s\n", session_id, system_info);
+// session ID[2 digits]|cluster ID[2 digits]|system info
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
 // De-Serialize: convert the type of session id from string to integer  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
@@ -901,7 +927,13 @@ NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
 	session_id = atoi(session_id_buf);
 
 	const char* param_char = (const char*)notify_param;
-	system_info = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+// De-Serialize: convert the type of cluster id from string to integer  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(char) * CLUSTER_ID_BUF_SIZE);
+	memcpy(cluster_id_buf, param_char + PAYLOAD_SESSION_ID_DIGITS, sizeof(char) * PAYLOAD_CLUSTER_ID_DIGITS);
+	cluster_id = atoi(cluster_id_buf);
+
+	system_info = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS);
 	if (strlen(system_info) == 0)
 		system_info = NULL;
 	// fprintf(stderr, "NotifySystemInfoCfg, session id: %d, system_info: %s\n", session_id, system_info);
@@ -923,6 +955,11 @@ int NotifySystemInfoCfg::get_session_id()const
 	return session_id;
 }
 
+int NotifySystemInfoCfg::get_cluster_id()const
+{
+	return cluster_id;
+}
+
 const char* NotifySystemInfoCfg::get_system_info()const
 {
 	return system_info;
@@ -930,29 +967,10 @@ const char* NotifySystemInfoCfg::get_system_info()const
 
 ///////////////////////////
 
-NotifySimulatorInstallCfg::NotifySimulatorInstallCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_INSTALL_SIMULATOR, param, param_size)
-{
-	assert(param != NULL && "param should NOT be NULL");
-// De-Serialize:
-	simulator_package_filepath = (char*)notify_param;
-}
-
-NotifySimulatorInstallCfg::~NotifySimulatorInstallCfg()
-{
-}
-
-const char* NotifySimulatorInstallCfg::get_simulator_package_filepath()const
-{
-	return simulator_package_filepath;
-}
-
-///////////////////////////
-
 NotifySimulatorVersionCfg::NotifySimulatorVersionCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_GET_SIMULATOR_VERSION, param, param_size)
 {
-// session ID[2 digits]|system info
+// session ID[2 digits]|cluster ID[2 digits]|system info
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
@@ -1000,6 +1018,25 @@ int NotifySimulatorVersionCfg::get_cluster_id()const
 const char* NotifySimulatorVersionCfg::get_simulator_version()const
 {
 	return simulator_version;
+}
+
+///////////////////////////
+
+NotifySimulatorInstallCfg::NotifySimulatorInstallCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_INSTALL_SIMULATOR, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+// De-Serialize:
+	simulator_package_filepath = (char*)notify_param;
+}
+
+NotifySimulatorInstallCfg::~NotifySimulatorInstallCfg()
+{
+}
+
+const char* NotifySimulatorInstallCfg::get_simulator_package_filepath()const
+{
+	return simulator_package_filepath;
 }
 
 ///////////////////////////

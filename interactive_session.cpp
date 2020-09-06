@@ -17,9 +17,10 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_Help,
 	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommand_GetClusterDetail,
-	InteractiveSessionCommand_GetNodeSystemInfo,
-	InteractiveSessionCommand_InstallSimulator,
+	InteractiveSessionCommand_GetSystemInfo,
+	// InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_GetSimulatorVersion,
+	InteractiveSessionCommand_InstallSimulator,
 	InteractiveSessionCommand_StartFakeAcspt,
 	InteractiveSessionCommand_StopFakeAcspt,
 	InteractiveSessionCommand_StartFakeUsrept,
@@ -32,9 +33,10 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"help",
 	"exit",
 	"get_cluster_detail",
-	"get_node_system_info",
-	"install_simulator",
+	"get_system_info",
+	// "get_node_system_info",
 	"get_simulator_version",
+	"install_simulator",
 	"start_fake_acspt",
 	"stop_fake_acspt",
 	"start_fake_usrept",
@@ -221,8 +223,8 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 {
 	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
 	{
-		InteractiveSessionCommand_InstallSimulator,
 		InteractiveSessionCommand_GetSimulatorVersion,
+		InteractiveSessionCommand_InstallSimulator,
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
@@ -463,9 +465,10 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_help_command,
 		&InteractiveSession::handle_exit_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
-		&InteractiveSession::handle_get_node_system_info_command,
-		&InteractiveSession::handle_install_simulator_command,
+		&InteractiveSession::handle_get_system_info_command,
+		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_simulator_version_command,
+		&InteractiveSession::handle_install_simulator_command,
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
@@ -492,15 +495,16 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	usage_string += string("* help\n Description: The usage\n");
 	usage_string += string("* exit\n Description: Exit the session\n");
 	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
-	usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
+	usage_string += string("* get_system_info\n Description: Get the system info in the cluster\n");
+	// usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
 	usage_string += string("  Param: Node ID/IP\n");
 	usage_string += string("    Format 1: Node ID: (ex. 1)\n");
 	usage_string += string("    Format 2: Node IP: (ex. 10.206.24.219)\n");
 	if (is_root)
 	{
+		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
 		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
-		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
@@ -553,10 +557,13 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 	unsigned short ret = RET_SUCCESS;
 	// int node_id;
 // Get the data
+	printf("Check00\n");
 	ClusterDetailParam cluster_detail_param;
     ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+    printf("Check01, ret: %d\n", ret);
 	if (CHECK_FAILURE(ret))
 		return ret;
+	printf("Check02\n");
 // Print data in cosole
 	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
 	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
@@ -579,12 +586,10 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 	return RET_SUCCESS;
 }
 
-unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
+unsigned short InteractiveSession::handle_get_system_info_command(int argc, char **argv)
 {
-	static const char* NODE_SYSTEM_INFO_TITLE = "\n====================== Node System Info ======================\n";
-	assert(manager != NULL && "manager should NOT be NULL");
-
-	if (argc != 2)
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
 		print_to_console(incorrect_command_phrases);
@@ -592,47 +597,81 @@ unsigned short InteractiveSession::handle_get_node_system_info_command(int argc,
 	}
 
 	unsigned short ret = RET_SUCCESS;
-	// int node_id;
 // Get the data
-	SystemInfoParam system_info_param;
-	system_info_param.session_id = session_id;
-	snprintf(system_info_param.node_ip_buf, VERY_SHORT_STRING_SIZE, "%s", argv[1]);
-    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
-	if (CHECK_FAILURE(ret))
+	ClusterSystemInfoParam cluster_system_info_param; // = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
+	// if (simulator_version_param  == NULL)
+	// 	throw bad_alloc();
+	printf("Check0-0\n");
+    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&cluster_system_info_param);
+ 	if (CHECK_FAILURE(ret))
 		return ret;
+	printf("Check0-1\n");
+    // SAFE_RELEASE(notify_cfg)
+	if (CHECK_SUCCESS(ret))
+	{
+		printf("Check0-2\n");
+		ClusterDetailParam cluster_detail_param;
+	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		printf("Check0-3\n");
+		if (CHECK_FAILURE(ret))
+			return ret;
+		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+		char buf[DEF_STRING_SIZE];
+		map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
 // Print data in cosole
-	string node_system_info_string(NODE_SYSTEM_INFO_TITLE);
-	char cluster_node[RSP_BUF_VERY_SHORT_SIZE];
-	snprintf(cluster_node,  RSP_BUF_VERY_SHORT_SIZE, "Node %s\n", system_info_param.node_ip_buf);
-	node_system_info_string += string(cluster_node);
-	node_system_info_string += system_info_param.system_info;
-	node_system_info_string += string("\n");
-	ret = print_to_console(node_system_info_string);
+		string system_info_string("system info\n");
+		map<int, string>::iterator iter = clusuter_system_info_map.begin();
+		while (iter != clusuter_system_info_map.end())
+		{
+			// simulator_version_string += string(simulator_version_param->simulator_version);
+			// simulator_version_string += string("\n");
+			int node_id = (int)iter->first;
+			string node_ip;
+			ret = cluster_map.get_node_ip(node_id, node_ip);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			system_info_string += string(buf);
+			++iter;
+		}
+		system_info_string += string("\n");
+		ret = print_to_console(system_info_string);
+	}
 	return RET_SUCCESS;
 }
 
-unsigned short InteractiveSession::handle_install_simulator_command(int argc, char **argv)
-{
-	assert(observer != NULL && "observer should NOT be NULL");
-	if (argc != 2)
-	{
-		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
-		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_COMMAND;
-	}
+// unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
+// {
+// 	static const char* NODE_SYSTEM_INFO_TITLE = "\n====================== Node System Info ======================\n";
+// 	assert(manager != NULL && "manager should NOT be NULL");
 
-// Send message to the user
-	// print_to_console(string("Install Simulator in the cluster..."));
-// Notify the parent
-	size_t notify_param_size = strlen(argv[1]) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)argv[1], notify_param_size);
-	if (notify_cfg == NULL)
-		throw bad_alloc();
-// Synchronous event
-	unsigned short ret = observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
-    SAFE_RELEASE(notify_cfg)
-	return ret;
-}
+// 	if (argc != 2)
+// 	{
+// 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+// 		print_to_console(incorrect_command_phrases);
+// 		return RET_WARN_INTERACTIVE_COMMAND;
+// 	}
+
+// 	unsigned short ret = RET_SUCCESS;
+// 	// int node_id;
+// // Get the data
+// 	SystemInfoParam system_info_param;
+// 	system_info_param.session_id = session_id;
+// 	snprintf(system_info_param.node_ip_buf, VERY_SHORT_STRING_SIZE, "%s", argv[1]);
+//     ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
+// // Print data in cosole
+// 	string node_system_info_string(NODE_SYSTEM_INFO_TITLE);
+// 	char cluster_node[RSP_BUF_VERY_SHORT_SIZE];
+// 	snprintf(cluster_node,  RSP_BUF_VERY_SHORT_SIZE, "Node %s\n", system_info_param.node_ip_buf);
+// 	node_system_info_string += string(cluster_node);
+// 	node_system_info_string += system_info_param.system_info;
+// 	node_system_info_string += string("\n");
+// 	ret = print_to_console(node_system_info_string);
+// 	return RET_SUCCESS;
+// }
 
 unsigned short InteractiveSession::handle_get_simulator_version_command(int argc, char **argv)
 {
@@ -683,6 +722,29 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 		ret = print_to_console(simulator_version_string);
 	}
 	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_install_simulator_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Install Simulator in the cluster..."));
+// Notify the parent
+	size_t notify_param_size = strlen(argv[1]) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)argv[1], notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	unsigned short ret = observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_start_fake_acspt_command(int argc, char **argv)

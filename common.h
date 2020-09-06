@@ -182,8 +182,8 @@ enum MessageType{
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_GET_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
-	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_GET_SIMULATOR_VERSION, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
@@ -196,6 +196,7 @@ enum ParamType{
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
 	PARAM_SYSTEM_INFO,
+	// PARAM_NODE_SYSTEM_INFO,
 	PARAM_SIMULATOR_VERSION,
 	PARAM_SIZE
 };
@@ -207,8 +208,8 @@ enum NotifyType{
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_GET_SYSTEM_INFO,
-	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_GET_SIMULATOR_VERSION,
+	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_SIZE
@@ -484,6 +485,19 @@ public:
 };
 typedef SystemInfoParam* PSYSTEM_INFO_PARAM;
 
+class ClusterSystemInfoParam
+{
+public:
+	int session_id;
+// (cluster id, system info)
+	std::map<int, std::string> clusuter_system_info_map;
+
+	ClusterSystemInfoParam();
+	~ClusterSystemInfoParam();
+
+};
+typedef ClusterSystemInfoParam* PCLUSTER_SYSTEM_INFO_PARAM;
+
 class SimulatorVersionParam
 {
 public:
@@ -566,6 +580,7 @@ class NotifySystemInfoCfg : public NotifyCfg
 {
 private:
 	int session_id;
+	int cluster_id;
 	char* system_info;
 
 public:
@@ -573,26 +588,12 @@ public:
 	virtual ~NotifySystemInfoCfg();
 
 	int get_session_id()const;
+	int get_cluster_id()const;
 	const char* get_system_info()const;
 };
 typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
 
 ///////////////////////////////////////////////////
-
-class NotifySimulatorInstallCfg : public NotifyCfg
-{
-private:
-	char* simulator_package_filepath;
-
-public:
-	NotifySimulatorInstallCfg(const void* param, size_t param_size);
-	virtual ~NotifySimulatorInstallCfg();
-
-	const char* get_simulator_package_filepath()const;
-};
-typedef NotifySimulatorInstallCfg* PNOTIFY_SIMULATOR_INSTALL_CFG;
-
-///////////////////////////
 
 class NotifySimulatorVersionCfg : public NotifyCfg
 {
@@ -612,6 +613,21 @@ public:
 typedef NotifySimulatorVersionCfg* PNOTIFY_SIMULATOR_VERSION_CFG;
 
 ///////////////////////////////////////////////////
+
+class NotifySimulatorInstallCfg : public NotifyCfg
+{
+private:
+	char* simulator_package_filepath;
+
+public:
+	NotifySimulatorInstallCfg(const void* param, size_t param_size);
+	virtual ~NotifySimulatorInstallCfg();
+
+	const char* get_simulator_package_filepath()const;
+};
+typedef NotifySimulatorInstallCfg* PNOTIFY_SIMULATOR_INSTALL_CFG;
+
+///////////////////////////
 
 class NotifyFakeAcsptControlCfg : public NotifyCfg
 {

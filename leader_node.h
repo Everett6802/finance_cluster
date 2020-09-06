@@ -47,8 +47,8 @@ private:
 	unsigned short recv_update_cluster_map(const std::string& message_data);
 	unsigned short recv_transmit_text(const std::string& message_data);
 	unsigned short recv_get_system_info(const std::string& message_data);
-	unsigned short recv_install_simulator(const std::string& message_data);
 	unsigned short recv_get_simulator_version(const std::string& message_data);
+	unsigned short recv_install_simulator(const std::string& message_data);
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
 // send
@@ -56,8 +56,8 @@ private:
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
-	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_simulator_version(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 

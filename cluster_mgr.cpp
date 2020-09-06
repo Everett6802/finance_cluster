@@ -661,90 +661,220 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     	break;
     	case PARAM_SYSTEM_INFO:
     	{
-    		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
-    		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
-// Get the node ip from the cluster map
-			ClusterMap cluster_map;
-		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
-			if (CHECK_FAILURE(ret))
-				return ret;
-			string node_ip;
-			if (check_string_is_number(system_info_param->node_ip_buf))
-			{
-// Find the node IP from the node id
-				int node_id = atoi(system_info_param->node_ip_buf);
-				ret = cluster_map.get_node_ip(node_id, node_ip);
-				if (CHECK_FAILURE(ret))
-				{
-	    			WRITE_FORMAT_ERROR("The node id[%d] does NOT exist in the cluster", node_id);
-	    			return ret;		
-				}
-			}
-			else
-			{
-				node_ip = string(system_info_param->node_ip_buf);
-				int node_id;
-				ret = cluster_map.get_node_id(node_ip, node_id);
-				if (CHECK_FAILURE(ret))
-				{
-	    			WRITE_FORMAT_ERROR("The node ip[%s] does NOT exist in the cluster", node_ip.c_str());
-	    			return ret;		
-				}
-			}
-			// fprintf(stderr, "node_ip: %s\n", node_ip.c_str());
-// Get the system info of the local node
-    		if (strcmp(node_ip.c_str(), local_ip) == 0)
+    		printf("Check1-0\n");
+        	if (param1 == NULL)
     		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+
+			if (node_type == LEADER)
+			{
+				printf("Check1-1\n");
+// Leader node
+	    		PCLUSTER_SYSTEM_INFO_PARAM cluster_system_info_param = (PCLUSTER_SYSTEM_INFO_PARAM)param1;
+	    		assert(cluster_system_info_param != NULL && "cluster_system_info_param should NOT be NULL");
+	    		printf("Check1-2\n");
+				PSYSTEM_INFO_PARAM system_info_param = new SystemInfoParam();
+				if (system_info_param  == NULL)
+					throw bad_alloc();
+				printf("Check1-3\n");
+				ret = get_system_info(system_info_param->system_info);
+				printf("Check1-4, %s\n", system_info_param->system_info.c_str());
+				if (CHECK_FAILURE(ret))
+					return ret;
+				printf("Check1-5\n");
+// Cluster ID of the Leader node: 1
+				cluster_system_info_param->clusuter_system_info_map[1] = system_info_param->system_info;
+				if (system_info_param != NULL)
+				{
+					delete system_info_param;
+					system_info_param = NULL;
+				}
+				printf("Check1-6\n");
+				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+				int cluster_node_count;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				printf("Check1-7: %d\n", cluster_node_count);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				printf("Check1-8\n");
+				// printf("Cluster Node Count: %d\n", cluster_node_count);
+				if (cluster_node_count > 1)
+				{
+					printf("Check1-9\n");
+// Not one node cluster, send notification to the followers
+// Reset the counter 
+					pthread_mutex_lock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+					interactive_session_param[cluster_system_info_param->session_id].follower_node_count = cluster_node_count - 1;
+					interactive_session_param[cluster_system_info_param->session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+					printf("Check1-10\n");
+// Send the request
+				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&cluster_system_info_param->session_id);
+					printf("Check1-11\n");
+					if (CHECK_FAILURE(ret))
+						return ret;
+					printf("Check1-12\n");
+// Receive the response
+					bool found = false;
+				    struct timespec ts;
+				    clock_gettime(CLOCK_REALTIME, &ts);
+				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+					pthread_mutex_lock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_system_info_param->session_id].cond, &interactive_session_param[cluster_system_info_param->session_id].mtx, &ts);
+					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+					{
+		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+					}
+					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_system_info_param->session_id].data_list;
+					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+					std::list<PNOTIFY_CFG> interactive_session_system_info_data;
+					while (iter != interactive_session_data.end())
+					{
+						PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
+						if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_INFO)
+						{
+							// found = true;
+							interactive_session_system_info_data.push_back(notify_cfg);
+							interactive_session_data.erase(iter);
+							if ((int)interactive_session_system_info_data.size() == interactive_session_param[cluster_system_info_param->session_id].follower_node_count)
+							{
+								found = true;
+								break;
+							}
+						}
+						iter++;
+					}
+					pthread_mutex_unlock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+	    			if (!found)
+	    			{
+		    			WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", cluster_system_info_param->session_id, cluster_node_count - 1, interactive_session_system_info_data.size());
+						return RET_FAILURE_NOT_FOUND;
+					}
+					std::list<PNOTIFY_CFG>::iterator iter_system_info = interactive_session_system_info_data.begin();
+					while (iter_system_info != interactive_session_system_info_data.end())
+					{
+						PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)*iter_system_info;
+						assert(cluster_system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_system_info_param->clusuter_system_info_map[notify_system_info_cfg->get_cluster_id()] = string(notify_system_info_cfg->get_system_info());
+						iter_system_info++;
+						SAFE_RELEASE(notify_system_info_cfg)
+					}
+				}
+			}
+			else if (node_type == FOLLOWER)
+			{
+	    		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
+	    		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
 				ret = get_system_info(system_info_param->system_info);
 				if (CHECK_FAILURE(ret))
 					return ret;
-    		}
-    		else
-    		{
-// Get the system info of the remote node
-// Only leader node can query the node system info in the cluster
-	    		if (node_type != LEADER)
-				{
-	    			WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
-	    			return RET_FAILURE_INCORRECT_OPERATION;				
-				}
-	    		assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-// Send the request
-			    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&system_info_param->session_id, (void*)node_ip.c_str());
-				if (CHECK_FAILURE(ret))
-					return ret;
-// Receive the response
-				PNOTIFY_CFG notify_cfg = NULL;
-				bool found = false;
-				pthread_mutex_lock(&interactive_session_param[system_info_param->session_id].mtx);
-				pthread_cond_wait(&interactive_session_param[system_info_param->session_id].cond, &interactive_session_param[system_info_param->session_id].mtx);
-				// dump_interactive_session_data_list(system_info_param->session_id);
-				std::list<PNOTIFY_CFG>& interactive_session_data_list = interactive_session_param[system_info_param->session_id].data_list;
-				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data_list.begin();
-				while (iter != interactive_session_data_list.end())
-				{
-					notify_cfg = (PNOTIFY_CFG)*iter;
-					if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_INFO)
-					{
-						found = true;
-						interactive_session_data_list.erase(iter);
-						break;
-					}
-					iter++;
-				}
-				pthread_mutex_unlock(&interactive_session_param[system_info_param->session_id].mtx);
-    			if (!found)
-    			{
-	    			WRITE_FORMAT_ERROR("Fail to find Node[%s] system info for the session[%d]", system_info_param->node_ip_buf, system_info_param->session_id);
-					return RET_FAILURE_NOT_FOUND;
-				}
-				PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
-				assert(system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
-				system_info_param->system_info = string(notify_system_info_cfg->get_system_info());
-    			SAFE_RELEASE(notify_system_info_cfg)
-    		}
+			}
+			else
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;		
+			}
     	}
     	break;
+//     	case PARAM_NODE_SYSTEM_INFO:
+//     	{
+//     		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
+//     		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
+// // Get the node ip from the cluster map
+// 			ClusterMap cluster_map;
+// 		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+// 			if (CHECK_FAILURE(ret))
+// 				return ret;
+// 			string node_ip;
+// 			if (check_string_is_number(system_info_param->node_ip_buf))
+// 			{
+// // Find the node IP from the node id
+// 				int node_id = atoi(system_info_param->node_ip_buf);
+// 				ret = cluster_map.get_node_ip(node_id, node_ip);
+// 				if (CHECK_FAILURE(ret))
+// 				{
+// 	    			WRITE_FORMAT_ERROR("The node id[%d] does NOT exist in the cluster", node_id);
+// 	    			return ret;		
+// 				}
+// 			}
+// 			else
+// 			{
+// 				node_ip = string(system_info_param->node_ip_buf);
+// 				int node_id;
+// 				ret = cluster_map.get_node_id(node_ip, node_id);
+// 				if (CHECK_FAILURE(ret))
+// 				{
+// 	    			WRITE_FORMAT_ERROR("The node ip[%s] does NOT exist in the cluster", node_ip.c_str());
+// 	    			return ret;		
+// 				}
+// 			}
+// 			// fprintf(stderr, "node_ip: %s\n", node_ip.c_str());
+// // Get the system info of the local node
+//     		if (strcmp(node_ip.c_str(), local_ip) == 0)
+//     		{
+// 				ret = get_system_info(system_info_param->system_info);
+// 				if (CHECK_FAILURE(ret))
+// 					return ret;
+//     		}
+//     		else
+//     		{
+// // Get the system info of the remote node
+// // Only leader node can query the node system info in the cluster
+// 	    		if (node_type != LEADER)
+// 				{
+// 	    			WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
+// 	    			return RET_FAILURE_INCORRECT_OPERATION;				
+// 				}
+// 	    		assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+// // Send the request
+// 			    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&system_info_param->session_id, (void*)node_ip.c_str());
+// 				if (CHECK_FAILURE(ret))
+// 					return ret;
+// // Receive the response
+// 				PNOTIFY_CFG notify_cfg = NULL;
+// 				bool found = false;
+// 				struct timespec ts;
+// 				clock_gettime(CLOCK_REALTIME, &ts);
+// 				ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 				pthread_mutex_lock(&interactive_session_param[system_info_param->session_id].mtx);
+// 				// pthread_cond_wait(&interactive_session_param[system_info_param->session_id].cond, &interactive_session_param[system_info_param->session_id].mtx);
+// 				int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[system_info_param->session_id].cond, &interactive_session_param[system_info_param->session_id].mtx, &ts);
+// 				if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 				{
+// 		    		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 					return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 				}
+// 				// dump_interactive_session_data_list(system_info_param->session_id);
+// 				std::list<PNOTIFY_CFG>& interactive_session_data_list = interactive_session_param[system_info_param->session_id].data_list;
+// 				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data_list.begin();
+// 				while (iter != interactive_session_data_list.end())
+// 				{
+// 					notify_cfg = (PNOTIFY_CFG)*iter;
+// 					if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_INFO)
+// 					{
+// 						found = true;
+// 						interactive_session_data_list.erase(iter);
+// 						break;
+// 					}
+// 					iter++;
+// 				}
+// 				pthread_mutex_unlock(&interactive_session_param[system_info_param->session_id].mtx);
+//     			if (!found)
+//     			{
+// 	    			WRITE_FORMAT_ERROR("Fail to find Node[%s] system info for the session[%d]", system_info_param->node_ip_buf, system_info_param->session_id);
+// 					return RET_FAILURE_NOT_FOUND;
+// 				}
+// 				PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)notify_cfg;
+// 				assert(system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
+// 				system_info_param->system_info = string(notify_system_info_cfg->get_system_info());
+//     			SAFE_RELEASE(notify_system_info_cfg)
+//     		}
+//     	}
+//     	break;
     	case PARAM_SIMULATOR_VERSION:
     	{
         	if (param1 == NULL)

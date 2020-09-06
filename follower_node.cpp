@@ -303,8 +303,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_update_cluster_map,
 		&FollowerNode::recv_transmit_text,
 		&FollowerNode::recv_get_system_info,
-		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_get_simulator_version,
+		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept
 	};
@@ -326,8 +326,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_update_cluster_map,
 		&FollowerNode::send_transmit_text,
 		&FollowerNode::send_get_system_info,
-		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_get_simulator_version,
+		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept
 	};
@@ -401,6 +401,16 @@ unsigned short FollowerNode::recv_get_system_info(const std::string& message_dat
 	return ret;
 }
 
+unsigned short FollowerNode::recv_get_simulator_version(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int session_id = atoi(message_data.c_str());
+	ret = send_get_simulator_version((void*)&session_id, (void*)&cluster_id);
+	return ret;
+}
+
 unsigned short FollowerNode::recv_install_simulator(const std::string& message_data)
 {
 // Message format:
@@ -415,16 +425,6 @@ unsigned short FollowerNode::recv_install_simulator(const std::string& message_d
 // Synchronous event
     observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
-	return ret;
-}
-
-unsigned short FollowerNode::recv_get_simulator_version(const std::string& message_data)
-{
-// Message format:
-// EventType | session ID | EOD
-	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
-	ret = send_get_simulator_version((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
@@ -502,6 +502,7 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 {
 // Parameters:
 // param1: The sessin id
+// param2: The cluster id
 // Message format:
 // EventType | playload: (session ID[2 digits]|system info) | EOD
 	if (param1 == NULL)
@@ -510,13 +511,19 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
     unsigned short ret = RET_SUCCESS;
 // Serialize: convert the type of session id from integer to string  
 	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Serialize: convert the type of cluster id from integer to string  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, *(int*)param2);
 
 // Combine the payload
-	string system_info_data = string(session_id_buf);
+	string system_info_data = string(session_id_buf) + string(cluster_id_buf);
 	string system_info;
 	ret = get_system_info(system_info);
 	if (CHECK_FAILURE(ret))
@@ -530,8 +537,6 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
 }
-
-unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
 
 unsigned short FollowerNode::send_get_simulator_version(void* param1, void* param2, void* param3)
 {
@@ -553,7 +558,7 @@ unsigned short FollowerNode::send_get_simulator_version(void* param1, void* para
 	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
 // Serialize: convert the type of cluster id from integer to string  
-	char cluster_id_buf[SESSION_ID_BUF_SIZE];
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
 	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
 	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, *(int*)param2);
 
@@ -579,6 +584,8 @@ unsigned short FollowerNode::send_get_simulator_version(void* param1, void* para
 
 	return send_data(MSG_GET_SIMULATOR_VERSION, simulator_version_data.c_str());
 }
+
+unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
 
 unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
 
