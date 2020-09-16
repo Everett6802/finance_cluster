@@ -518,31 +518,42 @@ unsigned short ClusterMgr::initialize()
 unsigned short ClusterMgr::deinitialize()
 {
 // Deinitialize the simulator handler
+	printf("Check10-1\n");
 	if (simulator_handler != NULL)
 	{
+		printf("Check10-2\n");
 		simulator_handler->deinitialize();
+		printf("Check10-3\n");
 		delete simulator_handler;
 		simulator_handler = NULL;	
 	}
+	printf("Check10-4\n");
 // Deinitialize the session server
 	if (interactive_server != NULL)
 	{
+		printf("Check10-5\n");
 		interactive_server->deinitialize();
+		printf("Check10-6\n");
 		delete interactive_server;
 		interactive_server = NULL;	
 	}
+	printf("Check10-7\n");
 // Stop a keep-alive timer
 	stop_keepalive_timer();
+	printf("Check10-8\n");
 // Close the connection
 	unsigned short ret = stop_connection();
+	printf("Check10-9\n");
 // Stop the event thread
 	if (notify_thread != NULL)
 	{
+		printf("Check10-10\n");
 		notify_thread->deinitialize();
+		printf("Check10-11\n");
 		delete notify_thread;
 		notify_thread = NULL;
 	}
-
+	printf("Check10-12\n");
 	return ret;
 }
 

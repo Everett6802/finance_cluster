@@ -397,7 +397,7 @@ unsigned short FollowerNode::recv_get_system_info(const std::string& message_dat
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
-	ret = send_get_system_info((void*)&session_id);
+	ret = send_get_system_info((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
