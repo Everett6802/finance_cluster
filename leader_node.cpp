@@ -163,9 +163,7 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 		return ret;
 	}
 
-	// printf("Check3-1\n");
 	pthread_mutex_lock(&node_channel_mtx);
-	// printf("Check3-2\n");
 	if (remote_ip != NULL)
 	{
 		// fprintf(stderr, "remote_ip: %s\n", remote_ip);
@@ -207,25 +205,19 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 			iter++;
 		}
 	}
-	// printf("Check3-3\n");
 	pthread_mutex_unlock(&node_channel_mtx);
-	// printf("Check3-4\n");
 	return ret;
 }
 
 unsigned short LeaderNode::remove_follower(const string& node_ip)
 {
 	unsigned short ret = RET_SUCCESS;
-	printf("Check4-1\n");
 	pthread_mutex_lock(&node_channel_mtx);
-	printf("Check4-2\n");
 	map<string, PNODE_CHANNEL>::iterator iter = node_channel_map.find(node_ip);
 	if (iter == node_channel_map.end())
 	{
 		WRITE_FORMAT_ERROR("The Follower[%s] does NOT exist", node_ip.c_str());
-		printf("Check4-3\n");
 		pthread_mutex_unlock(&node_channel_mtx);
-		printf("Check4-4\n");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 	PNODE_CHANNEL node_channel = (PNODE_CHANNEL)iter->second;
@@ -242,9 +234,7 @@ unsigned short LeaderNode::remove_follower(const string& node_ip)
 	{
 		WRITE_FORMAT_ERROR("Fail to delete the node[%s] in the map", node_ip.c_str());
 	}
-	printf("Check4-5\n");
 	pthread_mutex_unlock(&node_channel_mtx);
-	printf("Check4-6\n");
 	
 	return ret;
 }
@@ -437,25 +427,19 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 // EventType | Payload: Client IP| EOD
 	const string& follower_ip = message_data;
 	// fprintf(stderr, "KeepAlive follower_ip: %s\n", follower_ip.c_str());
-	// printf("Check5-1\n");
 	pthread_mutex_lock(&node_channel_mtx);
-	// printf("Check5-2\n");
 	map<string, int>::iterator iter = node_keepalive_map.find(follower_ip);
 	if (iter == node_keepalive_map.end())
 	{
 		WRITE_FORMAT_ERROR("The Follower[%s] does NOT exist", follower_ip.c_str());
-		// printf("Check5-3\n");
 		pthread_mutex_unlock(&node_channel_mtx);
-		// printf("Check5-4\n");
 		return RET_FAILURE_INTERNAL_ERROR;
 	}
 	int cnt = node_keepalive_map[follower_ip];
 	if (cnt < MAX_KEEPALIVE_CNT)
 		node_keepalive_map[follower_ip]++;
 	// fprintf(stderr, "KeepAlive[%s] Recv to counter: %d\n", follower_ip.c_str(), node_keepalive_map[follower_ip]);
-	// printf("Check5-5\n");
 	pthread_mutex_unlock(&node_channel_mtx);
-	// printf("Check5-6\n");
 	// fprintf(stderr, "Recv Check-Keepalive: %s:%d\n", message_data.c_str(), node_keepalive_map[message_data]);
 	return RET_SUCCESS;
 }
@@ -511,9 +495,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 	unsigned short ret = RET_SUCCESS;
 	bool follower_dead_found = false;
 // Check if nodes in cluster are dead
-	// printf("Check6-1\n");
 	pthread_mutex_lock(&node_channel_mtx);
-	// printf("Check6-2\n");
 	// dump_node_channel_map();
 	// dump_node_keepalive_map();
 	map<string, int>::iterator iter = node_keepalive_map.begin();
@@ -534,9 +516,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 			if (CHECK_FAILURE(ret))
 			{
 				WRITE_FORMAT_ERROR("Fail to delete the node[%s] in the map", node_ip.c_str());
-				// printf("Check6-3\n");
 				pthread_mutex_unlock(&node_channel_mtx);
-				// printf("Check6-4\n");
 				return ret;
 			}
 			follower_dead_found = true;
@@ -556,9 +536,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 	char* cluster_map_msg = NULL;
 	if (follower_dead_found)
 		cluster_map_msg = strdup(cluster_map.to_string());
-	// printf("Check6-5\n");
 	pthread_mutex_unlock(&node_channel_mtx);
-	// printf("Check6-6\n");
 
 // Update the cluster map to Followers
 	if (follower_dead_found)
@@ -580,15 +558,11 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 // Message format:
 // EventType | cluster map string | EOD
 	unsigned short ret = RET_SUCCESS;
-	printf("Check7-1\n");
 	pthread_mutex_lock(&node_channel_mtx);
-	printf("Check7-2\n");
 	// fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 	string cluster_map_msg(cluster_map.to_string());
 	// fprintf(stderr, "Leader: %s\n", cluster_map.to_string());
-	printf("Check7-3\n");
 	pthread_mutex_unlock(&node_channel_mtx);
-	printf("Check7-4\n");
 // Update the cluster map to Followers
 	if (CHECK_FAILURE(ret))
 	{
@@ -733,31 +707,22 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
-    		printf("Check8-1\n");
             pthread_mutex_lock(&node_channel_mtx);
-            printf("Check8-2\n");
             ret = cluster_map_param.copy(cluster_map);
-            printf("Check8-3\n");
             pthread_mutex_unlock(&node_channel_mtx);
-            printf("Check8-4\n");
     	}
     	break;
     	case PARAM_CLUSTER_NODE_COUNT:
     	{
-    		printf("Check2-0\n");
     		if (param1 == NULL)
     		{
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		int& cluster_node_count_param = *(int*)param1;
-    		printf("Check2-1\n");
             pthread_mutex_lock(&node_channel_mtx);
-            printf("Check2-2\n");
             cluster_node_count_param = cluster_map.size();
-            printf("Check2-3\n");
             pthread_mutex_unlock(&node_channel_mtx);
-            printf("Check2-4\n");
     	}
     	break;
       	case PARAM_NODE_ID:
@@ -959,9 +924,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 			return ret;
 		}
 // Add a channel of the new follower
-		printf("Check9-1\n");
 		pthread_mutex_lock(&node_channel_mtx);
-		printf("Check9-2\n");
 		// node_channel_deque.push_back(node_channel);
 		// dump_node_channel_map();
 		// dump_node_keepalive_map();
@@ -974,15 +937,11 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		if (CHECK_FAILURE(ret))
 		{
 			WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: node_channel", listen_thread_tag);
-			printf("Check9-3\n");
 			pthread_mutex_unlock(&node_channel_mtx);
-			printf("Check9-4\n");
 			return ret;
 		}
 		string cluster_map_msg(cluster_map.to_string());
-		printf("Check9-5\n");
 		pthread_mutex_unlock(&node_channel_mtx);
-		printf("Check9-6\n");
 		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_ip);
 // Update the cluster map to Followers
 		// fprintf(stderr, "LeaderNode::listen_thread_handler_internal %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));

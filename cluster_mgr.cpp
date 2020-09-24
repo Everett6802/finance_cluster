@@ -518,42 +518,30 @@ unsigned short ClusterMgr::initialize()
 unsigned short ClusterMgr::deinitialize()
 {
 // Deinitialize the simulator handler
-	printf("Check10-1\n");
 	if (simulator_handler != NULL)
 	{
-		printf("Check10-2\n");
 		simulator_handler->deinitialize();
-		printf("Check10-3\n");
 		delete simulator_handler;
 		simulator_handler = NULL;	
 	}
-	printf("Check10-4\n");
 // Deinitialize the session server
 	if (interactive_server != NULL)
 	{
-		printf("Check10-5\n");
 		interactive_server->deinitialize();
-		printf("Check10-6\n");
 		delete interactive_server;
 		interactive_server = NULL;	
 	}
-	printf("Check10-7\n");
 // Stop a keep-alive timer
 	stop_keepalive_timer();
-	printf("Check10-8\n");
 // Close the connection
 	unsigned short ret = stop_connection();
-	printf("Check10-9\n");
 // Stop the event thread
 	if (notify_thread != NULL)
 	{
-		printf("Check10-10\n");
 		notify_thread->deinitialize();
-		printf("Check10-11\n");
 		delete notify_thread;
 		notify_thread = NULL;
 	}
-	printf("Check10-12\n");
 	return ret;
 }
 
@@ -672,7 +660,6 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     	break;
     	case PARAM_SYSTEM_INFO:
     	{
-    		printf("Check1-0\n");
         	if (param1 == NULL)
     		{
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
@@ -681,20 +668,15 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 
 			if (node_type == LEADER)
 			{
-				printf("Check1-1\n");
 // Leader node
 	    		PCLUSTER_SYSTEM_INFO_PARAM cluster_system_info_param = (PCLUSTER_SYSTEM_INFO_PARAM)param1;
 	    		assert(cluster_system_info_param != NULL && "cluster_system_info_param should NOT be NULL");
-	    		printf("Check1-2\n");
 				PSYSTEM_INFO_PARAM system_info_param = new SystemInfoParam();
 				if (system_info_param  == NULL)
 					throw bad_alloc();
-				printf("Check1-3\n");
 				ret = get_system_info(system_info_param->system_info);
-				printf("Check1-4, %s\n", system_info_param->system_info.c_str());
 				if (CHECK_FAILURE(ret))
 					return ret;
-				printf("Check1-5\n");
 // Cluster ID of the Leader node: 1
 				cluster_system_info_param->clusuter_system_info_map[1] = system_info_param->system_info;
 				if (system_info_param != NULL)
@@ -702,31 +684,24 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					delete system_info_param;
 					system_info_param = NULL;
 				}
-				printf("Check1-6\n");
 				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 				int cluster_node_count;
 			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
-				printf("Check1-7: %d\n", cluster_node_count);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				printf("Check1-8\n");
 				// printf("Cluster Node Count: %d\n", cluster_node_count);
 				if (cluster_node_count > 1)
 				{
-					printf("Check1-9\n");
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
 					interactive_session_param[cluster_system_info_param->session_id].follower_node_count = cluster_node_count - 1;
 					interactive_session_param[cluster_system_info_param->session_id].event_count = 0;
 					pthread_mutex_unlock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
-					printf("Check1-10\n");
 // Send the request
 				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&cluster_system_info_param->session_id);
-					printf("Check1-11\n");
 					if (CHECK_FAILURE(ret))
 						return ret;
-					printf("Check1-12\n");
 // Receive the response
 					bool found = false;
 				    struct timespec ts;

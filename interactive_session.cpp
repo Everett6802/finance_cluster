@@ -557,13 +557,10 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 	unsigned short ret = RET_SUCCESS;
 	// int node_id;
 // Get the data
-	printf("Check00\n");
 	ClusterDetailParam cluster_detail_param;
     ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
-    printf("Check01, ret: %d\n", ret);
 	if (CHECK_FAILURE(ret))
 		return ret;
-	printf("Check02\n");
 // Print data in cosole
 	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
 	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
@@ -601,18 +598,14 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 	ClusterSystemInfoParam cluster_system_info_param; // = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
 	// if (simulator_version_param  == NULL)
 	// 	throw bad_alloc();
-	printf("Check0-0\n");
     ret = manager->get(PARAM_SYSTEM_INFO, (void*)&cluster_system_info_param);
  	if (CHECK_FAILURE(ret))
 		return ret;
-	printf("Check0-1\n");
     // SAFE_RELEASE(notify_cfg)
 	if (CHECK_SUCCESS(ret))
 	{
-		printf("Check0-2\n");
 		ClusterDetailParam cluster_detail_param;
 	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
-		printf("Check0-3\n");
 		if (CHECK_FAILURE(ret))
 			return ret;
 		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
