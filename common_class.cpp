@@ -774,6 +774,38 @@ ClusterSimulatorVersionParam::~ClusterSimulatorVersionParam(){}
 
 //////////////////////////////////////////////////////////
 
+FakeAcsptStateParam::FakeAcsptStateParam(int buf_size) :
+	fake_acspt_state_buf_size(buf_size),
+	fake_acspt_state(NULL)
+{
+	fake_acspt_state = new char[fake_acspt_state_buf_size + 1];
+	if (fake_acspt_state == NULL)
+		throw bad_alloc();
+	memset(fake_acspt_state, 0x0, sizeof(char) * (fake_acspt_state_buf_size + 1));
+}
+
+FakeAcsptStateParam::~FakeAcsptStateParam()
+{
+	if (fake_acspt_state != NULL)
+	{
+		delete[] fake_acspt_state;
+		fake_acspt_state = NULL;
+	}
+	fake_acspt_state_buf_size = 0;
+}
+
+//////////////////////////////////////////////////////////
+
+ClusterFakeAcsptStateParam::ClusterFakeAcsptStateParam() :
+	session_id(0)
+{
+
+}
+
+ClusterFakeAcsptStateParam::~ClusterFakeAcsptStateParam(){}
+
+//////////////////////////////////////////////////////////
+
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
 	notify_param(NULL),
@@ -1097,6 +1129,62 @@ NotifyFakeUsreptControlCfg::~NotifyFakeUsreptControlCfg()
 FakeUsreptControlType NotifyFakeUsreptControlCfg::get_fake_usrept_control_type()const
 {
 	return fake_usrept_control_type;
+}
+
+
+///////////////////////////
+
+NotifyFakeAcsptStateCfg::NotifyFakeAcsptStateCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_GET_FAKE_ACSPT_STATE, param, param_size)
+{
+// session ID[2 digits]|cluster ID[2 digits]|fake acspt state
+	// fprintf(stderr, "NotifyFakeAcsptStateCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+// De-Serialize: convert the type of cluster id from string to integer  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(char) * CLUSTER_ID_BUF_SIZE);
+	memcpy(cluster_id_buf, param_char + PAYLOAD_SESSION_ID_DIGITS, sizeof(char) * PAYLOAD_CLUSTER_ID_DIGITS);
+	cluster_id = atoi(cluster_id_buf);
+
+	fake_acspt_state = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS);
+	if (strlen(fake_acspt_state) == 0)
+		fake_acspt_state = NULL;
+	// fprintf(stderr, "NotifyFakeAcsptStateCfg, session id: %d, system_info: %s\n", session_id, system_info);
+}
+
+NotifyFakeAcsptStateCfg::~NotifyFakeAcsptStateCfg()
+{
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_system_info_param = (char*)notify_param;
+	// 	free(notify_system_info_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+int NotifyFakeAcsptStateCfg::get_session_id()const
+{
+	return session_id;
+}
+
+int NotifyFakeAcsptStateCfg::get_cluster_id()const
+{
+	return cluster_id;
+}
+
+const char* NotifyFakeAcsptStateCfg::get_fake_acspt_state()const
+{
+	return fake_acspt_state;
 }
 
 //////////////////////////////////////////////////////////

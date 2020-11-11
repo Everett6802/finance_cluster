@@ -990,6 +990,136 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
+    	case PARAM_FAKE_ACSPT_STATE:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			if (node_type == LEADER)
+			{
+// Leader node
+	    		PCLUSTER_FAKE_ACSPT_STATE_PARAM cluster_fake_acspt_state_param = (PCLUSTER_FAKE_ACSPT_STATE_PARAM)param1;
+	    		assert(cluster_fake_acspt_state_param != NULL && "cluster_fake_acspt_state_param should NOT be NULL");
+				if (simulator_installed)
+				{
+					PFAKE_ACSPT_STATE_PARAM fake_acspt_state_param = new FakeAcsptStateParam();
+					if (fake_acspt_state_param  == NULL)
+						throw bad_alloc();
+					ret = simulator_handler->get_fake_acspt_state(fake_acspt_state_param->fake_acspt_state, fake_acspt_state_param->fake_acspt_state_buf_size);
+					if (CHECK_FAILURE(ret))
+						return ret;
+					printf("fake_acspt_state_param->fake_acspt_state: %s\n", fake_acspt_state_param->fake_acspt_state);
+// Cluster ID of the Leader node: 1
+					cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[1] = string(fake_acspt_state_param->fake_acspt_state);
+					if (fake_acspt_state_param != NULL)
+					{
+						delete fake_acspt_state_param;
+						fake_acspt_state_param = NULL;
+					}
+				}
+				else
+				{
+					WRITE_INFO("The simulator is NOT installed");
+					// return RET_WARN_SIMULATOR_NOT_INSTALLED;
+// Cluster ID of the Leader node: 1
+					cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[1] = string("Not installed");
+				}
+
+				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+				int cluster_node_count;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				// printf("Cluster Node Count: %d\n", cluster_node_count);
+				if (cluster_node_count > 1)
+				{
+// Not one node cluster, send notification to the followers
+// Reset the counter 
+					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+					interactive_session_param[cluster_fake_acspt_state_param->session_id].follower_node_count = cluster_node_count - 1;
+					interactive_session_param[cluster_fake_acspt_state_param->session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+// Send the request
+				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_STATE, (void*)&cluster_fake_acspt_state_param->session_id);
+					if (CHECK_FAILURE(ret))
+						return ret;
+// Receive the response
+					bool found = false;
+				    struct timespec ts;
+				    clock_gettime(CLOCK_REALTIME, &ts);
+				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_fake_acspt_state_param->session_id].cond, &interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx, &ts);
+					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+					{
+		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+					}
+					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_fake_acspt_state_param->session_id].data_list;
+					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+					std::list<PNOTIFY_CFG> interactive_session_fake_acspt_state_data;
+					while (iter != interactive_session_data.end())
+					{
+						PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
+						if (notify_cfg->get_notify_type() == NOTIFY_GET_SIMULATOR_VERSION)
+						{
+							// found = true;
+							interactive_session_fake_acspt_state_data.push_back(notify_cfg);
+							interactive_session_data.erase(iter);
+							if ((int)interactive_session_fake_acspt_state_data.size() == interactive_session_param[cluster_fake_acspt_state_param->session_id].follower_node_count)
+							{
+								found = true;
+								break;
+							}
+						}
+						iter++;
+					}
+					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+	    			if (!found)
+	    			{
+		    			WRITE_FORMAT_ERROR("Lack of fake acspt state from some followers in the session[%d], expected: %d, actual: %d", cluster_fake_acspt_state_param->session_id, cluster_node_count - 1, interactive_session_fake_acspt_state_data.size());
+						return RET_FAILURE_NOT_FOUND;
+					}
+					std::list<PNOTIFY_CFG>::iterator iter_fake_acspt_state = interactive_session_fake_acspt_state_data.begin();
+					while (iter_fake_acspt_state != interactive_session_fake_acspt_state_data.end())
+					{
+						PNOTIFY_FAKE_ACSPT_STATE_CFG notify_fake_acspt_state_cfg = (PNOTIFY_FAKE_ACSPT_STATE_CFG)*iter_fake_acspt_state;
+						assert(cluster_fake_acspt_state_param->session_id == notify_fake_acspt_state_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[notify_fake_acspt_state_cfg->get_cluster_id()] = string(notify_fake_acspt_state_cfg->get_fake_acspt_state());
+						iter_fake_acspt_state++;
+						SAFE_RELEASE(notify_fake_acspt_state_cfg)
+					}
+				}
+			}
+			else if (node_type == FOLLOWER)
+			{
+	    		PFAKE_ACSPT_STATE_PARAM fake_acspt_state_param = (PFAKE_ACSPT_STATE_PARAM)param1;
+	    		assert(fake_acspt_state_param != NULL && "fake_acspt_state_param should NOT be NULL");
+				if (simulator_installed)
+				{
+					ret = simulator_handler->get_fake_acspt_state(fake_acspt_state_param->fake_acspt_state, fake_acspt_state_param->fake_acspt_state_buf_size);
+					if (CHECK_FAILURE(ret))
+						return ret;
+				}
+				else
+				{
+					WRITE_INFO("The simulator is NOT installed");
+					memset(fake_acspt_state_param->fake_acspt_state, 0x0, fake_acspt_state_param->fake_acspt_state_buf_size);
+					snprintf(fake_acspt_state_param->fake_acspt_state, fake_acspt_state_param->fake_acspt_state_buf_size, "%s", "Not installed");
+				}
+			}
+			else
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;		
+			}
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

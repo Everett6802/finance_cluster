@@ -51,6 +51,7 @@ private:
 	unsigned short recv_install_simulator(const std::string& message_data);
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
+	unsigned short recv_get_fake_acspt_state(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -60,6 +61,7 @@ private:
 	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_fake_acspt_state(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 	void dump_node_channel_map()const;
 	void dump_node_keepalive_map()const;

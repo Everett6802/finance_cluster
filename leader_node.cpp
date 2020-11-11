@@ -386,7 +386,8 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_get_simulator_version,
 		&LeaderNode::recv_install_simulator,
 		&LeaderNode::recv_control_fake_acspt,
-		&LeaderNode::recv_control_fake_usrept
+		&LeaderNode::recv_control_fake_usrept,
+		&LeaderNode::recv_get_fake_acspt_state
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -410,7 +411,8 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_simulator_version,
 		&LeaderNode::send_install_simulator,
 		&LeaderNode::send_control_fake_acspt,
-		&LeaderNode::send_control_fake_usrept
+		&LeaderNode::send_control_fake_usrept,
+		&LeaderNode::send_get_fake_acspt_state
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -487,6 +489,21 @@ unsigned short LeaderNode::recv_install_simulator(const std::string& message_dat
 unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
 
 unsigned short LeaderNode::recv_control_fake_usrept(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_USREPT);}
+
+unsigned short LeaderNode::recv_get_fake_acspt_state(const std::string& message_data)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|fake acspt state) | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptStateCfg((void*)message_data.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_GET_FAKE_ACSPT_STATE, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -675,6 +692,20 @@ unsigned short LeaderNode::send_control_fake_usrept(void* param1, void* param2, 
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", fake_usrept_control_type);
 	return send_data(MSG_CONTROL_FAKE_USREPT, buf);
+}
+
+unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// Message format:
+// EventType | session ID | EOD
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int session_id = *(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", session_id);
+	return send_data(MSG_GET_FAKE_ACSPT_STATE, buf);
 }
 
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)

@@ -5,10 +5,12 @@
 
 using namespace std;
 
-const char* SimulatorHandler::SIMULATOR_ROOT_FOLDER_PATH = "/simulator/BUILD";
 const char* SimulatorHandler::SIMULATOR_PACKAGE_FOLDER_PATH = "/dev/shm/simulator";
+const char* SimulatorHandler::SIMULATOR_ROOT_FOLDER_PATH = "/simulator/BUILD";
+const char* SimulatorHandler::SIMULATOR_SCRIPTS_FOLDER_NAME = "scripts";
 const char* SimulatorHandler::SIMULATOR_VERSION_FILENAME = "VERSION";
 const char* SimulatorHandler::SIMULATOR_BUILD_FILENAME = "BUILD";
+const char* SimulatorHandler::SIMULATOR_UTIL_FILENAME = "simulator_util";
 const char* SimulatorHandler::SIMULATOR_INSTALL_SCRIPT_NAME = "simulator_install.sh";
 const char* SimulatorHandler::FAKE_ACSPT_CONTROL_SCRIPT_NAME = "fake_acspt_control.sh";
 const char* SimulatorHandler::FAKE_USREPT_CONTROL_SCRIPT_NAME = "fake_usrept_control.sh";
@@ -85,6 +87,20 @@ void SimulatorHandler::assemble_script_filepath(char** filepath, const char* fil
 	snprintf(filepath_tmp, BUF_SIZE, "%s/%s", cwd, filename);
 	// printf("cwd: %s, filepath: %s\n", cwd, filepath);
 	*filepath = filepath_tmp;
+}
+
+void SimulatorHandler::assemble_simulator_sub_folder_path(char** sub_folder_path, const char* sub_folder_name)
+{
+	assert(sub_folder_path != NULL && "sub_folder_path should NOT be NULL");
+	assert(sub_folder_name != NULL && "sub_folder_name should NOT be NULL");	
+	static const int BUF_SIZE = 256;
+	char* sub_folder_path_tmp = new char[BUF_SIZE];
+	if (sub_folder_path_tmp == NULL)
+		throw runtime_error("fails to allocate memory: filepath_tmp");
+	memset(sub_folder_path_tmp, 0x0, sizeof(char) * BUF_SIZE);
+	snprintf(sub_folder_path_tmp, BUF_SIZE, "%s/%s", SIMULATOR_ROOT_FOLDER_PATH, sub_folder_name);
+	// printf("cwd: %s, filepath: %s\n", cwd, filepath);
+	*sub_folder_path = sub_folder_path_tmp;
 }
 
 const char* SimulatorHandler::get_script_filepath(SCRIPT_FILE_TYPE script_file_type)
@@ -239,6 +255,75 @@ unsigned short SimulatorHandler::stop_fake_usrept()
 	// system(cmd);
 	run_script(FAKE_USREPT_CONTROL, "stop");
 	return RET_SUCCESS;
+}
+
+unsigned short SimulatorHandler::get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const
+{
+	assert(fake_acspt_state != NULL && "fake_acspt_state should NOT be NULL");
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	static const int CMD_SIZE = 256;
+	char cmd[CMD_SIZE + 1];
+	// unsigned short ret = RET_SUCCESS;
+	// chdir(SIMULATOR_ROOT_FOLDER_PATH);
+// Get file path of the simulator_util executable
+	char *simulator_scripts_folder_path = NULL;
+	assemble_simulator_sub_folder_path(&simulator_scripts_folder_path, SIMULATOR_SCRIPTS_FOLDER_NAME);
+	memset(cmd, 0x0, sizeof(cmd) / sizeof(cmd[0]));
+	snprintf(cmd, CMD_SIZE, "%s/%s -v", simulator_scripts_folder_path, SIMULATOR_UTIL_FILENAME);
+	if (simulator_scripts_folder_path != NULL)
+	{
+		delete[] simulator_scripts_folder_path;
+		simulator_scripts_folder_path = NULL;
+	}
+	// printf("cmd: %s\n", cmd);
+// Parse the data from the executable
+	unsigned short ret = RET_SUCCESS;
+	FILE *fp = popen(cmd, "r");
+	static const char* SUMMARY_STR = "SUMMARY";
+	char *line = NULL;
+	size_t line_len = 0;
+    char* token; 
+    char* rest = NULL;
+    char* line_tmp = NULL; 
+    bool can_parse = false;
+    char* line_seg_array[16];
+    int line_seg_count = 0;
+    while (getline(&line, &line_len, fp) != -1)
+    {
+    	if (can_parse)
+    	{
+    		line_tmp = line;
+// strip the newline character
+    		char* line_tmp_new = strtok_r(line_tmp, "\n", &rest);
+    		token = strtok_r(line_tmp_new, " ", &rest);
+    		while (token != NULL)
+    		{
+    			token = strtok_r(NULL, " ", &rest);
+    			// printf("%d ==> token: %s, rest: %s\n", line_seg_count, token, rest);
+    			line_seg_array[line_seg_count++] = token;
+    		}
+    		break;
+    	}
+    	else
+    	{
+    		if(strstr(line, SUMMARY_STR) != NULL) 
+    			can_parse = true;
+    	}
+    	// printf("%d: %s\n", line_cnt++, line);
+    }
+    line_seg_count--;
+    string fake_acspt_state_str = string("");
+    for (int i = 0; i < line_seg_count ; i++)
+    {
+    	fake_acspt_state_str += string(line_seg_array[i]);
+    	if (i != line_seg_count - 1)
+    		fake_acspt_state_str += string("  ");
+    	// printf("%d %s\n", i, line_seg_array[i]);
+    }
+    strncpy(fake_acspt_state, fake_acspt_state_str.c_str(), fake_acspt_state_size - 1);
+	pclose(fp);
+	return ret;
 }
 
 unsigned short SimulatorHandler::notify(NotifyType notify_type, void* notify_param)

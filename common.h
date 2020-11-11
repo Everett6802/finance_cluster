@@ -25,7 +25,7 @@
 #define DEF_SHORT_STRING_SIZE 			32U
 #define DEF_STRING_SIZE 				64U
 #define DEF_LONG_STRING_SIZE			256U
-#define DEF_VERY_LONG_STRING_SIZE		LONG_STRING_SIZE * 2
+#define DEF_VERY_LONG_STRING_SIZE		DEF_LONG_STRING_SIZE * 2
 
 #ifndef CHECK_SUCCESS
 #define CHECK_SUCCESS(X) (X == RET_SUCCESS ? true : false)
@@ -182,10 +182,11 @@ enum MessageType{
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_GET_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
-	MSG_GET_SIMULATOR_VERSION, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
+	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_SIZE
 };
 
@@ -198,6 +199,7 @@ enum ParamType{
 	PARAM_SYSTEM_INFO,
 	// PARAM_NODE_SYSTEM_INFO,
 	PARAM_SIMULATOR_VERSION,
+	PARAM_FAKE_ACSPT_STATE,
 	PARAM_SIZE
 };
 
@@ -212,6 +214,7 @@ enum NotifyType{
 	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
+	NOTIFY_GET_FAKE_ACSPT_STATE,
 	NOTIFY_SIZE
 };
 
@@ -522,6 +525,30 @@ public:
 };
 typedef ClusterSimulatorVersionParam* PCLUSTER_SIMULATOR_VERSION_PARAM;
 
+class FakeAcsptStateParam
+{
+public:
+	int fake_acspt_state_buf_size;
+	char* fake_acspt_state;
+
+	FakeAcsptStateParam(int fake_acspt_state_bufsize=DEF_VERY_LONG_STRING_SIZE);
+	~FakeAcsptStateParam();
+};
+typedef FakeAcsptStateParam* PFAKE_ACSPT_STATE_PARAM;
+
+class ClusterFakeAcsptStateParam
+{
+public:
+	int session_id;
+// (cluster id, fake acspt state)
+	std::map<int, std::string> cluster_fake_acspt_state_map;
+
+	ClusterFakeAcsptStateParam();
+	~ClusterFakeAcsptStateParam();
+
+};
+typedef ClusterFakeAcsptStateParam* PCLUSTER_FAKE_ACSPT_STATE_PARAM;
+
 ///////////////////////////////////////////////////
 
 class NotifyCfg
@@ -656,6 +683,25 @@ public:
 	FakeUsreptControlType get_fake_usrept_control_type()const;
 };
 typedef NotifyFakeUsreptControlCfg* PNOTIFY_FAKE_USREPT_CONTROL_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifyFakeAcsptStateCfg : public NotifyCfg
+{
+private:
+	int session_id;
+	int cluster_id;
+	char* fake_acspt_state;
+
+public:
+	NotifyFakeAcsptStateCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeAcsptStateCfg();
+
+	int get_session_id()const;
+	int get_cluster_id()const;
+	const char* get_fake_acspt_state()const;
+};
+typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
 
 ///////////////////////////////////////////////////
 

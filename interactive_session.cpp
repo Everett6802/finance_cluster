@@ -25,6 +25,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_StopFakeAcspt,
 	InteractiveSessionCommand_StartFakeUsrept,
 	InteractiveSessionCommand_StopFakeUsrept,
+	InteractiveSessionCommand_GetFakeAcsptState,
 	InteractiveSessionCommandSize
 };
 
@@ -41,6 +42,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"stop_fake_acspt",
 	"start_fake_usrept",
 	"stop_fake_usrept",
+	"get_fake_acspt_state",
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
@@ -228,7 +230,8 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
-		InteractiveSessionCommand_StopFakeUsrept
+		InteractiveSessionCommand_StopFakeUsrept,
+		InteractiveSessionCommand_GetFakeAcsptState
 	};
 	static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
 	for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
@@ -472,7 +475,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
-		&InteractiveSession::handle_stop_fake_usrept_command
+		&InteractiveSession::handle_stop_fake_usrept_command,
+		&InteractiveSession::handle_get_fake_acspt_state_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -509,6 +513,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
 		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts in the cluster\n");
+		usage_string += string("* get_fake_acspt_state\n Description: Get the states of all fake acepts in the cluster\n");
 	}
 	usage_string += string("===================================================\n");
 
@@ -613,7 +618,7 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 		char buf[DEF_STRING_SIZE];
 		map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
 // Print data in cosole
-		string system_info_string("system info\n");
+		string system_info_string("*** System Info ***\n");
 		map<int, string>::iterator iter = clusuter_system_info_map.begin();
 		while (iter != clusuter_system_info_map.end())
 		{
@@ -832,4 +837,53 @@ unsigned short InteractiveSession::handle_stop_fake_usrept_command(int argc, cha
 	unsigned short ret = observer->notify(NOTIFY_CONTROL_FAKE_USREPT, notify_cfg);
     SAFE_RELEASE(notify_cfg)
 	return ret;
+}
+
+unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+// Get the data
+	ClusterFakeAcsptStateParam cluster_fake_acspt_state_param;
+    ret = manager->get(PARAM_FAKE_ACSPT_STATE, (void*)&cluster_fake_acspt_state_param);
+ 	if (CHECK_FAILURE(ret))
+		return ret;
+    // SAFE_RELEASE(notify_cfg)
+	if (CHECK_SUCCESS(ret))
+	{
+		ClusterDetailParam cluster_detail_param;
+	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+		char buf[DEF_VERY_LONG_STRING_SIZE];
+		map<int, string>& cluster_fake_acspt_state_map = cluster_fake_acspt_state_param.cluster_fake_acspt_state_map;
+// Print data in cosole
+		string fake_acspt_state_string("*** Fake Acspt State ***\n");
+		map<int, string>::iterator iter = cluster_fake_acspt_state_map.begin();
+		while (iter != cluster_fake_acspt_state_map.end())
+		{
+			// simulator_version_string += string(simulator_version_param->simulator_version);
+			// simulator_version_string += string("\n");
+			int node_id = (int)iter->first;
+			string node_ip;
+			ret = cluster_map.get_node_ip(node_id, node_ip);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			snprintf(buf, DEF_VERY_LONG_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			fake_acspt_state_string += string(buf);
+			++iter;
+		}
+		fake_acspt_state_string += string("\n");
+		ret = print_to_console(fake_acspt_state_string);
+	}
+	return RET_SUCCESS;
 }
