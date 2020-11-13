@@ -1066,7 +1066,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					while (iter != interactive_session_data.end())
 					{
 						PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-						if (notify_cfg->get_notify_type() == NOTIFY_GET_SIMULATOR_VERSION)
+						if (notify_cfg->get_notify_type() == NOTIFY_GET_FAKE_ACSPT_STATE)
 						{
 							// found = true;
 							interactive_session_fake_acspt_state_data.push_back(notify_cfg);
@@ -1281,6 +1281,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_GET_FAKE_ACSPT_STATE:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the fake acspt state for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1334,6 +1345,26 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_simulator_version_cfg);
+			interactive_session_param[session_id].event_count++;
+// It's required to sleep for a while before notifying to accessing the list in another thread
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
+			{
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+    	}
+    	break;
+    	case NOTIFY_GET_FAKE_ACSPT_STATE:
+    	{
+    		PNOTIFY_FAKE_ACSPT_STATE_CFG notify_fake_acspt_state_cfg = (PNOTIFY_FAKE_ACSPT_STATE_CFG)notify_cfg;
+			// assert(notify_system_info_cfg != NULL && "notify_system_info_cfg should NOT be NULL");ri
+// Caution: Required to add reference count, since another thread will access it
+			notify_fake_acspt_state_cfg->addref(__FILE__, __LINE__);
+			int session_id = notify_fake_acspt_state_cfg->get_session_id();
+			// const char* system_info = notify_system_info_cfg->get_system_info();
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_state_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
