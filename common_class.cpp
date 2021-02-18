@@ -806,6 +806,43 @@ ClusterFakeAcsptStateParam::~ClusterFakeAcsptStateParam(){}
 
 //////////////////////////////////////////////////////////
 
+FileTransferParam::FileTransferParam() :
+	session_id(-1),
+	filepath(NULL)
+{
+}
+
+FileTransferParam::~FileTransferParam()
+{
+	if (filepath != NULL)
+	{
+		delete[] filepath;
+		filepath = NULL;
+	}
+	session_id = -1;
+}
+
+//////////////////////////////////////////////////////////
+
+ClusterFileTransferParam::ClusterFileTransferParam() :
+	session_id(0)
+{
+
+}
+
+ClusterFileTransferParam::~ClusterFileTransferParam(){}
+
+//////////////////////////////////////////////////////////
+
+FileTransferDoneParam::FileTransferDoneParam()
+{
+	memset(node_ip, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
+}
+
+FileTransferDoneParam::~FileTransferDoneParam(){}
+
+//////////////////////////////////////////////////////////
+
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
 	notify_param(NULL),
@@ -1185,6 +1222,73 @@ int NotifyFakeAcsptStateCfg::get_cluster_id()const
 const char* NotifyFakeAcsptStateCfg::get_fake_acspt_state()const
 {
 	return fake_acspt_state;
+}
+
+///////////////////////////
+
+NotifyFileTransferAbortCfg::NotifyFileTransferAbortCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_ABORT_FILE_TRANSFER, param, param_size)
+{
+	// printf("NotifyFileTransferAbortCfg()\n");
+	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	remote_ip = (char*)notify_param;
+}
+
+NotifyFileTransferAbortCfg::~NotifyFileTransferAbortCfg()
+{
+	remote_ip = NULL;
+}
+
+const char* NotifyFileTransferAbortCfg::get_remote_ip()const
+{
+	return remote_ip;
+}
+
+///////////////////////////
+
+NotifyFileTransferCompleteCfg::NotifyFileTransferCompleteCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_COMPLETE_FILE_TRANSFER, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+	static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+// De-Serialize: convert the type of cluster id from string to integer  
+	param_char += PAYLOAD_SESSION_ID_DIGITS;
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(char) * CLUSTER_ID_BUF_SIZE);
+	memcpy(cluster_id_buf, param_char, sizeof(char) * PAYLOAD_CLUSTER_ID_DIGITS);
+	cluster_id = atoi(cluster_id_buf);
+// De-Serialize: convert the type of ret code from string to integer  
+	param_char += PAYLOAD_CLUSTER_ID_DIGITS;
+	char return_code_buf[RETURN_CODE_BUF_SIZE];
+	memset(return_code_buf, 0x0, sizeof(char) * RETURN_CODE_BUF_SIZE);
+	memcpy(return_code_buf, param_char, sizeof(unsigned short));
+	return_code = atoi(return_code_buf);
+}
+
+NotifyFileTransferCompleteCfg::~NotifyFileTransferCompleteCfg(){}
+
+int NotifyFileTransferCompleteCfg::get_session_id()const
+{
+	return session_id;
+}
+
+int NotifyFileTransferCompleteCfg::get_cluster_id()const
+{
+	return cluster_id;
+}
+
+unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
+{
+	return return_code;
 }
 
 //////////////////////////////////////////////////////////

@@ -20,6 +20,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetSystemInfo,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_GetSimulatorVersion,
+	InteractiveSessionCommand_TransferSimulatorPackage,
 	InteractiveSessionCommand_InstallSimulator,
 	InteractiveSessionCommand_StartFakeAcspt,
 	InteractiveSessionCommand_StopFakeAcspt,
@@ -37,6 +38,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"get_system_info",
 	// "get_node_system_info",
 	"get_simulator_version",
+	"trasnfer_simulator_package",
 	"install_simulator",
 	"start_fake_acspt",
 	"stop_fake_acspt",
@@ -226,6 +228,7 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
 	{
 		InteractiveSessionCommand_GetSimulatorVersion,
+		InteractiveSessionCommand_TransferSimulatorPackage,
 		InteractiveSessionCommand_InstallSimulator,
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
@@ -471,6 +474,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_system_info_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_simulator_version_command,
+		&InteractiveSession::handle_trasnfer_simulator_package_command,
 		&InteractiveSession::handle_install_simulator_command,
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
@@ -507,6 +511,8 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	if (is_root)
 	{
 		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
+		usage_string += string("* transfer_simulator_package\n Description: Leader transfers the simulator package to each follower\n");
+		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
 		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
@@ -670,6 +676,58 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 // 	ret = print_to_console(node_system_info_string);
 // 	return RET_SUCCESS;
 // }
+
+unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	const char* filepath = (const char*)argv[1];
+	if (!check_file_exist(filepath))
+	{
+		WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
+		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+	}
+
+	ClusterFileTransferParam cluster_file_transfer_param;
+// Start to transfer simulator package
+	unsigned short ret = RET_SUCCESS;
+	cluster_file_transfer_param.session_id = session_id;
+    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+ 	if (CHECK_FAILURE(ret))
+		return ret;
+    // SAFE_RELEASE(notify_cfg)
+// Wait for transferring done...
+	ClusterDetailParam cluster_detail_param;
+	ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+	char buf[DEF_STRING_SIZE];
+	map<int, string>& clusuter_file_transfer_map = cluster_file_transfer_param.clusuter_file_transfer_map;
+// Print data in cosole
+	string file_transfer_string("file transfer\n");
+	map<int, string>::iterator iter = clusuter_file_transfer_map.begin();
+	while (iter != clusuter_file_transfer_map.end())
+	{
+		int node_id = (int)iter->first;
+		string node_ip;
+		ret = cluster_map.get_node_ip(node_id, node_ip);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+		file_transfer_string += string(buf);
+		++iter;
+	}
+	file_transfer_string += string("\n");
+	ret = print_to_console(file_transfer_string);
+	return RET_SUCCESS;
+}
 
 unsigned short InteractiveSession::handle_get_simulator_version_command(int argc, char **argv)
 {

@@ -59,6 +59,7 @@ private:
 	unsigned short handle_get_system_info_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
 	unsigned short handle_get_simulator_version_command(int argc, char **argv);
+	unsigned short handle_trasnfer_simulator_package_command(int argc, char **argv);
 	unsigned short handle_install_simulator_command(int argc, char **argv);
 	unsigned short handle_start_fake_acspt_command(int argc, char **argv);
 	unsigned short handle_stop_fake_acspt_command(int argc, char **argv);

@@ -8,7 +8,7 @@
 
 using namespace std;
 
-const char* NodeChannel::thread_tag = "Channel Thread";
+const char* NodeChannel::thread_tag = "Node Channel Thread";
 const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
 NodeChannel::NodeChannel(PINODE node) :
@@ -29,8 +29,6 @@ NodeChannel::NodeChannel(PINODE node) :
 NodeChannel::~NodeChannel()
 {
 	RELEASE_MSG_DUMPER()
-	if (observer != NULL)
-		observer = NULL;
 }
 
 unsigned short NodeChannel::initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip)
@@ -179,7 +177,8 @@ unsigned short NodeChannel::deinitialize()
 		node_socket = 0;
 	}
 
-	observer = NULL;
+	if (observer != NULL)
+		observer = NULL;
 	return ret;
 }
 

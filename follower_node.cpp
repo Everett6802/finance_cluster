@@ -18,13 +18,15 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 FollowerNode::FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip) :
 	observer(parent),
 	socketfd(0),
+	tx_socketfd(0),
 	local_ip(NULL),
 	cluster_ip(NULL),
 	cluster_id(0),
 	keepalive_cnt(0),
 	connection_retry(false),
 	node_channel(NULL),
-	notify_thread(NULL)
+	notify_thread(NULL),
+	file_channel(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 
@@ -54,7 +56,7 @@ FollowerNode::~FollowerNode()
 
 unsigned short FollowerNode::connect_leader()
 {
-	WRITE_FORMAT_DEBUG("Try to connect to %s......", cluster_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to Leader[%s]......", cluster_ip);
 
 // Create socket
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -173,6 +175,107 @@ unsigned short FollowerNode::become_follower()
 	return ret;
 }
 
+
+unsigned short FollowerNode::connect_file_sender()
+{
+	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_ip);
+
+// Create socket
+	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock_fd < 0)
+	{
+		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+
+// Set non-blocking
+	long sock_arg;
+	if((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
+	{
+		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+	sock_arg |= O_NONBLOCK;
+	if(fcntl(sock_fd, F_SETFL, sock_arg) < 0)
+	{
+		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+
+	sockaddr_in client_address;
+	memset(&client_address, 0x0, sizeof(struct sockaddr_in));
+	client_address.sin_family = AF_INET;
+	client_address.sin_port = htons(CLUSTER_PORT_NO);
+	client_address.sin_addr.s_addr = inet_addr(cluster_ip);
+	int res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	if (res < 0)
+	{
+		if (errno == EINPROGRESS)
+		{
+			WRITE_DEBUG("Connection is NOT established......");
+			struct timeval tv;
+			fd_set sock_set;
+
+			tv.tv_sec = WAIT_CONNECTION_TIMEOUT;
+			tv.tv_usec = 0;
+
+			FD_ZERO(&sock_set);
+			FD_SET(sock_fd, &sock_set);
+			res = select(sock_fd + 1, NULL, &sock_set, NULL, &tv);
+			if (res < 0 && errno != EINTR)
+			{
+				WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
+			else if (res > 0)
+			{
+// Socket selected for writing
+				int error;
+				socklen_t error_len = sizeof(error);
+				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, (void*)&error, &error_len) < 0)
+				{
+					WRITE_FORMAT_ERROR("getsockopt() fails, due to: %s", strerror(errno));
+					return RET_FAILURE_SYSTEM_API;
+				}
+// Check the value returned...
+				if (error)
+				{
+					WRITE_FORMAT_ERROR("Error in delayed connection(), due to: %s", strerror(error));
+					return RET_FAILURE_SYSTEM_API;
+				}
+			}
+			else
+			{
+				WRITE_DEBUG("Connection timeout");
+				return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
+			}
+		}
+		else
+		{
+			WRITE_FORMAT_ERROR("connect() fails, due to: %s", strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+	}
+
+// Set to blocking mode again...
+	if ((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
+	{
+		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+	sock_arg &= (~O_NONBLOCK);
+	if (fcntl(sock_fd, F_SETFL, sock_arg) < 0)
+	{
+		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_ip);
+	tx_socketfd = sock_fd;
+
+	return RET_SUCCESS;
+}
+
 unsigned short FollowerNode::send_data(MessageType message_type, const char* data)
 {
 	unsigned short ret = RET_SUCCESS;
@@ -258,6 +361,16 @@ unsigned short FollowerNode::initialize()
 unsigned short FollowerNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
+
+	if (file_channel != NULL)
+	{
+		ret = file_channel->deinitialize();
+		delete file_channel;
+		file_channel = NULL;
+		if (CHECK_FAILURE(ret))
+			WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_ip);
+	}
+
 	if (node_channel != NULL)
 	{
 		ret = node_channel->deinitialize();
@@ -307,7 +420,9 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept,
-		&FollowerNode::recv_get_fake_acspt_state
+		&FollowerNode::recv_get_fake_acspt_state,
+		&FollowerNode::recv_request_file_transfer,
+		&FollowerNode::recv_complete_file_transfer
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -331,7 +446,9 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept,
-		&FollowerNode::send_get_fake_acspt_state
+		&FollowerNode::send_get_fake_acspt_state,
+		&FollowerNode::send_request_file_transfer,
+		&FollowerNode::send_complete_file_transfer
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -471,6 +588,56 @@ unsigned short FollowerNode::recv_get_fake_acspt_state(const std::string& messag
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
 	ret = send_get_fake_acspt_state((void*)&session_id, (void*)&cluster_id);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_request_file_transfer(const std::string& message_data)
+{
+// Message format:
+// EventType | filepath | EOD
+	assert(file_channel == NULL && "file_channel should be NULL");
+	const char* tx_filepath = (const char*)message_data.c_str();
+	unsigned short ret = RET_SUCCESS;
+	usleep((random() % 10) * 100000);
+// Receiver tries to connect to Sender
+	ret = connect_file_sender();
+	if (CHECK_FAILURE(ret))
+		return ret;
+// Create the channel for file tranfer
+	file_channel = new FileChannel(this);
+	if (file_channel == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: file_channel");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_ip);
+	ret = file_channel->initialize(tx_filepath, local_ip, cluster_ip, tx_socketfd);
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	return RET_SUCCESS;
+}
+
+unsigned short FollowerNode::recv_complete_file_transfer(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	if (file_channel != NULL)
+	{
+// ret is the recv thread return code
+		ret = file_channel->deinitialize();
+		delete file_channel;
+		file_channel = NULL;
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
+	else
+		WRITE_WARN("The file channel does NOT exist");
+
+	int session_id = atoi(message_data.c_str());
+	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
 	return ret;
 }
 
@@ -650,6 +817,41 @@ unsigned short FollowerNode::send_get_fake_acspt_state(void* param1, void* param
 	return send_data(MSG_GET_FAKE_ACSPT_STATE, fake_acspt_state_data.c_str());
 }
 
+unsigned short FollowerNode::send_request_file_transfer(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REQUEST_FILE_TRANSFER);}
+
+unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: The sessin id
+// param2: The return code
+// Message format:
+// EventType | playload: (session ID[2 digits]) | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+	static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+    // unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Serialize: convert the type of session id from integer to string  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
+// Serialize: convert the type of return code from integer to string  
+	char return_code_buf[RETURN_CODE_BUF_SIZE];
+	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
+	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
+
+	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf);
+	return send_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
+}
+
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -738,6 +940,15 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
     	}
     	break;
 // Asynchronous event:
+      	case NOTIFY_ABORT_FILE_TRANSFER:
+    	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		ret = notify_thread->add_event(notify_cfg);
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -757,6 +968,16 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     NotifyType notify_type = notify_cfg->get_notify_type();
     switch(notify_type)
     {
+    	case NOTIFY_ABORT_FILE_TRANSFER:
+    	{
+    		assert(file_channel != NULL && "file_channel should NOT be NULL");
+			ret = file_channel->deinitialize();
+			delete file_channel;
+			file_channel = NULL;
+			if (CHECK_FAILURE(ret))
+				return ret;
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

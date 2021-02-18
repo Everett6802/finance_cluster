@@ -6,6 +6,7 @@
 #include "common.h"
 #include "node_base.h"
 #include "node_channel.h"
+#include "file_channel.h"
 
 
 class FollowerNode : public INode
@@ -22,6 +23,7 @@ private:
 	// CHAR_LIST server_list;
 	PIMANAGER observer;
 	int socketfd;
+	int tx_socketfd; // For file transfer
 	char* local_ip;
 	char* cluster_ip;
 // Start from 1, 1 for leader, otherwise for follower
@@ -31,12 +33,14 @@ private:
 	bool connection_retry;
 	PNODE_CHANNEL node_channel;
 	PNOTIFY_THREAD notify_thread;
+	PFILE_CHANNEL file_channel;
 
 	pthread_mutex_t cluster_map_mtx;
 	pthread_mutex_t node_channel_mtx;
 
 	unsigned short connect_leader();
 	unsigned short become_follower();
+	unsigned short connect_file_sender();
 	unsigned short send_data(MessageType message_type, const char* data=NULL);
 // events
 // recv
@@ -49,6 +53,8 @@ private:
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
 	unsigned short recv_get_fake_acspt_state(const std::string& message_data);
+	unsigned short recv_request_file_transfer(const std::string& message_data);
+	unsigned short recv_complete_file_transfer(const std::string& message_data);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
@@ -59,6 +65,8 @@ private:
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_fake_acspt_state(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
 	FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip);

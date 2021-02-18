@@ -1,0 +1,180 @@
+g++ -g -Wall -std=c++0x -c file_channel.cpp -o file_channel.o
+file_channel.cpp: In member function ‘short unsigned int FileChannel::deinitialize()’:
+file_channel.cpp:113:7: warning: unused variable ‘thread_alive’ [-Wunused-variable]
+  bool thread_alive = false;
+       ^
+In file included from common.h:17:0,
+                 from file_channel.h:6,
+                 from file_channel.cpp:6:
+file_channel.cpp: In member function ‘short unsigned int FileChannel::request_transfer()’:
+msg_dumper_wrapper.h:48:83: error: cannot pass objects of non-trivially-copyable type ‘std::string {aka class std::basic_string<char>}’ through ‘...’
+ msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, __VA_ARGS__)
+                                                                                   ^
+msg_dumper_wrapper.h:100:49: note: in expansion of macro ‘WRITE_FORMAT_MSG_DUMPER’
+ #define WRITE_FORMAT_ERROR(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
+                                                 ^
+file_channel.cpp:266:6: note: in expansion of macro ‘WRITE_FORMAT_ERROR’
+      WRITE_FORMAT_ERROR("Incorrect operation: Node[%s] is NOT a sender", node_ip);
+      ^
+file_channel.cpp: In member function ‘short unsigned int FileChannel::send_thread_handler_internal()’:
+file_channel.cpp:352:22: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+   if (read_bytes == -1)
+                      ^
+file_channel.cpp:364:24: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+    if (write_bytes == -1)
+                        ^
+file_channel.cpp:380:70: error: cannot convert ‘std::string {aka std::basic_string<char>}’ to ‘const char*’ for argument ‘1’ to ‘size_t strlen(const char*)’
+  size_t notify_param_size = sizeof(unsigned short) + strlen(remote_ip) + 1;
+                                                                      ^
+file_channel.cpp:386:80: error: cannot convert ‘std::string {aka std::basic_string<char>}’ to ‘const char*’ for argument ‘1’ to ‘size_t strlen(const char*)’
+  memcpy(char_notify_param + sizeof(unsigned short), remote_ip, strlen(remote_ip));
+                                                                                ^
+file_channel.cpp: In member function ‘void FileChannel::send_thread_cleanup_handler_internal()’:
+file_channel.cpp:417:10: error: ‘fp’ was not declared in this scope
+   fclose(fp);
+          ^
+file_channel.cpp: In member function ‘short unsigned int FileChannel::recv_thread_handler_internal()’:
+file_channel.cpp:460:6: error: ‘fp’ was not declared in this scope
+  if (fp == NULL)
+      ^
+file_channel.cpp:494:33: error: ‘buf’ was not declared in this scope
+    read_bytes = recv(tx_socket, buf, sizeof(char) * MAX_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);   
+                                 ^
+file_channel.cpp:500:34: error: expected type-specifier before ‘NotifyFileTransferAbortCfg’
+     PNOTIFY_CFG notify_cfg = new NotifyFileTransferAbortCfg(remote_ip.c_str(), notify_param_size);
+                                  ^
+file_channel.cpp:505:22: error: ‘NOTIFY_FILE_TRANSFER_ABORT’ was not declared in this scope
+     observer->notify(NOTIFY_FILE_TRANSFER_ABORT, notify_cfg);
+                      ^
+file_channel.cpp:499:12: warning: unused variable ‘notify_param_size’ [-Wunused-variable]
+     size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
+            ^
+file_channel.cpp:514:24: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+     if (read_bytes == -1)
+                        ^
+file_channel.cpp: In member function ‘void FileChannel::recv_thread_cleanup_handler_internal()’:
+file_channel.cpp:559:10: error: ‘fp’ was not declared in this scope
+   fclose(fp);
+          ^
+make: *** [file_channel.o] Error 1
+g++ -g -Wall -std=c++0x -c leader_node.cpp -o leader_node.o
+leader_node.cpp:249:69: error: no ‘short unsigned int LeaderNode::remove_file_channel(const string&)’ member function declared in class ‘LeaderNode’
+ unsigned short LeaderNode::remove_file_channel(const string& node_ip)
+                                                                     ^
+leader_node.cpp: In member function ‘short unsigned int LeaderNode::wait_file_transfer()’:
+leader_node.cpp:394:1: warning: no return statement in function returning non-void [-Wreturn-type]
+ }
+ ^
+leader_node.cpp: In member function ‘short unsigned int LeaderNode::recv_complete_file_transfer(const string&)’:
+leader_node.cpp:675:31: error: expected type-specifier before ‘NotifyFileTransferCfgComplete’
+  PNOTIFY_CFG notify_cfg = new NotifyFileTransferCfgComplete((void*)message_data.c_str(), notify_param_size);
+                               ^
+leader_node.cpp:674:9: warning: unused variable ‘notify_param_size’ [-Wunused-variable]
+  size_t notify_param_size = strlen(message_data.c_str()) + 1;
+         ^
+leader_node.cpp: In member function ‘short unsigned int LeaderNode::send_request_file_transfer(void*, void*, void*)’:
+leader_node.cpp:893:17: warning: unused variable ‘ret’ [-Wunused-variable]
+  unsigned short ret = RET_SUCCESS;
+                 ^
+leader_node.cpp: In member function ‘short unsigned int LeaderNode::send_complete_file_transfer(void*, void*, void*)’:
+leader_node.cpp:915:52: error: ‘remote_ip’ was not declared in this scope
+  return send_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_ip);
+                                                    ^
+leader_node.cpp: In member function ‘virtual short unsigned int LeaderNode::set(ParamType, void*, void*)’:
+leader_node.cpp:932:20: error: ‘ile_transfer_param’ was not declared in this scope
+    tx_session_id = ile_transfer_param.session_id;
+                    ^
+leader_node.cpp:938:45: error: request for member ‘filepath’ in ‘file_transfer_param’, which is of pointer type ‘PFILE_TRANSFER_PARAM {aka FileTransferParam*}’ (maybe you meant to use ‘->’ ?)
+    tx_filepath = strdup(file_transfer_param.filepath);
+                                             ^
+leader_node.cpp: In member function ‘virtual short unsigned int LeaderNode::get(ParamType, void*, void*)’:
+leader_node.cpp:1001:19: error: ‘cluster_node_count_param’ was not declared in this scope
+             ret = cluster_node_count_param = cluster_map.get_node_id(cluster_node_ip_param, cluster_node_id_param);
+                   ^
+leader_node.cpp:1015:19: error: ‘cluster_node_count_param’ was not declared in this scope
+             ret = cluster_node_count_param = cluster_map.get_node_ip(cluster_node_id_param, cluster_node_ip_param);
+                   ^
+leader_node.cpp: In member function ‘virtual short unsigned int LeaderNode::async_handle(NotifyCfg*)’:
+leader_node.cpp:1099:104: error: lvalue required as unary ‘&’ operand
+       ret = send(MSG_COMPLETE_FILE_TRANSFER, (void*)&notify_file_transfer_complete_cfg->get_session_id(), (void*)notify_file_transfer_complete_cfg->get_remote_ip());
+                                                                                                        ^
+leader_node.cpp:1104:41: error: ‘remove_file_channel’ was not declared in this scope
+    ret = remove_file_channel(follower_ip);
+                                         ^
+leader_node.cpp: In member function ‘short unsigned int LeaderNode::send_complete_file_transfer(void*, void*, void*)’:
+leader_node.cpp:916:1: warning: control reaches end of non-void function [-Wreturn-type]
+ }
+ ^
+make: *** [leader_node.o] Error 1
+g++ -g -Wall -std=c++0x -c follower_node.cpp -o follower_node.o
+In file included from common.h:17:0,
+                 from follower_node.h:6,
+                 from follower_node.cpp:7:
+follower_node.cpp: In member function ‘short unsigned int FollowerNode::recv_request_file_transfer(const string&)’:
+follower_node.cpp:610:68: error: ‘tx_listen_thread_tag’ was not declared in this scope
+   WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: file_channel", tx_listen_thread_tag);
+                                                                    ^
+msg_dumper_wrapper.h:48:72: note: in definition of macro ‘WRITE_FORMAT_MSG_DUMPER’
+ msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, __VA_ARGS__)
+                                                                        ^
+follower_node.cpp:610:3: note: in expansion of macro ‘WRITE_FORMAT_ERROR’
+   WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: file_channel", tx_listen_thread_tag);
+   ^
+follower_node.cpp:615:33: error: ‘tx_filepath’ was not declared in this scope
+  ret = file_channel->initialize(tx_filepath, local_ip, client_ip, client_socketfd);
+                                 ^
+follower_node.cpp:615:56: error: ‘client_ip’ was not declared in this scope
+  ret = file_channel->initialize(tx_filepath, local_ip, client_ip, client_socketfd);
+                                                        ^
+follower_node.cpp:615:67: error: ‘client_socketfd’ was not declared in this scope
+  ret = file_channel->initialize(tx_filepath, local_ip, client_ip, client_socketfd);
+                                                                   ^
+follower_node.cpp:599:14: warning: unused variable ‘filepath’ [-Wunused-variable]
+  const char* filepath = (const char*)message_data.c_str();
+              ^
+follower_node.cpp: In member function ‘short unsigned int FollowerNode::send_complete_file_transfer(void*, void*, void*)’:
+follower_node.cpp:831:20: warning: unused variable ‘ret’ [-Wunused-variable]
+     unsigned short ret = RET_SUCCESS;
+                    ^
+make: *** [follower_node.o] Error 1
+g++ -g -Wall -std=c++0x -c cluster_mgr.cpp -o cluster_mgr.o
+cluster_mgr.cpp: In member function ‘virtual short unsigned int ClusterMgr::set(ParamType, void*, void*)’:
+cluster_mgr.cpp:672:72: error: base operand of ‘->’ has non-pointer type ‘FileTransferParam’
+     pthread_mutex_unlock(&interactive_session_param[file_transfer_param->session_id].mtx);
+                                                                        ^
+cluster_mgr.cpp:679:94: error: base operand of ‘->’ has non-pointer type ‘FileTransferParam’
+     int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
+                                                                                              ^
+cluster_mgr.cpp:686:101: error: base operand of ‘->’ has non-pointer type ‘FileTransferParam’
+     std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[file_transfer_param->session_id].data_list;
+                                                                                                     ^
+In file included from common.h:17:0,
+                 from cluster_mgr.h:7,
+                 from cluster_mgr.cpp:14:
+cluster_mgr.cpp:707:140: error: ‘cluster_system_info_param’ was not declared in this scope
+         WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_system_info_param->session_id, cluster_node_count - 1, interactive_session_file_transfer_data.size());
+                                                                                                                                            ^
+msg_dumper_wrapper.h:48:72: note: in definition of macro ‘WRITE_FORMAT_MSG_DUMPER’
+ msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, __VA_ARGS__)
+                                                                        ^
+cluster_mgr.cpp:707:9: note: in expansion of macro ‘WRITE_FORMAT_ERROR’
+         WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_system_info_param->session_id, cluster_node_count - 1, interactive_session_file_transfer_data.size());
+         ^
+cluster_mgr.cpp:723:18: warning: unused variable ‘success_str_len’ [-Wunused-variable]
+       static int success_str_len = strlen(success_str);
+                  ^
+cluster_mgr.cpp:727:101: warning: deprecated conversion from string constant to ‘char*’ [-Wwrite-strings]
+       snprintf("Fail, due to : %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
+                                                                                                     ^
+cluster_mgr.cpp:727:100: error: invalid conversion from ‘const char*’ to ‘size_t {aka long unsigned int}’ [-fpermissive]
+       snprintf("Fail, due to : %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
+                                                                                                    ^
+cluster_mgr.cpp:727:101: error: too few arguments to function ‘int snprintf(char*, size_t, const char*, ...)’
+       snprintf("Fail, due to : %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
+                                                                                                     ^
+In file included from cluster_mgr.cpp:3:0:
+/usr/include/stdio.h:386:12: note: declared here
+ extern int snprintf (char *__restrict __s, size_t __maxlen,
+            ^
+make: *** [cluster_mgr.o] Error 1
+make: Target `build' not remade because of errors.

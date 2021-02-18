@@ -48,6 +48,8 @@ const unsigned short RET_FAILURE_CONNECTION_END = 0x1FF;
 const unsigned short RET_WARN_BASE = 0x200;
 const unsigned short RET_WARN_INTERACTIVE_COMMAND = RET_WARN_BASE + 0;
 const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 1;
+const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND = RET_WARN_BASE + 2;
+const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS = RET_WARN_BASE + 3;
 const unsigned short RET_WARN_END = 0x2FF;
 
 const char *GetErrorDescription(unsigned short ret)
@@ -86,7 +88,9 @@ const char *GetErrorDescription(unsigned short ret)
 	{
 		// "Warn Base",
 		"Warn Interactive Command",
-		"Warn Simulator Not Installed"
+		"Warn Simulator Not Installed",
+		"Warn Simulator Package Not Found",
+		"Warn File Transfer in Process"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
 	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);
@@ -138,6 +142,7 @@ const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
 const int BASE_PORT_NO = 5988;
 const int CLUSTER_PORT_NO = BASE_PORT_NO + 0;
 const int SESSION_PORT_NO = BASE_PORT_NO + 1;
+const int FILE_TRANSFER_PORT_NO = BASE_PORT_NO + 2;
 const int RECV_BUF_SIZE = 512;
 
 const char* CONFIG_FOLDER_NAME = "conf";

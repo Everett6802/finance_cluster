@@ -38,6 +38,7 @@ const char* ClusterMgr::SERVER_LIST_CONF_FILENAME = "server_list.conf";
 const int ClusterMgr::WAIT_RETRY_CONNECTION_TIME = 3; // 3 seconds
 const int ClusterMgr::TRY_TIMES = 3;
 const int ClusterMgr::WAIT_MESSAGE_RESPONSE_TIME = 20; // 20 seconds
+const int ClusterMgr::WAIT_FILE_TRANSFER_TIME = 60; // 60 seconds
 
 unsigned short ClusterMgr::parse_config()
 {
@@ -170,7 +171,8 @@ ClusterMgr::~ClusterMgr()
 
 	if (local_ip != NULL)
 	{
-		delete[] local_ip;
+		// delete[] local_ip;
+		free(local_ip);
 		local_ip = NULL;
 	}
 
@@ -614,6 +616,135 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_FILE_TRANSFER:
+    	{
+// Only leader can do the file transfer to the follower
+	    	if (node_type != LEADER)
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;
+			}
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+	    	assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+
+	    	unsigned short ret = RET_SUCCESS;
+			if (node_type == LEADER)
+			{
+// Leader node
+	    		PCLUSTER_FILE_TRANSFER_PARAM cluster_file_transfer_param = (PCLUSTER_FILE_TRANSFER_PARAM)param1;
+	    		assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
+	    		const char* filepath = (const char*)param2;
+	    		assert(filepath != NULL && "filepath should NOT be NULL");
+
+		    	int cluster_node_count;
+				ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				assert(cluster_node_count != 0 && "cluster_node_count should NOT be 0");
+					// printf("Cluster Node Count: %d\n", cluster_node_count);
+				if (cluster_node_count == 1)
+				{
+					WRITE_ERROR("No follwer nodes in the cluster, no need to transfer the simulator package");
+					return RET_SUCCESS;
+				}
+// Start the file transfer
+				FileTransferParam file_transfer_param;
+				file_transfer_param.session_id = cluster_file_transfer_param->session_id;
+				file_transfer_param.filepath = new char[strlen(filepath) + 1];
+				if (file_transfer_param.filepath == NULL)
+					throw bad_alloc();
+				memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
+				strcpy(file_transfer_param.filepath, filepath);
+
+				WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_count - 1);
+				ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				// printf("Cluster Node Count: %d\n", cluster_node_count);
+// Reset the counter 
+				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+				interactive_session_param[cluster_file_transfer_param->session_id].follower_node_count = cluster_node_count - 1;
+				interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
+				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+// Receive the response
+				bool found = false;
+				struct timespec ts;
+				clock_gettime(CLOCK_REALTIME, &ts);
+				ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
+				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+				int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
+				if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+				{
+		    		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+					return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+				}
+					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
+				std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
+				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+				std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
+				while (iter != interactive_session_data.end())
+				{
+					PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
+					if (notify_cfg->get_notify_type() == NOTIFY_COMPLETE_FILE_TRANSFER)
+					{
+						interactive_session_file_transfer_data.push_back(notify_cfg);
+						interactive_session_data.erase(iter);
+						if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[cluster_file_transfer_param->session_id].follower_node_count)
+						{
+							found = true;
+							break;
+						}
+					}
+					iter++;
+				}
+				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+	    		if (!found)
+	    		{
+		    		WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_count - 1, interactive_session_file_transfer_data.size());
+					return RET_FAILURE_NOT_FOUND;
+				}
+				std::list<PNOTIFY_CFG>::iterator iter_file_transfer= interactive_session_file_transfer_data.begin();
+				while (iter_file_transfer != interactive_session_file_transfer_data.end())
+				{
+					PNOTIFY_FILE_TRANSFER_COMPLETE_CFG notify_file_transfer_cfg = (PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)*iter_file_transfer;
+					assert(cluster_file_transfer_param->session_id == notify_file_transfer_cfg->get_session_id() && "The session ID is NOT identical");
+					// string node_ip;
+					// ret = cluster_node->get(PARAM_CLUSTER_ID2IP, (void*)&notify_file_transfer_cfg->get_cluster_id(), (void*)&node_ip);
+					if (CHECK_FAILURE(ret))
+						return ret;
+					char buf[DEF_STRING_SIZE];
+					if (CHECK_SUCCESS(notify_file_transfer_cfg->get_return_code()))
+					{
+						static const char* success_str = "Success";
+						// static int success_str_len = strlen(success_str);
+						strcpy(buf, success_str);
+					}
+					else
+						snprintf(buf, DEF_STRING_SIZE, "Fail, due to: %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
+					cluster_file_transfer_param->clusuter_file_transfer_map[notify_file_transfer_cfg->get_cluster_id()] = string(buf);					
+					iter_file_transfer++;
+					SAFE_RELEASE(notify_file_transfer_cfg)
+				}
+			}
+			else if (node_type == FOLLOWER)
+			{
+	    		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
+	    		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
+				ret = get_system_info(system_info_param->system_info);
+				if (CHECK_FAILURE(ret))
+					return ret;
+			}
+			else
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;		
+			}
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1292,6 +1423,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_COMPLETE_FILE_TRANSFER:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the notification of transfering file completely for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1365,6 +1507,26 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_state_cfg);
+			interactive_session_param[session_id].event_count++;
+// It's required to sleep for a while before notifying to accessing the list in another thread
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
+			{
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+    	}
+    	break;
+    	case NOTIFY_COMPLETE_FILE_TRANSFER:
+    	{
+    		PNOTIFY_FILE_TRANSFER_COMPLETE_CFG notify_file_transfer_complete_cfg = (PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg;
+			// assert(notify_system_info_cfg != NULL && "notify_system_info_cfg should NOT be NULL");ri
+// Caution: Required to add reference count, since another thread will access it
+			notify_file_transfer_complete_cfg->addref(__FILE__, __LINE__);
+			int session_id = notify_file_transfer_complete_cfg->get_session_id();
+			// const char* system_info = notify_system_info_cfg->get_system_info();
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)

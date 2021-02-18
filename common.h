@@ -136,6 +136,8 @@ extern const unsigned short RET_FAILURE_CONNECTION_END;
 extern const unsigned short RET_WARN_BASE;
 extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
 extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
+extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
 extern const unsigned short RET_WARN_END;
 
 const char* GetErrorDescription(unsigned short ret);
@@ -156,6 +158,7 @@ extern const char* CONF_FODLERNAME;
 extern const char* FINANCE_CLUSTER_CONF_FILENAME;
 extern const int CLUSTER_PORT_NO;
 extern const int SESSION_PORT_NO;
+extern const int FILE_TRANSFER_PORT_NO;
 extern const int RECV_BUF_SIZE;
 
 extern const char* CONFIG_FOLDER_NAME;
@@ -181,18 +184,22 @@ enum MessageType{
 	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
 	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
-	MSG_GET_SYSTEM_INFO, // Uni-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_GET_SYSTEM_INFO, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Leader -> Follower
+	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_SIZE
 };
 
 enum ParamType{
 	PARAM_CLUSTER_MAP,
 	PARAM_CLUSTER_NODE_COUNT,
+	PARAM_CLUSTER_IP2ID,
+	PARAM_CLUSTER_ID2IP,
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
@@ -200,6 +207,8 @@ enum ParamType{
 	// PARAM_NODE_SYSTEM_INFO,
 	PARAM_SIMULATOR_VERSION,
 	PARAM_FAKE_ACSPT_STATE,
+	PARAM_FILE_TRANSFER,
+	PARAM_FILE_TRANSFER_DONE,
 	PARAM_SIZE
 };
 
@@ -215,6 +224,8 @@ enum NotifyType{
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_GET_FAKE_ACSPT_STATE,
+	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
+	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SIZE
 };
 
@@ -549,6 +560,40 @@ public:
 };
 typedef ClusterFakeAcsptStateParam* PCLUSTER_FAKE_ACSPT_STATE_PARAM;
 
+class FileTransferParam
+{
+public:
+	int session_id;
+	char* filepath;
+
+	FileTransferParam();
+	~FileTransferParam();
+};
+typedef FileTransferParam* PFILE_TRANSFER_PARAM;
+
+class ClusterFileTransferParam
+{
+public:
+	int session_id;
+// (cluster id, system info)
+	std::map<int, std::string> clusuter_file_transfer_map;
+
+	ClusterFileTransferParam();
+	~ClusterFileTransferParam();
+
+};
+typedef ClusterFileTransferParam* PCLUSTER_FILE_TRANSFER_PARAM;
+
+class FileTransferDoneParam
+{
+public:
+	char node_ip[DEF_VERY_SHORT_STRING_SIZE];
+
+	FileTransferDoneParam();
+	~FileTransferDoneParam();
+};
+typedef FileTransferDoneParam* PFILE_TRANSFER_DONE_PARAM;
+
 ///////////////////////////////////////////////////
 
 class NotifyCfg
@@ -702,6 +747,41 @@ public:
 	const char* get_fake_acspt_state()const;
 };
 typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
+
+///////////////////////////
+
+class NotifyFileTransferAbortCfg : public NotifyCfg
+{
+private:
+	char* remote_ip;
+
+public:
+	NotifyFileTransferAbortCfg(const void* param, size_t param_size);
+	virtual ~NotifyFileTransferAbortCfg();
+
+	const char* get_remote_ip()const;
+};
+typedef NotifyFileTransferAbortCfg* PNOTIFY_FILE_TRANSFER_ABORT_CFG;
+
+///////////////////////////
+
+class NotifyFileTransferCompleteCfg : public NotifyCfg
+{
+
+private:
+	int session_id;
+	int cluster_id;
+	unsigned short return_code;
+
+public:
+	NotifyFileTransferCompleteCfg(const void* param, size_t param_size);
+	virtual ~NotifyFileTransferCompleteCfg();
+
+	int get_session_id()const;
+	int get_cluster_id()const;
+	unsigned short get_return_code()const;
+};
+typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
 
 ///////////////////////////////////////////////////
 

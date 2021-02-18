@@ -14,18 +14,25 @@
 using namespace std;
 
 const char* LeaderNode::listen_thread_tag = "Listen Thread";
+const char* LeaderNode::tx_listen_thread_tag = "File Transfer Listen Thread";
 const int LeaderNode::WAIT_CONNECTION_TIMEOUT = 60; // 5 seconds
 
 LeaderNode::LeaderNode(PIMANAGER parent, const char* ip) :
 	observer(parent),
 	socketfd(0),
+	tx_socketfd(0),
 	local_ip(NULL),
 	cluster_id(0),
 	cluster_node_cnt(0),
 	notify_thread(NULL),
 	listen_exit(0),
 	listen_tid(0),
-	listen_thread_ret(RET_SUCCESS)
+	listen_thread_ret(RET_SUCCESS),
+	tx_listen_exit(0),
+	tx_listen_tid(0),
+	tx_listen_thread_ret(RET_SUCCESS),
+	tx_session_id(-1),
+	tx_filepath(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 	if (ip == NULL)
@@ -239,6 +246,147 @@ unsigned short LeaderNode::remove_follower(const string& node_ip)
 	return ret;
 }
 
+unsigned short LeaderNode::remove_file_channel(const string& node_ip)
+{
+	unsigned short ret = RET_SUCCESS;
+	pthread_mutex_lock(&file_channel_mtx);
+	map<string, PFILE_CHANNEL>::iterator iter = file_channel_map.find(node_ip);
+	if (iter == file_channel_map.end())
+	{
+		WRITE_FORMAT_ERROR("The file channel to Follower[%s] does NOT exist", node_ip.c_str());
+		pthread_mutex_unlock(&file_channel_mtx);
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	PFILE_CHANNEL file_channel = (PFILE_CHANNEL)iter->second;
+	assert(file_channel != NULL && "file_channel should NOT be NULL");
+// Stop the node of the channel
+	file_channel->deinitialize();
+	delete file_channel;
+	file_channel = NULL;
+// Remove the node
+	file_channel_map.erase(node_ip);
+	pthread_mutex_unlock(&node_channel_mtx);
+	
+	return ret;
+}
+
+unsigned short LeaderNode::become_file_sender()
+{
+	int on = 1;
+	unsigned short ret = RET_SUCCESS;
+// Create socket
+	int listen_sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listen_sd < 0)
+	{
+		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+// Allow socket descriptor to be reuseable
+// Bind failed: Address already in use: 
+// I faced the same issue when I closed the server program with client program still running. This put the socket into TIME_WAIT stat
+/*
+What exactly does SO_REUSEADDR do?
+This socket option tells the kernel that even if 
+this port is busy (in the TIME_WAIT state), go ahead and 
+reuse it anyway. If it is busy, but with another state, 
+you will still get an address already in use error. 
+It is useful if your server has been shut down, and then 
+restarted right away while sockets are still active on its port. 
+
+*** How do I remove a CLOSE_WAIT socket connection ***
+CLOSE_WAIT means your program is still running, and hasn't 
+closed the socket (and the kernel is waiting for it to do so). 
+Add -p to netstat to get the pid, and then kill it more 
+forcefully (with SIGKILL if needed). 
+That should get rid of your CLOSE_WAIT sockets. 
+You can also use ps to find the pid.
+
+SO_REUSEADDR is for servers and TIME_WAIT sockets, so doesn't apply here.
+*/
+   if (setsockopt(listen_sd, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on)) < 0)
+   {
+      WRITE_FORMAT_ERROR("setsockopt() fails, due to: %s", strerror(errno));
+      close(listen_sd);
+      return RET_FAILURE_SYSTEM_API;
+   }
+
+// Set socket to be nonblocking. 
+/*
+All sockets for the incoming connections will also be nonblocking
+since they will inherit that state from the listening socket.   
+*/
+   if (ioctl(listen_sd, FIONBIO, (char*)&on) < 0)
+   {
+      WRITE_FORMAT_ERROR("ioctl() fails, due to: %s", strerror(errno));
+      close(listen_sd);
+      return RET_FAILURE_SYSTEM_API;
+   }
+// Bind
+	int server_len;
+	struct sockaddr_in server_address;
+	memset(&server_address, 0x0, sizeof(struct sockaddr_in));
+	server_address.sin_family = AF_INET;
+	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+	server_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
+	server_len = sizeof(server_address);
+	if (bind(listen_sd, (struct sockaddr*)&server_address, server_len) == -1)
+	{
+		WRITE_FORMAT_ERROR("bind() fail, due to: %s", strerror(errno));
+		close(listen_sd);
+		return RET_FAILURE_SYSTEM_API;
+	}
+// Listen
+	if (listen(listen_sd, MAX_CONNECTED_CLIENT) == -1)
+	{
+		WRITE_FORMAT_ERROR("listen() fail, due to: %s", strerror(errno));
+		close(listen_sd);
+		return RET_FAILURE_SYSTEM_API;
+	}
+	tx_socketfd = listen_sd;
+
+	WRITE_FORMAT_INFO("Node[%s] is a File Sender", local_ip);
+
+	return ret;
+}
+
+unsigned short LeaderNode::start_file_transfer()
+{
+// Restrict only one file transfer process at one time in the cluster
+	unsigned short ret = RET_SUCCESS;
+	if (tx_listen_tid == 0)
+	{
+		pthread_mutex_lock(&tx_mtx);
+		if (tx_listen_tid == 0)
+		{
+			ret = become_file_sender();
+			if (CHECK_FAILURE(ret))
+				goto OUT;
+
+// Create worker thread
+			if (pthread_create(&tx_listen_tid, NULL, tx_listen_thread_handler, this))
+			{
+				WRITE_FORMAT_ERROR("Fail to create a worker thread of accepting file trasnfer client, due to: %s",strerror(errno));
+				ret = RET_FAILURE_HANDLE_THREAD;
+				goto OUT;
+			}
+		}
+		else
+		{
+			WRITE_ERROR("Another file transfer is in process");
+			ret = RET_WARN_FILE_TRANSFER_IN_PROCESS;
+			goto OUT;
+		}
+OUT:
+		pthread_mutex_unlock(&tx_mtx);
+	}
+	else
+	{
+		WRITE_ERROR("Another file transfer is in process");
+		ret = RET_WARN_FILE_TRANSFER_IN_PROCESS;
+	}
+
+	return ret;
+}
 
 unsigned short LeaderNode::initialize()
 {
@@ -251,7 +399,9 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 // Initialize the synchronization object
+	tx_mtx = PTHREAD_MUTEX_INITIALIZER;
 	node_channel_mtx = PTHREAD_MUTEX_INITIALIZER;
+	file_channel_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 // Try to become leader
 	ret = become_leader();
@@ -387,7 +537,9 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_install_simulator,
 		&LeaderNode::recv_control_fake_acspt,
 		&LeaderNode::recv_control_fake_usrept,
-		&LeaderNode::recv_get_fake_acspt_state
+		&LeaderNode::recv_get_fake_acspt_state,
+		&LeaderNode::recv_request_file_transfer,
+		&LeaderNode::recv_complete_file_transfer
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -412,7 +564,9 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_install_simulator,
 		&LeaderNode::send_control_fake_acspt,
 		&LeaderNode::send_control_fake_usrept,
-		&LeaderNode::send_get_fake_acspt_state
+		&LeaderNode::send_get_fake_acspt_state,
+		&LeaderNode::send_request_file_transfer,
+		&LeaderNode::send_complete_file_transfer
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -501,6 +655,23 @@ unsigned short LeaderNode::recv_get_fake_acspt_state(const std::string& message_
 		throw bad_alloc();
 // Asynchronous event
 	observer->notify(NOTIFY_GET_FAKE_ACSPT_STATE, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short LeaderNode::recv_request_file_transfer(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REQUEST_FILE_TRANSFER);}
+
+unsigned short LeaderNode::recv_complete_file_transfer(const std::string& message_data)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_ip) | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
@@ -599,7 +770,7 @@ unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* 
 	if (param1 == NULL)
 	{
 		WRITE_ERROR("param1 should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;		
+		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
 	const char* text_data = (const char*)param1;
@@ -708,11 +879,89 @@ unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2,
 	return send_data(MSG_GET_FAKE_ACSPT_STATE, buf);
 }
 
+unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: filepath
+// Message format:
+// EventType | filepath | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+
+	const char* filepath = (const char*)param1;
+	return send_data(MSG_REQUEST_FILE_TRANSFER, filepath);
+}
+
+unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// param2: remote ip. NULL for broadcast
+// Message format:
+// EventType | session ID | EOD
+	if (param1 == NULL || param2 == NULL)
+	{
+		WRITE_ERROR("param1/param2 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int session_id = *(int*)param1;
+	const char* remote_ip = (const char*)param2;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", session_id);
+	return send_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_ip);
+}
+
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_FILE_TRANSFER:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		PFILE_TRANSFER_PARAM file_transfer_param = (PFILE_TRANSFER_PARAM)param1; 
+    		assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
+			tx_session_id = file_transfer_param->session_id;
+			if (tx_session_id == -1)
+			{
+				WRITE_ERROR("tx_session_id should NOT be -1");
+				return RET_FAILURE_SYSTEM_API;
+			}			
+			tx_filepath = strdup(file_transfer_param->filepath);
+			if (tx_filepath == NULL)
+			{
+				WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));		
+				return RET_FAILURE_SYSTEM_API;
+			}
+
+    		ret = start_file_transfer();
+    	}
+    	break;
+    	case PARAM_FILE_TRANSFER_DONE:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		PFILE_TRANSFER_DONE_PARAM file_transfer_done_param = (PFILE_TRANSFER_DONE_PARAM)param1; 
+    		WRITE_FORMAT_INFO("The file transferring to follower[%s] complete", file_transfer_done_param->node_ip);
+// Delete a file transfer channel
+    		string follower_ip(file_transfer_done_param->node_ip);
+			ret = remove_file_channel(follower_ip);
+    		if (CHECK_FAILURE(ret))
+    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", file_transfer_done_param->node_ip, GetErrorDescription(ret));
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -753,6 +1002,34 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     		int& cluster_node_count_param = *(int*)param1;
             pthread_mutex_lock(&node_channel_mtx);
             cluster_node_count_param = cluster_map.size();
+            pthread_mutex_unlock(&node_channel_mtx);
+    	}
+    	break;
+    	case PARAM_CLUSTER_IP2ID:
+    	{
+    		if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1/param2 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		string& cluster_node_ip_param = *(string*)param1;
+    		int& cluster_node_id_param = *(int*)param2;
+            pthread_mutex_lock(&node_channel_mtx);
+            ret = cluster_map.get_node_id(cluster_node_ip_param, cluster_node_id_param);
+            pthread_mutex_unlock(&node_channel_mtx);
+    	}
+    	break;
+    	case PARAM_CLUSTER_ID2IP:
+    	{
+    		if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1/param2 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		int& cluster_node_id_param = *(int*)param1;
+    		string& cluster_node_ip_param = *(string*)param2;
+            pthread_mutex_lock(&node_channel_mtx);
+            ret = cluster_map.get_node_ip(cluster_node_id_param, cluster_node_ip_param);
             pthread_mutex_unlock(&node_channel_mtx);
     	}
     	break;
@@ -824,6 +1101,8 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     		string follower_ip(((PNOTIFY_NODE_DIE_CFG)notify_cfg)->get_remote_ip());
     		WRITE_FORMAT_WARN("The follower[%s] dies, remove the node from the cluster", follower_ip.c_str());
     		ret = remove_follower(follower_ip);
+    		if (CHECK_FAILURE(ret))
+    			WRITE_FORMAT_ERROR("Fails to remove follower[%s], due to: %s", follower_ip.c_str(), GetErrorDescription(ret));
     	}
     	break;
     	default:
@@ -998,6 +1277,138 @@ void LeaderNode::listen_thread_cleanup_handler(void* pvoid)
 }
 
 void LeaderNode::listen_thread_cleanup_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the listen thread......", listen_thread_tag);
+	map<std::string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
+	while (iter != node_channel_map.end())
+	{
+		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
+		iter++;
+		if (node_channel != NULL)
+		{
+			node_channel->deinitialize();
+			delete node_channel;
+			node_channel = NULL;
+		}
+	}
+	node_channel_map.clear();
+}
+
+void* LeaderNode::tx_listen_thread_handler(void* pvoid)
+{
+	LeaderNode* pthis = (LeaderNode*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+
+// // https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+//     if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+//     {
+//     	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+//     	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
+//     }
+
+// // PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+//     // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+//     // thread receive cancel message.
+//     if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+//     {
+//     	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+//     	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
+// 	}
+
+	if (CHECK_SUCCESS(pthis->tx_listen_thread_ret))
+	{
+		pthread_cleanup_push(tx_listen_thread_cleanup_handler, pthis);
+		pthis->tx_listen_thread_ret = pthis->tx_listen_thread_handler_internal();
+		pthread_cleanup_pop(1);
+	}
+
+// No need to send data to pthread_join
+	// pthread_exit((CHECK_SUCCESS(pthis->listen_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->listen_thread_ret)));
+	pthread_exit(NULL);
+}
+
+unsigned short LeaderNode::tx_listen_thread_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] The worker thread of file transfer listening socket is running", tx_listen_thread_tag);
+	unsigned short ret = RET_SUCCESS;
+
+	struct sockaddr client_addr;
+	socklen_t client_addr_len = sizeof(client_addr);
+	while (tx_listen_exit == 0)
+	{
+		struct timeval tv;
+		fd_set sock_set;
+		tv.tv_sec = WAIT_CONNECTION_TIMEOUT;
+		tv.tv_usec = 0;
+		FD_ZERO(&sock_set);
+		FD_SET(tx_socketfd, &sock_set);
+		int res = select(tx_socketfd + 1, &sock_set, NULL, NULL, &tv);
+		if (res < 0 && errno != EINTR)
+		{
+			WRITE_FORMAT_ERROR("[%s] select() fails, due to: %s",tx_listen_thread_tag, strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+		else if (res == 0)
+		{
+			// WRITE_DEBUG("Accept timeout");
+			usleep(100000);
+			continue;
+		}		
+// Follower connect to Leader
+		int client_socketfd = accept(tx_socketfd, &client_addr, (socklen_t*)&client_addr_len);
+		if (client_socketfd < 0)
+		{
+			WRITE_FORMAT_ERROR("[%s] accept() fails, due to: %s", tx_listen_thread_tag, strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+		// deal with both IPv4 and IPv6:
+		struct sockaddr_in *client_s = (struct sockaddr_in *)&client_addr;
+		// PRINT("family: %d, port: %d\n", s->sin_family, ntohs(s->sin_port));
+//		port = ntohs(s->sin_port);
+		char client_ip[INET_ADDRSTRLEN + 1];
+		inet_ntop(AF_INET, &client_s->sin_addr, client_ip, sizeof(client_ip));
+		WRITE_FORMAT_INFO("[%s] Receiver[%s] request connecting to the Sender", tx_listen_thread_tag, client_ip);
+		// PRINT("Follower[%s] connects to the Leader\n", ip);
+// Initialize a channel for file transfer between follower
+		PFILE_CHANNEL file_channel = new FileChannel(this);
+		if (file_channel == NULL)
+		{
+			WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: file_channel", tx_listen_thread_tag);
+			// pthread_mutex_unlock(&node_channel_mtx);
+			return RET_FAILURE_INSUFFICIENT_MEMORY;
+		}
+		WRITE_FORMAT_INFO("[%s] Initialize the File Channel between Receiver[%s] and Sender", tx_listen_thread_tag, client_ip);
+		ret = file_channel->initialize(tx_filepath, local_ip, client_ip, client_socketfd, true, tx_session_id);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		sleep(3);
+// Start to transfer the file
+		ret = file_channel->request_transfer();
+		if (CHECK_FAILURE(ret))
+			return ret;
+
+// Add a channel for file transfer
+		pthread_mutex_lock(&file_channel_mtx);
+		file_channel_map[client_ip] = file_channel;
+		pthread_mutex_unlock(&file_channel_mtx);
+		PRINT("[%s] The File Channel between Receiver[%s] and Sender is Established......\n", tx_listen_thread_tag, client_ip);
+		WRITE_FORMAT_INFO("[%s] Follower File Channel[%s] connects to the Leader...... successfully !!!", tx_listen_thread_tag, client_ip);
+	}
+
+	WRITE_FORMAT_INFO("[%s] The worker thread of file trasnfer listening socket is dead", tx_listen_thread_tag);
+	return ret;
+}
+
+void LeaderNode::tx_listen_thread_cleanup_handler(void* pvoid)
+{
+	LeaderNode* pthis = (LeaderNode*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+	pthis->tx_listen_thread_cleanup_handler_internal();
+}
+
+void LeaderNode::tx_listen_thread_cleanup_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the listen thread......", listen_thread_tag);
 	map<std::string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
