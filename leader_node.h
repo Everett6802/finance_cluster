@@ -56,6 +56,7 @@ private:
 	unsigned short remove_file_channel(const std::string& node_ip);
 	unsigned short become_file_sender();
 	unsigned short start_file_transfer();
+	unsigned short stop_file_transfer();
 // events
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);

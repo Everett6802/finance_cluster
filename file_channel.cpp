@@ -380,9 +380,9 @@ OUT:
 // Notify the follower 
 	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_ip.c_str());
 // Close the local file transfer channel
-	FileTransferDoneParam file_transfer_done_param;
-	snprintf(file_transfer_done_param.node_ip, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_ip.c_str());
-	observer->set(PARAM_FILE_TRANSFER_DONE, (void*)&file_transfer_done_param);
+	NodeFileTransferDoneParam node_file_transfer_done_param;
+	snprintf(node_file_transfer_done_param.node_ip, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_ip.c_str());
+	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
 	
 	return ret;
 }

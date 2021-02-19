@@ -834,12 +834,12 @@ ClusterFileTransferParam::~ClusterFileTransferParam(){}
 
 //////////////////////////////////////////////////////////
 
-FileTransferDoneParam::FileTransferDoneParam()
+NodeFileTransferDoneParam::NodeFileTransferDoneParam()
 {
 	memset(node_ip, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
 }
 
-FileTransferDoneParam::~FileTransferDoneParam(){}
+NodeFileTransferDoneParam::~NodeFileTransferDoneParam(){}
 
 //////////////////////////////////////////////////////////
 

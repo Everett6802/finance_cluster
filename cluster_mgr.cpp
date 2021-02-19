@@ -677,6 +677,11 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
 				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 				int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
+// Stop the listening thread
+				ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+				if (CHECK_FAILURE(ret))
+					return ret;
+
 				if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 				{
 		    		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));

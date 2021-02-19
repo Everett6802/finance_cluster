@@ -209,6 +209,7 @@ enum ParamType{
 	PARAM_FAKE_ACSPT_STATE,
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
+	PARAM_NODE_FILE_TRANSFER_DONE,
 	PARAM_SIZE
 };
 
@@ -584,15 +585,15 @@ public:
 };
 typedef ClusterFileTransferParam* PCLUSTER_FILE_TRANSFER_PARAM;
 
-class FileTransferDoneParam
+class NodeFileTransferDoneParam
 {
 public:
 	char node_ip[DEF_VERY_SHORT_STRING_SIZE];
 
-	FileTransferDoneParam();
-	~FileTransferDoneParam();
+	NodeFileTransferDoneParam();
+	~NodeFileTransferDoneParam();
 };
-typedef FileTransferDoneParam* PFILE_TRANSFER_DONE_PARAM;
+typedef NodeFileTransferDoneParam* PNODE_FILE_TRANSFER_DONE_PARAM;
 
 ///////////////////////////////////////////////////
 

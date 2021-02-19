@@ -388,6 +388,63 @@ OUT:
 	return ret;
 }
 
+unsigned short LeaderNode::stop_file_transfer()
+{
+// Restrict only one file transfer process at one time in the cluster
+	unsigned short ret = RET_SUCCESS;
+	if (tx_listen_tid != 0)
+	{
+		pthread_mutex_lock(&tx_mtx);
+// Notify the worker thread it's time to exit
+		__sync_fetch_and_add(&tx_listen_exit, 1);
+		usleep(100000);
+// Check tx listen thread alive
+		// bool listen_thread_alive = false;
+		if (tx_listen_tid != 0)
+		{
+			int kill_ret = pthread_kill(tx_listen_tid, 0);
+			if(kill_ret == ESRCH)
+			{
+				WRITE_WARN("The worker thread of tx listening did NOT exist......");
+				ret = RET_SUCCESS;
+			}
+			else if(kill_ret == EINVAL)
+			{
+				WRITE_ERROR("The signal to the worker thread of tx listening is invalid");
+				ret = RET_FAILURE_HANDLE_THREAD;
+			}
+			else
+			{
+				WRITE_DEBUG("The signal to the worker thread of tx listening is STILL alive");
+// Kill the thread
+			    if (pthread_cancel(tx_listen_tid) != 0)
+			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of tx listening, due to: %s", strerror(errno));
+				usleep(100000);
+			}
+		}
+
+		WRITE_DEBUG("Wait for the worker thread of tx listening's death...");
+
+// Wait for tx listen thread's death
+		pthread_join(tx_listen_tid, NULL);
+		if (CHECK_SUCCESS(tx_listen_thread_ret))
+			WRITE_DEBUG("Wait for the worker thread of tx listening's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of tx listening's death, due to: %s", GetErrorDescription(tx_listen_thread_ret));
+			ret = tx_listen_thread_ret;
+		}
+
+		pthread_mutex_unlock(&tx_mtx);
+	}
+	else
+	{
+		WRITE_INFO("No file transfer is in process");
+	}
+
+	return ret;
+}
+
 unsigned short LeaderNode::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
@@ -948,18 +1005,23 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     	break;
     	case PARAM_FILE_TRANSFER_DONE:
     	{
+    		ret = stop_file_transfer();
+    	}
+    	break;
+    	case PARAM_NODE_FILE_TRANSFER_DONE:
+    	{
     		if (param1 == NULL)
     		{
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-    		PFILE_TRANSFER_DONE_PARAM file_transfer_done_param = (PFILE_TRANSFER_DONE_PARAM)param1; 
-    		WRITE_FORMAT_INFO("The file transferring to follower[%s] complete", file_transfer_done_param->node_ip);
+    		PNODE_FILE_TRANSFER_DONE_PARAM node_file_transfer_done_param = (PNODE_FILE_TRANSFER_DONE_PARAM)param1; 
+    		WRITE_FORMAT_INFO("The file transferring to follower[%s] complete", node_file_transfer_done_param->node_ip);
 // Delete a file transfer channel
-    		string follower_ip(file_transfer_done_param->node_ip);
+    		string follower_ip(node_file_transfer_done_param->node_ip);
 			ret = remove_file_channel(follower_ip);
     		if (CHECK_FAILURE(ret))
-    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", file_transfer_done_param->node_ip, GetErrorDescription(ret));
+    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", node_file_transfer_done_param->node_ip, GetErrorDescription(ret));
     	}
     	break;
     	default:
@@ -1300,21 +1362,21 @@ void* LeaderNode::tx_listen_thread_handler(void* pvoid)
 	if (pthis == NULL)
 		throw std::invalid_argument("pvoid should NOT be NULL");
 
-// // https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
-//     if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
-//     {
-//     	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
-//     	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
-//     }
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
 
-// // PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
-//     // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
-//     // thread receive cancel message.
-//     if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
-//     {
-//     	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
-//     	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
-// 	}
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->tx_listen_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
 
 	if (CHECK_SUCCESS(pthis->tx_listen_thread_ret))
 	{

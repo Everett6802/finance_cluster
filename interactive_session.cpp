@@ -38,7 +38,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"get_system_info",
 	// "get_node_system_info",
 	"get_simulator_version",
-	"trasnfer_simulator_package",
+	"transfer_simulator_package",
 	"install_simulator",
 	"start_fake_acspt",
 	"stop_fake_acspt",
