@@ -205,7 +205,7 @@ unsigned short FollowerNode::connect_file_sender()
 	sockaddr_in client_address;
 	memset(&client_address, 0x0, sizeof(struct sockaddr_in));
 	client_address.sin_family = AF_INET;
-	client_address.sin_port = htons(CLUSTER_PORT_NO);
+	client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
 	client_address.sin_addr.s_addr = inet_addr(cluster_ip);
 	int res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
 	if (res < 0)

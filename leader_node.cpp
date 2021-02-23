@@ -939,17 +939,18 @@ unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2,
 unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: filepath
 // Message format:
 // EventType | filepath | EOD
-	if (param1 == NULL)
-	{
-		WRITE_ERROR("param1 should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;
-	}
+	// if (param1 == NULL)
+	// {
+	// 	WRITE_ERROR("param1 should NOT be NULL");
+	// 	return RET_FAILURE_INVALID_ARGUMENT;
+	// }
 
-	const char* filepath = (const char*)param1;
-	return send_data(MSG_REQUEST_FILE_TRANSFER, filepath);
+	// const char* filepath = (const char*)param1;
+	assert(tx_filepath != NULL && "tx_filepath should NOT be NULL");
+	WRITE_DEBUG("Notify the follower to establish the connection for file transfer");
+	return send_data(MSG_REQUEST_FILE_TRANSFER, tx_filepath);
 }
 
 unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param2, void* param3)
@@ -999,8 +1000,14 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 				WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));		
 				return RET_FAILURE_SYSTEM_API;
 			}
-
+// Start a thread for listening the connection request of file tranfer from the folower
     		ret = start_file_transfer();
+			if (CHECK_FAILURE(ret))
+				return ret;
+// Notify the folower to connect to the sender and become a receiver
+			ret = send_request_file_transfer();
+			if (CHECK_FAILURE(ret))
+				return ret;	
     	}
     	break;
     	case PARAM_FILE_TRANSFER_DONE:

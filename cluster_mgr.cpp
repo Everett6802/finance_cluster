@@ -651,7 +651,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 					WRITE_ERROR("No follwer nodes in the cluster, no need to transfer the simulator package");
 					return RET_SUCCESS;
 				}
-// Start the file transfer
+// Start the file transfer sender
 				FileTransferParam file_transfer_param;
 				file_transfer_param.session_id = cluster_file_transfer_param->session_id;
 				file_transfer_param.filepath = new char[strlen(filepath) + 1];
@@ -664,7 +664,6 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				// printf("Cluster Node Count: %d\n", cluster_node_count);
 // Reset the counter 
 				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 				interactive_session_param[cluster_file_transfer_param->session_id].follower_node_count = cluster_node_count - 1;
