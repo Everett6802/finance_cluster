@@ -451,14 +451,14 @@ unsigned short FileChannel::recv_thread_handler_internal()
 	unsigned short ret = RET_SUCCESS;
 	assert(tx_filepath != NULL && "tx_filepath should be NOT NULL");
 	assert(tx_buf == NULL && "tx_buf should be NULL");
-	tx_fp = fopen(tx_filepath, "rb");
+	tx_fp = fopen(tx_filepath, "wb");
 	if (tx_fp == NULL)
 	{
     	WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
    	}
    	tx_buf = new char[MAX_BUF_SIZE];
-   	if (tx_buf != NULL)
+   	if (tx_buf == NULL)
    	{
     	WRITE_ERROR("Fail to allocate memory: tx_buf");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
