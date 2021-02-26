@@ -1453,6 +1453,7 @@ unsigned short LeaderNode::tx_listen_thread_handler_internal()
 			return ret;
 		sleep(3);
 // Start to transfer the file
+		WRITE_FORMAT_DEBUG("[%s] Notify Receiver[%s] to start to transfer data...", tx_listen_thread_tag, client_ip);
 		ret = file_channel->request_transfer();
 		if (CHECK_FAILURE(ret))
 			return ret;

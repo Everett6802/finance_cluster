@@ -355,6 +355,8 @@ unsigned short FileChannel::send_thread_handler_internal()
 			ret = RET_FAILURE_SYSTEM_API;
 			goto OUT;
 	   	}
+	   	else
+	   		WRITE_FORMAT_DEBUG("Read %d bytes from the file for the Node[%s]", read_bytes, remote_ip.c_str());
 // Send data to the remote
 		start_pos = 0;
 		write_to_byte = read_bytes;
@@ -367,6 +369,8 @@ unsigned short FileChannel::send_thread_handler_internal()
 				ret = RET_FAILURE_SYSTEM_API;
 				goto OUT;
 			}
+		   	else
+		   		WRITE_FORMAT_DEBUG("Write %d bytes to the Node[%s]", write_bytes, remote_ip.c_str());
 			start_pos += write_bytes;
 			write_to_byte -= write_bytes;
 		}
@@ -445,8 +449,8 @@ unsigned short FileChannel::recv_thread_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
 	unsigned short ret = RET_SUCCESS;
-	assert(tx_filepath != NULL && "tx_filepath should NOT be NULL");
-	assert(tx_buf != NULL && "tx_buf should NOT be NULL");
+	assert(tx_filepath != NULL && "tx_filepath should be NOT NULL");
+	assert(tx_buf == NULL && "tx_buf should be NULL");
 	tx_fp = fopen(tx_filepath, "rb");
 	if (tx_fp == NULL)
 	{

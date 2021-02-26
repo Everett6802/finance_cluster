@@ -407,7 +407,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		}
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
-			// Read the data from the remote
+// Read the data from the remote
 			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
 			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
@@ -426,7 +426,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			}
 			else
 			{
-// // Parse the message
+// Parse the message
 				ret = node_message_parser.parse(buf);
 				if (CHECK_FAILURE(ret))
 				{
