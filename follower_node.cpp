@@ -970,6 +970,7 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     {
     	case NOTIFY_ABORT_FILE_TRANSFER:
     	{
+    		WRITE_DEBUG("File transfer ABORT !!!");
     		assert(file_channel != NULL && "file_channel should NOT be NULL");
 			ret = file_channel->deinitialize();
 			delete file_channel;
