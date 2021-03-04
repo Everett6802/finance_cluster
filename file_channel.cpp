@@ -104,6 +104,7 @@ unsigned short FileChannel::initialize(const char* filepath, const char* channel
 
 unsigned short FileChannel::deinitialize()
 {
+	WRITE_DEBUG("Release resource in FileChannel......");
 	unsigned short ret = RET_SUCCESS;
 	// int kill_ret;
 	__sync_fetch_and_add(&exit, 1);
