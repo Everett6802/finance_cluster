@@ -327,16 +327,18 @@ unsigned short FileChannel::send_thread_handler_internal()
 	WRITE_FORMAT_INFO("[%s] The worker thread of sending message is running", thread_tag);
 	unsigned short ret = RET_SUCCESS;
 	assert(tx_filepath != NULL && "tx_filepath should NOT be NULL");
-	assert(tx_buf != NULL && "tx_buf should NOT be NULL");
+	assert(tx_buf == NULL && "tx_buf should be NULL");
 
-	FILE* fp = fopen(tx_filepath, "rb");
-	if (fp == NULL)
+	tx_fp = fopen(tx_filepath, "rb");
+	if (tx_fp == NULL)
 	{
     	WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
    	}
-   	char* tx_buf = new char[MAX_BUF_SIZE];
-   	if (tx_buf != NULL)
+   	else
+   		WRITE_FORMAT_DEBUG("Open the file for being transferred: %s", tx_filepath);
+   	tx_buf = new char[MAX_BUF_SIZE];
+   	if (tx_buf == NULL)
    	{
     	WRITE_ERROR("Fail to allocate memory: tx_buf");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
@@ -345,7 +347,8 @@ unsigned short FileChannel::send_thread_handler_internal()
    	size_t write_bytes;
    	int start_pos = 0;
 	size_t write_to_byte;
-   	while (!feof(fp))
+	WRITE_FORMAT_DEBUG("Start to read data from the file for the Node[%s]...", remote_ip.c_str());
+   	while (!feof(tx_fp))
    	{
 // Read data from the file
    		read_bytes = fread(tx_buf, sizeof(char), MAX_BUF_SIZE, tx_fp);
