@@ -1480,18 +1480,18 @@ void LeaderNode::tx_listen_thread_cleanup_handler(void* pvoid)
 
 void LeaderNode::tx_listen_thread_cleanup_handler_internal()
 {
-	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the listen thread......", listen_thread_tag);
-	map<std::string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
-	while (iter != node_channel_map.end())
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the tx listen thread......", listen_thread_tag);
+	map<std::string, PFILE_CHANNEL>::iterator iter = file_channel_map.begin();
+	while (iter != file_channel_map.end())
 	{
-		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
+		PFILE_CHANNEL file_channel = (PFILE_CHANNEL)(iter->second);
 		iter++;
-		if (node_channel != NULL)
+		if (file_channel != NULL)
 		{
-			node_channel->deinitialize();
-			delete node_channel;
-			node_channel = NULL;
+			file_channel->deinitialize();
+			delete file_channel;
+			file_channel = NULL;
 		}
 	}
-	node_channel_map.clear();
+	file_channel_map.clear();
 }

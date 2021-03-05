@@ -10,7 +10,7 @@ using namespace std;
 
 const char* FileChannel::thread_tag = "File Channel Thread";
 const int FileChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
-const long FileChannel::MAX_BUF_SIZE = 1024 * 10;
+const long FileChannel::MAX_BUF_SIZE = 1024 * 100;
 
 FileChannel::FileChannel(PINODE node) :
 	exit(0),
@@ -121,42 +121,42 @@ unsigned short FileChannel::deinitialize()
 			int kill_ret = pthread_kill(send_tid, 0);
 			if(kill_ret == ESRCH)
 			{
-				WRITE_WARN("The worker thread of sending message did NOT exist......");
+				WRITE_WARN("The worker thread of sending file did NOT exist......");
 				ret = RET_SUCCESS;
 				// goto OUT;
 			}
 			else if(kill_ret == EINVAL)
 			{
-				WRITE_ERROR("The signal to the worker thread of sending message is invalid");
+				WRITE_ERROR("The signal to the worker thread of sending file is invalid");
 				ret = RET_FAILURE_HANDLE_THREAD;
 				// goto OUT;
 			}
 			else
 			{
-				WRITE_DEBUG("The signal to the worker thread of sending message is STILL alive");
+				WRITE_DEBUG("The signal to the worker thread of sending file is STILL alive");
 	// Kill the thread
 			    if (pthread_cancel(send_tid) != 0)
-			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of sending message, due to: %s", strerror(errno));
+			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of sending file, due to: %s", strerror(errno));
 				usleep(100000);
 // Wait for send thread's death
-				WRITE_DEBUG("Wait for the worker thread of sending message's death...");
+				WRITE_DEBUG("Wait for the worker thread of sending file's death...");
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'send_status' variable accesses the illegal address
 				// void* send_status;
 				// pthread_join(send_tid, &send_status);
 				// if (send_status == NULL)
-				// 	WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+				// 	WRITE_DEBUG("Wait for the worker thread of sending file's death Successfully !!!");
 				// else
 				// {
-				// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)send_status);
+				// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending file's death, due to: %s", (char*)send_status);
 				// 	ret = send_thread_ret;
 				// }
 				pthread_join(send_tid, NULL);
 				if (CHECK_SUCCESS(send_thread_ret))
-					WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+					WRITE_DEBUG("Wait for the worker thread of sending file's death Successfully !!!");
 				else
 				{
-					WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", GetErrorDescription(send_thread_ret));
+					WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending file's death, due to: %s", GetErrorDescription(send_thread_ret));
 					ret = send_thread_ret;
 				}
 			}
@@ -171,41 +171,41 @@ unsigned short FileChannel::deinitialize()
 			int kill_ret = pthread_kill(recv_tid, 0);
 			if(kill_ret == ESRCH)
 			{
-				WRITE_WARN("The worker thread of receiving message did NOT exist......");
+				WRITE_WARN("The worker thread of receiving file did NOT exist......");
 				ret = RET_SUCCESS;
 				// goto OUT;
 			}
 			else if(kill_ret == EINVAL)
 			{
-				WRITE_ERROR("The signal to the worker thread of receiving message is invalid");
+				WRITE_ERROR("The signal to the worker thread of receiving file is invalid");
 				ret = RET_FAILURE_HANDLE_THREAD;
 				// goto OUT;
 			}		
 			else
 			{
-				WRITE_DEBUG("The signal to the worker thread of receiving message is STILL alive");
+				WRITE_DEBUG("The signal to the worker thread of receiving file is STILL alive");
 			    if (pthread_cancel(recv_tid) != 0)
-			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
+			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving file, due to: %s", strerror(errno));
 				usleep(100000);
 // Wait for recv thread's death
-				WRITE_DEBUG("Wait for the worker thread of receiving message's death...");
+				WRITE_DEBUG("Wait for the worker thread of receiving file's death...");
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'recv_status' variable accesses the illegal address
 				// void* recv_status;
 				// pthread_join(recv_tid, &recv_status);
 				// if (recv_status == NULL)
-				// 	WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+				// 	WRITE_DEBUG("Wait for the worker thread of receiving file's death Successfully !!!");
 				// else
 				// {
-				// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)recv_status);
+				// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving file's death, due to: %s", (char*)recv_status);
 				// 	ret = recv_thread_ret;
 				// }
 				pthread_join(recv_tid, NULL);
 				if (CHECK_SUCCESS(recv_thread_ret))
-					WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+					WRITE_DEBUG("Wait for the worker thread of receiving file's death Successfully !!!");
 				else
 				{
-					WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", GetErrorDescription(recv_thread_ret));
+					WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving file's death, due to: %s", GetErrorDescription(recv_thread_ret));
 					ret = recv_thread_ret;
 				}
 			}

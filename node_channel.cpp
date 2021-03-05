@@ -68,6 +68,7 @@ unsigned short NodeChannel::initialize(int channel_socket, const char* channel_i
 
 unsigned short NodeChannel::deinitialize()
 {
+	WRITE_DEBUG("Release resource in NodeChannel......");
 	unsigned short ret = RET_SUCCESS;
 	// int kill_ret;
 	__sync_fetch_and_add(&exit, 1);
