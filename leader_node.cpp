@@ -428,7 +428,10 @@ unsigned short LeaderNode::stop_file_transfer()
 // Wait for tx listen thread's death
 		pthread_join(tx_listen_tid, NULL);
 		if (CHECK_SUCCESS(tx_listen_thread_ret))
+		{
 			WRITE_DEBUG("Wait for the worker thread of tx listening's death Successfully !!!");
+			tx_listen_tid = 0;
+		}
 		else
 		{
 			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of tx listening's death, due to: %s", GetErrorDescription(tx_listen_thread_ret));
