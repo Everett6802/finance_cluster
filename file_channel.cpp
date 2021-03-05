@@ -349,6 +349,8 @@ unsigned short FileChannel::send_thread_handler_internal()
    	int start_pos = 0;
 	size_t write_to_byte;
 	WRITE_FORMAT_DEBUG("Start to read data from the file for the Node[%s]...", remote_ip.c_str());
+   	int read_cnt = 0;
+   	int send_cnt = 0;
    	while (!feof(tx_fp))
    	{
 // Read data from the file
@@ -360,7 +362,7 @@ unsigned short FileChannel::send_thread_handler_internal()
 			goto OUT;
 	   	}
 	   	else
-	   		WRITE_FORMAT_DEBUG("Read %d bytes from the file for the Node[%s]", read_bytes, remote_ip.c_str());
+	   		WRITE_FORMAT_DEBUG("Read %d bytes from the file for the Node[%s]... %d", read_bytes, remote_ip.c_str(), ++read_cnt);
 // Send data to the remote
 		start_pos = 0;
 		write_to_byte = read_bytes;
@@ -374,7 +376,7 @@ unsigned short FileChannel::send_thread_handler_internal()
 				goto OUT;
 			}
 		   	else
-		   		WRITE_FORMAT_DEBUG("Write %d bytes to the Node[%s]", write_bytes, remote_ip.c_str());
+		   		WRITE_FORMAT_DEBUG("Send %d bytes to the Node[%s]... %d", write_bytes, remote_ip.c_str(), ++send_cnt);
 			start_pos += write_bytes;
 			write_to_byte -= write_bytes;
 		}
@@ -507,24 +509,29 @@ unsigned short FileChannel::recv_thread_handler_internal()
 			}
 			else
 			{
+				WRITE_FORMAT_DEBUG("Recv %d bytes from the Node[%s]", read_bytes, remote_ip.c_str());
 // Write data from into file
 // When using fwrite() for record output, set size to 1 and count to 
 // the length of the record to obtain the number of bytes written. 
 		   		write_bytes = fwrite(tx_buf, sizeof(char), read_bytes, tx_fp);
 				if (read_bytes < 0)
 				{
-			    	WRITE_FORMAT_ERROR("Error occurs while writing file for the Node[%s], due to: %s", remote_ip.c_str(), strerror(errno));
+			    	WRITE_FORMAT_ERROR("Error occurs while writing file, due to: %s", strerror(errno));
 					ret = RET_FAILURE_SYSTEM_API;
 					goto OUT;
 			   	}
 			   	else if (write_bytes != read_bytes)
 				{
-			    	WRITE_FORMAT_ERROR("Incorrect data size while writing file for the Node[%s], expected: %d, actual: %d", remote_ip.c_str(), read_bytes, write_bytes);
+			    	WRITE_FORMAT_ERROR("Incorrect data size while writing file, expected: %d, actual: %d", read_bytes, write_bytes);
 					ret = RET_FAILURE_SYSTEM_API;
 					goto OUT;
 			   	}
+			   	else
+			   		WRITE_FORMAT_DEBUG("Write %d bytes to the file", write_bytes);
 			}
 		}
+// A value of 0 indicates that the call timed out and 
+// no file descriptors were ready
 		// else
 		// {
 		// 	WRITE_DEBUG("Time out. Nothing happen...");
