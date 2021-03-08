@@ -372,7 +372,7 @@ unsigned short LeaderNode::start_file_transfer()
 		}
 		else
 		{
-			WRITE_ERROR("Another file transfer is in process");
+			WRITE_FORMAT_ERROR("Another file transfer is in process[2], tx_listen_tid: %d", tx_listen_tid);
 			ret = RET_WARN_FILE_TRANSFER_IN_PROCESS;
 			goto OUT;
 		}
@@ -381,7 +381,7 @@ OUT:
 	}
 	else
 	{
-		WRITE_ERROR("Another file transfer is in process");
+		WRITE_FORMAT_ERROR("Another file transfer is in process[1], tx_listen_tid: %d", tx_listen_tid);
 		ret = RET_WARN_FILE_TRANSFER_IN_PROCESS;
 	}
 
@@ -427,14 +427,14 @@ unsigned short LeaderNode::stop_file_transfer()
 
 // Wait for tx listen thread's death
 		pthread_join(tx_listen_tid, NULL);
+		tx_listen_tid = 0;
 		if (CHECK_SUCCESS(tx_listen_thread_ret))
 		{
-			WRITE_DEBUG("Wait for the worker thread of tx listening's death Successfully !!!");
-			tx_listen_tid = 0;
+			WRITE_FORMAT_DEBUG("Wait for the worker thread[tx_listen_tid: %d] of tx listening's death Successfully !!!", tx_listen_tid);
 		}
 		else
 		{
-			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of tx listening's death, due to: %s", GetErrorDescription(tx_listen_thread_ret));
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread[tx_listen_tid: %d] of tx listening's death, due to: %s", tx_listen_tid, GetErrorDescription(tx_listen_thread_ret));
 			ret = tx_listen_thread_ret;
 		}
 
@@ -1497,4 +1497,9 @@ void LeaderNode::tx_listen_thread_cleanup_handler_internal()
 		}
 	}
 	file_channel_map.clear();
+	if (tx_socketfd != 0)
+	{
+		close(tx_socketfd);
+		tx_socketfd = 0;
+	}
 }
