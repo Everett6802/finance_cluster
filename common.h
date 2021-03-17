@@ -209,7 +209,7 @@ enum ParamType{
 	PARAM_FAKE_ACSPT_STATE,
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
-	PARAM_NODE_FILE_TRANSFER_DONE,
+	// PARAM_NODE_FILE_TRANSFER_DONE,
 	PARAM_SIZE
 };
 
@@ -227,6 +227,7 @@ enum NotifyType{
 	NOTIFY_GET_FAKE_ACSPT_STATE,
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
+	NOTIFY_SEND_FILE_DONE,
 	NOTIFY_SIZE
 };
 
@@ -585,16 +586,6 @@ public:
 };
 typedef ClusterFileTransferParam* PCLUSTER_FILE_TRANSFER_PARAM;
 
-class NodeFileTransferDoneParam
-{
-public:
-	char node_ip[DEF_VERY_SHORT_STRING_SIZE];
-
-	NodeFileTransferDoneParam();
-	~NodeFileTransferDoneParam();
-};
-typedef NodeFileTransferDoneParam* PNODE_FILE_TRANSFER_DONE_PARAM;
-
 ///////////////////////////////////////////////////
 
 class NotifyCfg
@@ -783,6 +774,21 @@ public:
 	unsigned short get_return_code()const;
 };
 typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
+
+///////////////////////////
+
+class NotifySendFileDoneCfg : public NotifyCfg
+{
+private:
+	char* remote_ip;
+
+public:
+	NotifySendFileDoneCfg(const void* param, size_t param_size);
+	virtual ~NotifySendFileDoneCfg();
+
+	const char* get_remote_ip()const;
+};
+typedef NotifySendFileDoneCfg* PNOTIFY_SEND_FILE_DONE_CFG;
 
 ///////////////////////////////////////////////////
 

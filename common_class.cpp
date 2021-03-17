@@ -834,15 +834,6 @@ ClusterFileTransferParam::~ClusterFileTransferParam(){}
 
 //////////////////////////////////////////////////////////
 
-NodeFileTransferDoneParam::NodeFileTransferDoneParam()
-{
-	memset(node_ip, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
-}
-
-NodeFileTransferDoneParam::~NodeFileTransferDoneParam(){}
-
-//////////////////////////////////////////////////////////
-
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
 	notify_param(NULL),
@@ -1289,6 +1280,27 @@ int NotifyFileTransferCompleteCfg::get_cluster_id()const
 unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
 {
 	return return_code;
+}
+
+
+//////////////////////////////////////////////////////////
+
+NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_SEND_FILE_DONE, param, param_size)
+{
+	// printf("NotifyFileTransferAbortCfg()\n");
+	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	remote_ip = (char*)notify_param;
+}
+
+NotifySendFileDoneCfg::~NotifySendFileDoneCfg()
+{
+	remote_ip = NULL;
+}
+
+const char* NotifySendFileDoneCfg::get_remote_ip()const
+{
+	return remote_ip;
 }
 
 //////////////////////////////////////////////////////////

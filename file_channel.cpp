@@ -134,7 +134,7 @@ unsigned short FileChannel::deinitialize()
 			else
 			{
 				WRITE_DEBUG("The signal to the worker thread of sending file is STILL alive");
-	// Kill the thread
+// Kill the thread
 			    if (pthread_cancel(send_tid) != 0)
 			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of sending file, due to: %s", strerror(errno));
 				usleep(100000);
@@ -384,16 +384,25 @@ unsigned short FileChannel::send_thread_handler_internal()
    	}
 
 OUT:
-	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is dead", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is done. Notify the follower", thread_tag);
 
 	assert(observer != NULL && "observer should NOT be NULL");
 // Notify the follower 
 	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_ip.c_str());
-// Close the local file transfer channel
-	NodeFileTransferDoneParam node_file_transfer_done_param;
-	snprintf(node_file_transfer_done_param.node_ip, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_ip.c_str());
-	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
-	
+// // Close the local file transfer channel
+// 	NodeFileTransferDoneParam node_file_transfer_done_param;
+// 	snprintf(node_file_transfer_done_param.node_ip, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_ip.c_str());
+// 	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
+// Close the parent to close the local file transfer channel
+	size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(remote_ip.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_SEND_FILE_DONE, notify_cfg);
+	SAFE_RELEASE(notify_cfg);
+
+	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is dead", thread_tag);	
 	return ret;
 }
 

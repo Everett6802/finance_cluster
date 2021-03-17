@@ -248,6 +248,7 @@ unsigned short LeaderNode::remove_follower(const string& node_ip)
 
 unsigned short LeaderNode::remove_file_channel(const string& node_ip)
 {
+	WRITE_FORMAT_DEBUG("Try to remove the file channel[%s]", node_ip.c_str());
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&file_channel_mtx);
 	map<string, PFILE_CHANNEL>::iterator iter = file_channel_map.find(node_ip);
@@ -257,15 +258,17 @@ unsigned short LeaderNode::remove_file_channel(const string& node_ip)
 		pthread_mutex_unlock(&file_channel_mtx);
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
+	else
+		WRITE_FORMAT_DEBUG("The file channel to %s FOUND. Release the resource...", node_ip.c_str());
 	PFILE_CHANNEL file_channel = (PFILE_CHANNEL)iter->second;
 	assert(file_channel != NULL && "file_channel should NOT be NULL");
 // Stop the node of the channel
-	file_channel->deinitialize();
+	ret = file_channel->deinitialize();
 	delete file_channel;
 	file_channel = NULL;
 // Remove the node
 	file_channel_map.erase(node_ip);
-	pthread_mutex_unlock(&node_channel_mtx);
+	pthread_mutex_unlock(&file_channel_mtx);
 	
 	return ret;
 }
@@ -428,6 +431,7 @@ unsigned short LeaderNode::stop_file_transfer()
 // Wait for tx listen thread's death
 		pthread_join(tx_listen_tid, NULL);
 		tx_listen_tid = 0;
+		tx_listen_exit = 0;
 		if (CHECK_SUCCESS(tx_listen_thread_ret))
 		{
 			WRITE_FORMAT_DEBUG("Wait for the worker thread[tx_listen_tid: %d] of tx listening's death Successfully !!!", tx_listen_tid);
@@ -1018,22 +1022,22 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     		ret = stop_file_transfer();
     	}
     	break;
-    	case PARAM_NODE_FILE_TRANSFER_DONE:
-    	{
-    		if (param1 == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
-    		PNODE_FILE_TRANSFER_DONE_PARAM node_file_transfer_done_param = (PNODE_FILE_TRANSFER_DONE_PARAM)param1; 
-    		WRITE_FORMAT_INFO("The file transferring to follower[%s] complete", node_file_transfer_done_param->node_ip);
-// Delete a file transfer channel
-    		string follower_ip(node_file_transfer_done_param->node_ip);
-			ret = remove_file_channel(follower_ip);
-    		if (CHECK_FAILURE(ret))
-    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", node_file_transfer_done_param->node_ip, GetErrorDescription(ret));
-    	}
-    	break;
+//     	case PARAM_NODE_FILE_TRANSFER_DONE:
+//     	{
+//     		if (param1 == NULL)
+//     		{
+//     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+//     			return RET_FAILURE_INVALID_ARGUMENT;
+//     		}
+//     		PNODE_FILE_TRANSFER_DONE_PARAM node_file_transfer_done_param = (PNODE_FILE_TRANSFER_DONE_PARAM)param1; 
+//     		WRITE_FORMAT_INFO("The file transferring to follower[%s] complete", node_file_transfer_done_param->node_ip);
+// // Delete a file transfer channel
+//     		string follower_ip(node_file_transfer_done_param->node_ip);
+// 			ret = remove_file_channel(follower_ip);
+//     		if (CHECK_FAILURE(ret))
+//     			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", node_file_transfer_done_param->node_ip, GetErrorDescription(ret));
+//     	}
+//     	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1148,6 +1152,15 @@ unsigned short LeaderNode::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
     	}
     	break;
+    	case NOTIFY_SEND_FILE_DONE:
+    	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		ret = notify_thread->add_event(notify_cfg);
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1175,6 +1188,16 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     		ret = remove_follower(follower_ip);
     		if (CHECK_FAILURE(ret))
     			WRITE_FORMAT_ERROR("Fails to remove follower[%s], due to: %s", follower_ip.c_str(), GetErrorDescription(ret));
+    	}
+    	break;
+      	case NOTIFY_SEND_FILE_DONE:
+    	{
+    		// string follower_ip((char*)notify_cfg->get_notify_param());
+    		string follower_ip(((PNOTIFY_SEND_FILE_DONE_CFG)notify_cfg)->get_remote_ip());
+    		WRITE_FORMAT_WARN("Send file to the follwer[%s] completely, remove the file channel to the follower", follower_ip.c_str());
+			ret = remove_file_channel(follower_ip);
+    		if (CHECK_FAILURE(ret))
+    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", follower_ip.c_str(), GetErrorDescription(ret));
     	}
     	break;
     	default:
@@ -1484,6 +1507,7 @@ void LeaderNode::tx_listen_thread_cleanup_handler(void* pvoid)
 void LeaderNode::tx_listen_thread_cleanup_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the tx listen thread......", listen_thread_tag);
+	pthread_mutex_lock(&file_channel_mtx);
 	map<std::string, PFILE_CHANNEL>::iterator iter = file_channel_map.begin();
 	while (iter != file_channel_map.end())
 	{
@@ -1497,6 +1521,7 @@ void LeaderNode::tx_listen_thread_cleanup_handler_internal()
 		}
 	}
 	file_channel_map.clear();
+	pthread_mutex_unlock(&file_channel_mtx);
 	if (tx_socketfd != 0)
 	{
 		close(tx_socketfd);
