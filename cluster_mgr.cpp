@@ -1301,6 +1301,41 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			}
 		}
 		break;
+		case NOTIFY_APPLY_FAKE_ACSPT_CONFIG:
+		{
+     		assert(node_type != NONE && "node type should be NONE");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			PNOTIFY_FAKE_ACSPT_CONFIG_APPLY_CFG notify_fake_acspt_config_apply_cfg = (PNOTIFY_FAKE_ACSPT_CONFIG_APPLY_CFG)notify_param;
+			assert(notify_fake_acspt_config_apply_cfg != NULL && "notify_fake_acspt_config_apply_cfg should NOT be NULL");
+
+			char* config_line_list_str = strdup(notify_fake_acspt_config_apply_cfg->get_fake_acspt_config_line_list_str());
+			fprintf(stderr, "config_line_list_str: %s\n", config_line_list_str);
+// De-serialize the new fake acspt config
+			char* rest_config_line_list_str = NULL;
+			char* config_line;
+			list<string> new_config_line_list;
+			while ((config_line = strtok_r(config_line_list_str, ",", &rest_config_line_list_str)) != NULL)
+			{
+				string config_line_str(config_line);
+				fprintf(stderr, "parse config_line_str: %s\n", config_line_str.c_str());
+				new_config_line_list.push_back(config_line_str);
+				if (config_line_list_str != NULL)
+					config_line_list_str = NULL;
+			}
+			free(config_line_list_str);
+			config_line_list_str = NULL;
+
+			ret = simulator_handler->apply_new_fake_acspt_config(new_config_line_list);
+			if (CHECK_SUCCESS(ret))
+			{
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					ret = cluster_node->send(MSG_APPLY_FAKE_ACSPT_CONFIG, (void*)notify_fake_acspt_config_apply_cfg->get_fake_acspt_config_line_list_str());
+				}
+			}
+		}
+		break;
 		case NOTIFY_CONTROL_FAKE_ACSPT:
 		{
 			if (!simulator_installed)

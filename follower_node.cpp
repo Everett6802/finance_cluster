@@ -418,6 +418,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_get_system_info,
 		&FollowerNode::recv_get_simulator_version,
 		&FollowerNode::recv_install_simulator,
+		&FollowerNode::recv_apply_fake_acspt_config,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept,
 		&FollowerNode::recv_get_fake_acspt_state,
@@ -444,6 +445,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_get_system_info,
 		&FollowerNode::send_get_simulator_version,
 		&FollowerNode::send_install_simulator,
+		&FollowerNode::send_apply_fake_acspt_config,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept,
 		&FollowerNode::send_get_fake_acspt_state,
@@ -543,6 +545,23 @@ unsigned short FollowerNode::recv_install_simulator(const std::string& message_d
     assert(observer != NULL && "observer should NOT be NULL");
 // Synchronous event
     observer->notify(NOTIFY_INSTALL_SIMULATOR, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
+unsigned short FollowerNode::recv_apply_fake_acspt_config(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: simulator package filepath | EOD
+	unsigned short ret = RET_SUCCESS;
+	const char* fake_acspt_config_line_list_str = (const char*)message_data.c_str();
+	size_t notify_param_size = strlen(fake_acspt_config_line_list_str);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptConfigApplyCfg((void*)fake_acspt_config_line_list_str, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+    observer->notify(NOTIFY_APPLY_FAKE_ACSPT_CONFIG, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 	return ret;
 }
@@ -765,6 +784,8 @@ unsigned short FollowerNode::send_get_simulator_version(void* param1, void* para
 }
 
 unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
+
+unsigned short FollowerNode::send_apply_fake_acspt_config(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_APPLY_FAKE_ACSPT_CONFIG);}
 
 unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
 

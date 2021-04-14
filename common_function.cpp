@@ -103,7 +103,7 @@ unsigned short get_file_line_count(unsigned int &line_count, const char* filepat
 	return RET_SUCCESS;	
 }
 
-unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character)
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character, bool ignore_comment)
 {
 	if (!check_file_exist(filepath))
 	{
@@ -122,7 +122,10 @@ unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char*
 	while (fgets(line_buf, BUF_SIZE, fp) != NULL) 
 	{
 		if (line_buf[0] == '\n' || line_buf[0] == '#')
-			continue;
+		{
+			if (ignore_comment)
+				continue;
+		}
 		last_character_in_string_index = strlen(line_buf) - 1;
 		if (line_buf[last_character_in_string_index] == '\n')
 			line_buf[last_character_in_string_index] = '\0';
@@ -147,6 +150,31 @@ unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list,
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath)
 {
 	return read_config_file_lines_ex(conf_line_list, config_filename, "r", config_folderpath);
+}
+
+unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute, const char* newline_character)
+{
+	FILE* fp = fopen(filepath, file_write_attribute);
+	if (fp == NULL)
+	{
+		STATIC_WRITE_FORMAT_ERROR("Fail to open the file[%s], due to: %s", filepath, strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+	list<string>::const_iterator iter = line_list.cbegin();
+	while (iter != line_list.cend())
+	{
+		const char* line = ((string)*iter).c_str();
+		fputs(line, fp);
+		if (newline_character != NULL)
+			fputs(newline_character, fp);
+		iter++;
+	}
+	if (fp != NULL)
+	{
+		fclose(fp);
+		fp = NULL;
+	}
+	return RET_SUCCESS;
 }
 
 unsigned short get_linux_platform(string& linux_platform)

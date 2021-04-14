@@ -11,6 +11,7 @@ const char* SimulatorHandler::SIMULATOR_SCRIPTS_FOLDER_NAME = "scripts";
 const char* SimulatorHandler::SIMULATOR_VERSION_FILENAME = "VERSION";
 const char* SimulatorHandler::SIMULATOR_BUILD_FILENAME = "BUILD";
 const char* SimulatorHandler::SIMULATOR_UTIL_FILENAME = "simulator_util";
+const char* SimulatorHandler::SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME = "fake_acspt_sim.cfg";
 const char* SimulatorHandler::SIMULATOR_INSTALL_SCRIPT_NAME = "simulator_install.sh";
 const char* SimulatorHandler::FAKE_ACSPT_CONTROL_SCRIPT_NAME = "fake_acspt_control.sh";
 const char* SimulatorHandler::FAKE_USREPT_CONTROL_SCRIPT_NAME = "fake_usrept_control.sh";
@@ -187,21 +188,6 @@ unsigned short SimulatorHandler::get_simulator_version(char* simulator_version, 
 
 unsigned short SimulatorHandler::start_fake_acspt(bool need_reset)
 {
-	// static const int BUF_SIZE = 256;
-	// char cmd[BUF_SIZE + 1];
-	// memset(cmd, 0x0, sizeof(cmd)/sizeof(cmd[0]));
-
-	// // system("fake_acspt.sh clean");
-	// if (need_reset)
-	// {
-	// 	snprintf(cmd, BUF_SIZE, "%s stop", get_script_filepath(FAKE_ACSPT_CONTROL));
-	// 	system(cmd);
-	// 	sleep(3);	
-	// }
-
-	// // system("fake_acspt.sh up");
-	// snprintf(cmd, BUF_SIZE, "%s start", get_script_filepath(FAKE_ACSPT_CONTROL));
-	// system(cmd);
 	if (need_reset)
 		run_script(FAKE_ACSPT_CONTROL, "stop");
 	run_script(FAKE_ACSPT_CONTROL, "start");
@@ -210,35 +196,12 @@ unsigned short SimulatorHandler::start_fake_acspt(bool need_reset)
 
 unsigned short SimulatorHandler::stop_fake_acspt()
 {
-	// static const int BUF_SIZE = 256;
-	// char cmd[BUF_SIZE + 1];
-	// memset(cmd, 0x0, sizeof(cmd)/sizeof(cmd[0]));
-
-	// // system("fake_acspt.sh clean");
-	// snprintf(cmd, BUF_SIZE, "%s stop", get_script_filepath(FAKE_ACSPT_CONTROL));
-	// system(cmd);
 	run_script(FAKE_ACSPT_CONTROL, "stop");
 	return RET_SUCCESS;
 }
 
 unsigned short SimulatorHandler::start_fake_usrept(bool need_reset)
 {
-	// static const int BUF_SIZE = 256;
-	// char cmd[BUF_SIZE + 1];
-	// memset(cmd, 0x0, sizeof(cmd)/sizeof(cmd[0]));
-
-	// // system("fake_acspt.sh clean");
-	// if (need_reset)
-	// {
-	// 	snprintf(cmd, BUF_SIZE, "%s stop", get_script_filepath(FAKE_USREPT_CONTROL));
-	// 	printf("cmd: %s\n", cmd);
-	// 	system(cmd);
-	// 	sleep(3);	
-	// }
-
-	// snprintf(cmd, BUF_SIZE, "%s start", get_script_filepath(FAKE_USREPT_CONTROL));
-	// printf("cmd: %s\n", cmd);
-	// system(cmd);
 	if (need_reset)
 		run_script(FAKE_USREPT_CONTROL, "stop");
 	run_script(FAKE_USREPT_CONTROL, "start");
@@ -247,12 +210,6 @@ unsigned short SimulatorHandler::start_fake_usrept(bool need_reset)
 
 unsigned short SimulatorHandler::stop_fake_usrept()
 {
-	// static const int BUF_SIZE = 256;
-	// char cmd[BUF_SIZE + 1];
-	// memset(cmd, 0x0, sizeof(cmd)/sizeof(cmd[0]));
-
-	// snprintf(cmd, BUF_SIZE, "%s stop", get_script_filepath(FAKE_USREPT_CONTROL));
-	// system(cmd);
 	run_script(FAKE_USREPT_CONTROL, "stop");
 	return RET_SUCCESS;
 }
@@ -323,6 +280,89 @@ unsigned short SimulatorHandler::get_fake_acspt_state(char* fake_acspt_state, in
     }
     strncpy(fake_acspt_state, fake_acspt_state_str.c_str(), fake_acspt_state_size - 1);
 	pclose(fp);
+	return ret;
+}
+
+unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>& new_config_line_list)
+{
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	static const int BUF_SIZE = 256;
+	unsigned short ret = RET_SUCCESS;
+	char fake_acspt_sim_cfg_filepath[BUF_SIZE + 1];
+	char *simulator_scripts_folder_path = NULL;
+	assemble_simulator_sub_folder_path(&simulator_scripts_folder_path, SIMULATOR_SCRIPTS_FOLDER_NAME);
+	memset(fake_acspt_sim_cfg_filepath, 0x0, sizeof(fake_acspt_sim_cfg_filepath) / sizeof(fake_acspt_sim_cfg_filepath[0]));
+	snprintf(fake_acspt_sim_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
+	if (simulator_scripts_folder_path != NULL)
+	{
+		delete[] simulator_scripts_folder_path;
+		simulator_scripts_folder_path = NULL;
+	}
+// Read the config in simulator
+	list<string> simulator_config_line_list;
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath, "r", ',', false);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_sim_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// // Read the new config
+// 	list<string> new_config_line_list;
+// 	ret = read_file_lines_ex(new_config_line_list, new_fake_acspt_config_filepath);
+// 	if (CHECK_FAILURE(ret))
+// 	{
+// 		WRITE_FORMAT_ERROR("Fail to read the new config file[%s], due to: %s", new_fake_acspt_config_filepath, GetErrorDescription(ret));
+// 		return ret;
+// 	}
+// Update the config in simulator
+	fprintf(stderr, "new line length: %d\n", new_config_line_list.size());
+	list<string>::const_iterator iter_new = new_config_line_list.begin();
+	while (iter_new != new_config_line_list.end())
+	{
+		std::size_t found;
+		string line_new = (string)*iter_new;
+		found = line_new.find('=');
+		if (found == std::string::npos)
+		{
+			WRITE_FORMAT_ERROR("Incorrect new configuration format in line: %s", line_new.c_str());
+			ret = RET_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+		fprintf(stderr, "new: %s, %d, found: %d, substr: %s\n", line_new.c_str(), line_new.length(), found, line_new.substr(0, found).c_str());
+		list<string>::iterator iter_simulator = simulator_config_line_list.begin();
+		bool update = false;
+		while (iter_simulator != simulator_config_line_list.end())
+		{
+			string line_simulator = (string)*iter_simulator;
+			fprintf(stderr, "simulator: %s, %d, substr: %s\n", line_simulator.c_str(), line_simulator.length(), line_new.substr(0, found).c_str());
+			if (line_simulator.compare(0, found, line_new.substr(0, found)) == 0)
+			{
+				// str.replace(str.find(str2), str2.length(),"preposition");
+				simulator_config_line_list.insert(iter_simulator, line_new);
+				simulator_config_line_list.erase(iter_simulator);
+				update = true;
+				fprintf(stderr, "FOUND\n");
+				break;
+			}
+			iter_simulator++;
+		}
+		if (!update)
+		{
+			WRITE_FORMAT_ERROR("Undefined config in line: %s", line_new.c_str());
+			ret = RET_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+		iter_new++;
+	}
+	fprintf(stderr, "All Config are applied\n");
+// Write the config in simulator
+	ret = write_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to write the simulator config file[%s], due to: %s", fake_acspt_sim_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
 	return ret;
 }
 

@@ -1101,6 +1101,25 @@ const char* NotifySimulatorInstallCfg::get_simulator_package_filepath()const
 
 ///////////////////////////
 
+NotifyFakeAcsptConfigApplyCfg::NotifyFakeAcsptConfigApplyCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_APPLY_FAKE_ACSPT_CONFIG, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+// De-Serialize:
+	fake_acspt_config_line_list_str = (char*)notify_param;
+}
+
+NotifyFakeAcsptConfigApplyCfg::~NotifyFakeAcsptConfigApplyCfg()
+{
+}
+
+const char* NotifyFakeAcsptConfigApplyCfg::get_fake_acspt_config_line_list_str()const
+{
+	return fake_acspt_config_line_list_str;
+}
+
+///////////////////////////
+
 NotifyFakeAcsptControlCfg::NotifyFakeAcsptControlCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_CONTROL_FAKE_ACSPT, param, param_size)
 {

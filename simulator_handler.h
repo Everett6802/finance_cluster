@@ -17,6 +17,7 @@ class SimulatorHandler : public INotify
 	static const char* SIMULATOR_VERSION_FILENAME;
 	static const char* SIMULATOR_BUILD_FILENAME;
 	static const char* SIMULATOR_UTIL_FILENAME;
+	static const char* SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME;
 	static const char* SIMULATOR_INSTALL_SCRIPT_NAME;
 	static const char* FAKE_ACSPT_CONTROL_SCRIPT_NAME;
 	static const char* FAKE_USREPT_CONTROL_SCRIPT_NAME;
@@ -55,6 +56,8 @@ public:
 	unsigned short stop_fake_usrept();
 
 	unsigned short get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const;
+
+	unsigned short apply_new_fake_acspt_config(const std::list<std::string>& new_config_line_list);
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

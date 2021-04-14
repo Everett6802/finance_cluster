@@ -187,6 +187,7 @@ enum MessageType{
 	MSG_GET_SYSTEM_INFO, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
+	MSG_APPLY_FAKE_ACSPT_CONFIG, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
@@ -222,6 +223,7 @@ enum NotifyType{
 	NOTIFY_GET_SYSTEM_INFO,
 	NOTIFY_GET_SIMULATOR_VERSION,
 	NOTIFY_INSTALL_SIMULATOR,
+	NOTIFY_APPLY_FAKE_ACSPT_CONFIG,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_GET_FAKE_ACSPT_STATE,
@@ -269,9 +271,10 @@ unsigned short get_local_interface_ip(std::map<std::string, std::string>& interf
 bool check_file_exist(const char* filepath); // folder or file
 bool check_config_file_exist(const char* config_filename);
 unsigned short get_file_line_count(unsigned int &line_count, const char* filepath);
-unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute="r", char data_seperate_character=',');
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute="r", char data_seperate_character=',', bool ignore_comment=true);
 unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
+unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute="w", const char* newline_character="\n");
 unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
 bool check_string_is_number(const char* input);
@@ -690,6 +693,21 @@ public:
 	const char* get_simulator_package_filepath()const;
 };
 typedef NotifySimulatorInstallCfg* PNOTIFY_SIMULATOR_INSTALL_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifyFakeAcsptConfigApplyCfg : public NotifyCfg
+{
+private:
+	char* fake_acspt_config_line_list_str;
+
+public:
+	NotifyFakeAcsptConfigApplyCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeAcsptConfigApplyCfg();
+
+	const char* get_fake_acspt_config_line_list_str()const;
+};
+typedef NotifyFakeAcsptConfigApplyCfg* PNOTIFY_FAKE_ACSPT_CONFIG_APPLY_CFG;
 
 ///////////////////////////
 
