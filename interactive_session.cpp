@@ -822,7 +822,6 @@ unsigned short InteractiveSession::handle_apply_fake_acspt_config_command(int ar
 // Send message to the user
 	// print_to_console(string("Install Simulator in the cluster..."));
 	const char* new_fake_acspt_config_filepath = (const char*)argv[1];
-	fprintf(stderr, "new_fake_acspt_config_filepath: %s\n", new_fake_acspt_config_filepath);
 	unsigned short ret = RET_SUCCESS;
 // Read the new config
 	list<string> new_config_line_list;
@@ -838,7 +837,6 @@ unsigned short InteractiveSession::handle_apply_fake_acspt_config_command(int ar
 	while (iter != new_config_line_list.end())
 	{
 		string new_config_line = (string)*iter;
-		fprintf(stderr, "read new_config_line: %s\n", new_config_line.c_str());
 		if (new_config_line_list_str.length() != 0)
 			new_config_line_list_str += string(",");
 		new_config_line_list_str += new_config_line;

@@ -1309,7 +1309,6 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			assert(notify_fake_acspt_config_apply_cfg != NULL && "notify_fake_acspt_config_apply_cfg should NOT be NULL");
 
 			char* config_line_list_str = strdup(notify_fake_acspt_config_apply_cfg->get_fake_acspt_config_line_list_str());
-			fprintf(stderr, "config_line_list_str: %s\n", config_line_list_str);
 // De-serialize the new fake acspt config
 			char* rest_config_line_list_str = NULL;
 			char* config_line;
@@ -1317,7 +1316,6 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			while ((config_line = strtok_r(config_line_list_str, ",", &rest_config_line_list_str)) != NULL)
 			{
 				string config_line_str(config_line);
-				fprintf(stderr, "parse config_line_str: %s\n", config_line_str.c_str());
 				new_config_line_list.push_back(config_line_str);
 				if (config_line_list_str != NULL)
 					config_line_list_str = NULL;

@@ -316,7 +316,6 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 // 		return ret;
 // 	}
 // Update the config in simulator
-	fprintf(stderr, "new line length: %d\n", new_config_line_list.size());
 	list<string>::const_iterator iter_new = new_config_line_list.begin();
 	while (iter_new != new_config_line_list.end())
 	{
@@ -329,20 +328,17 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 			ret = RET_FAILURE_INCORRECT_CONFIG;
 			break;
 		}
-		fprintf(stderr, "new: %s, %d, found: %d, substr: %s\n", line_new.c_str(), line_new.length(), found, line_new.substr(0, found).c_str());
 		list<string>::iterator iter_simulator = simulator_config_line_list.begin();
 		bool update = false;
 		while (iter_simulator != simulator_config_line_list.end())
 		{
 			string line_simulator = (string)*iter_simulator;
-			fprintf(stderr, "simulator: %s, %d, substr: %s\n", line_simulator.c_str(), line_simulator.length(), line_new.substr(0, found).c_str());
 			if (line_simulator.compare(0, found, line_new.substr(0, found)) == 0)
 			{
 				// str.replace(str.find(str2), str2.length(),"preposition");
 				simulator_config_line_list.insert(iter_simulator, line_new);
 				simulator_config_line_list.erase(iter_simulator);
 				update = true;
-				fprintf(stderr, "FOUND\n");
 				break;
 			}
 			iter_simulator++;
@@ -355,7 +351,6 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 		}
 		iter_new++;
 	}
-	fprintf(stderr, "All Config are applied\n");
 // Write the config in simulator
 	ret = write_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath);
 	if (CHECK_FAILURE(ret))
