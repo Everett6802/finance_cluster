@@ -555,7 +555,7 @@ unsigned short FollowerNode::recv_apply_fake_acspt_config(const std::string& mes
 // EventType | Payload: simulator package filepath | EOD
 	unsigned short ret = RET_SUCCESS;
 	const char* fake_acspt_config_line_list_str = (const char*)message_data.c_str();
-	size_t notify_param_size = strlen(fake_acspt_config_line_list_str);
+	size_t notify_param_size = strlen(fake_acspt_config_line_list_str) + 1;
 	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptConfigApplyCfg((void*)fake_acspt_config_line_list_str, notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
