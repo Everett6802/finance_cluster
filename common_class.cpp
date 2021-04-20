@@ -834,6 +834,12 @@ ClusterFileTransferParam::~ClusterFileTransferParam(){}
 
 //////////////////////////////////////////////////////////
 
+FakeAcsptConfigValueParam::FakeAcsptConfigValueParam(){}
+
+FakeAcsptConfigValueParam::~FakeAcsptConfigValueParam(){}
+
+//////////////////////////////////////////////////////////
+
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
 	notify_type(type),
 	notify_param(NULL),

@@ -58,6 +58,7 @@ public:
 	unsigned short get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const;
 
 	unsigned short apply_new_fake_acspt_config(const std::list<std::string>& new_config_line_list);
+	unsigned short get_fake_acspt_config_value(const std::list<std::string>& config_list, std::list<std::string>& config_line_list)const;
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

@@ -1125,6 +1125,19 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
+    	case PARAM_FAKE_ACSPT_CONFIG_VALUE:
+    	{
+    		PFAKE_ACSPT_CONFIG_VALUE_PARAM fake_acspt_config_value_param = (PFAKE_ACSPT_CONFIG_VALUE_PARAM)param1;
+    		assert(fake_acspt_config_value_param != NULL && "fake_acspt_config_value_param should NOT be NULL");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			if (node_type != LEADER)
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;		
+			}
+			ret = simulator_handler->get_fake_acspt_config_value(fake_acspt_config_value_param->config_list, fake_acspt_config_value_param->config_line_list);
+    	}
+    	break;
     	case PARAM_FAKE_ACSPT_STATE:
     	{
         	if (param1 == NULL)
@@ -1309,6 +1322,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			assert(notify_fake_acspt_config_apply_cfg != NULL && "notify_fake_acspt_config_apply_cfg should NOT be NULL");
 
 			char* config_line_list_str = strdup(notify_fake_acspt_config_apply_cfg->get_fake_acspt_config_line_list_str());
+			char* config_line_list_str_tmp = config_line_list_str;
 // De-serialize the new fake acspt config
 			char* rest_config_line_list_str = NULL;
 			char* config_line;
@@ -1320,8 +1334,8 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				if (config_line_list_str != NULL)
 					config_line_list_str = NULL;
 			}
-			free(config_line_list_str);
-			config_line_list_str = NULL;
+			free(config_line_list_str_tmp);
+			config_line_list_str_tmp = NULL;
 
 			ret = simulator_handler->apply_new_fake_acspt_config(new_config_line_list);
 			if (CHECK_SUCCESS(ret))

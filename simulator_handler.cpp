@@ -361,6 +361,60 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 	return ret;
 }
 
+unsigned short SimulatorHandler::get_fake_acspt_config_value(const std::list<std::string>& config_list, std::list<std::string>& config_line_list)const
+{
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	static const int BUF_SIZE = 256;
+	unsigned short ret = RET_SUCCESS;
+	char fake_acspt_sim_cfg_filepath[BUF_SIZE + 1];
+	char *simulator_scripts_folder_path = NULL;
+	assemble_simulator_sub_folder_path(&simulator_scripts_folder_path, SIMULATOR_SCRIPTS_FOLDER_NAME);
+	memset(fake_acspt_sim_cfg_filepath, 0x0, sizeof(fake_acspt_sim_cfg_filepath) / sizeof(fake_acspt_sim_cfg_filepath[0]));
+	snprintf(fake_acspt_sim_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
+	if (simulator_scripts_folder_path != NULL)
+	{
+		delete[] simulator_scripts_folder_path;
+		simulator_scripts_folder_path = NULL;
+	}
+// Read the config in simulator
+	list<string> simulator_config_line_list;
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath, "r", ',', false);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_sim_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// Update the config in simulator
+	list<string>::const_iterator iter_config= config_list.begin();
+	while (iter_config != config_list.end())
+	{
+		string line_config = (string)*iter_config;
+		std::size_t line_config_size = line_config.size();
+		list<string>::iterator iter_simulator = simulator_config_line_list.begin();
+		bool update = false;
+		while (iter_simulator != simulator_config_line_list.end())
+		{
+			string line_simulator = (string)*iter_simulator;
+			if (line_simulator.compare(0, line_config_size, line_config.substr(0, line_config_size)) == 0)
+			{
+				config_line_list.push_back(line_simulator);
+				update = true;
+				break;
+			}
+			iter_simulator++;
+		}
+		if (!update)
+		{
+			WRITE_FORMAT_ERROR("Undefined config in line: %s", line_config.c_str());
+			ret = RET_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+		iter_config++;
+	}
+	return ret;
+}
+
 unsigned short SimulatorHandler::notify(NotifyType notify_type, void* notify_param)
 {
     unsigned short ret = RET_SUCCESS;

@@ -207,6 +207,7 @@ enum ParamType{
 	PARAM_SYSTEM_INFO,
 	// PARAM_NODE_SYSTEM_INFO,
 	PARAM_SIMULATOR_VERSION,
+	PARAM_FAKE_ACSPT_CONFIG_VALUE,
 	PARAM_FAKE_ACSPT_STATE,
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
@@ -588,6 +589,17 @@ public:
 
 };
 typedef ClusterFileTransferParam* PCLUSTER_FILE_TRANSFER_PARAM;
+
+class FakeAcsptConfigValueParam
+{
+public:
+	std::list<std::string> config_list;
+	std::list<std::string> config_line_list;
+
+	FakeAcsptConfigValueParam();
+	~FakeAcsptConfigValueParam();
+};
+typedef FakeAcsptConfigValueParam* PFAKE_ACSPT_CONFIG_VALUE_PARAM;
 
 ///////////////////////////////////////////////////
 
