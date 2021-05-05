@@ -63,6 +63,7 @@ private:
 	unsigned short handle_install_simulator_command(int argc, char **argv);
 	unsigned short handle_apply_fake_acspt_config_command(int argc, char **argv);
 	unsigned short handle_get_fake_acspt_config_value_command(int argc, char **argv);
+	unsigned short handle_apply_fake_usrept_config_command(int argc, char **argv);
 	unsigned short handle_start_fake_acspt_command(int argc, char **argv);
 	unsigned short handle_stop_fake_acspt_command(int argc, char **argv);
 	unsigned short handle_start_fake_usrept_command(int argc, char **argv);

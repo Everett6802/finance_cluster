@@ -188,6 +188,7 @@ enum MessageType{
 	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_APPLY_FAKE_ACSPT_CONFIG, // Uni-Direction, Leader -> Follower
+	MSG_APPLY_FAKE_USREPT_CONFIG, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
@@ -225,6 +226,7 @@ enum NotifyType{
 	NOTIFY_GET_SIMULATOR_VERSION,
 	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_APPLY_FAKE_ACSPT_CONFIG,
+	NOTIFY_APPLY_FAKE_USREPT_CONFIG,
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_GET_FAKE_ACSPT_STATE,
@@ -244,6 +246,12 @@ enum FakeUsreptControlType{
 	FAKE_USREPT_START, 
 	FAKE_USREPT_STOP, 
 	FAKE_USREPT_CONTROL_SIZE
+};
+
+enum UsreptConfigType{
+	NORMAL, 
+	PKT_PROFILE, 
+	WLAN_PROFILE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -720,6 +728,21 @@ public:
 	const char* get_fake_acspt_config_line_list_str()const;
 };
 typedef NotifyFakeAcsptConfigApplyCfg* PNOTIFY_FAKE_ACSPT_CONFIG_APPLY_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifyFakeUsreptConfigApplyCfg : public NotifyCfg
+{
+private:
+	char* fake_usrept_config_line_list_str;
+
+public:
+	NotifyFakeUsreptConfigApplyCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeUsreptConfigApplyCfg();
+
+	const char* get_fake_usrept_config_line_list_str()const;
+};
+typedef NotifyFakeUsreptConfigApplyCfg* PNOTIFY_FAKE_USREPT_CONFIG_APPLY_CFG;
 
 ///////////////////////////
 

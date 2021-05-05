@@ -2,6 +2,7 @@
 finance_cluster
 .project
 log/
+core
 libmsg_dumper.so
 msg_dumper.h
 msg_dumper_wrapper.h

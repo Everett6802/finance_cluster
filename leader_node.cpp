@@ -600,6 +600,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_get_simulator_version,
 		&LeaderNode::recv_install_simulator,
 		&LeaderNode::recv_apply_fake_acspt_config,
+		&LeaderNode::recv_apply_fake_usrept_config,
 		&LeaderNode::recv_control_fake_acspt,
 		&LeaderNode::recv_control_fake_usrept,
 		&LeaderNode::recv_get_fake_acspt_state,
@@ -628,6 +629,7 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_simulator_version,
 		&LeaderNode::send_install_simulator,
 		&LeaderNode::send_apply_fake_acspt_config,
+		&LeaderNode::send_apply_fake_usrept_config,
 		&LeaderNode::send_control_fake_acspt,
 		&LeaderNode::send_control_fake_usrept,
 		&LeaderNode::send_get_fake_acspt_state,
@@ -707,6 +709,8 @@ unsigned short LeaderNode::recv_get_simulator_version(const std::string& message
 unsigned short LeaderNode::recv_install_simulator(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_INSTALL_SIMULATOR);}
 
 unsigned short LeaderNode::recv_apply_fake_acspt_config(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_ACSPT_CONFIG);}
+
+unsigned short LeaderNode::recv_apply_fake_usrept_config(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_USREPT_CONFIG);}
 
 unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
 
@@ -917,6 +921,20 @@ unsigned short LeaderNode::send_apply_fake_acspt_config(void* param1, void* para
 	return send_data(MSG_APPLY_FAKE_ACSPT_CONFIG, fake_acspt_config_line_list_str);
 }
 
+unsigned short LeaderNode::send_apply_fake_usrept_config(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: fake usrept new config line list string
+// Message format:
+// EventType | fake_acspt_config_line_list_str | EOD
+	// static const int BUF_SIZE = 256;
+	const char* fake_usrept_config_line_list_str = (const char*)param1;
+	// char buf[BUF_SIZE + 1];
+	// memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	// snprintf(buf, BUF_SIZE, "%s", fake_usrept_config_filepath);
+	return send_data(MSG_APPLY_FAKE_USREPT_CONFIG, fake_usrept_config_line_list_str);
+}
+
 unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)
 {
 // Parameters:
@@ -1061,6 +1079,7 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1147,6 +1166,7 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1184,6 +1204,7 @@ unsigned short LeaderNode::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1223,6 +1244,7 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

@@ -754,6 +754,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1273,6 +1274,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1348,6 +1350,81 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			}
 		}
 		break;
+		case NOTIFY_APPLY_FAKE_USREPT_CONFIG:
+		{
+			static const char* START_PKT_PROFILE_TAG = "START_PKT_PROFILES";
+			static const int START_PKT_PROFILE_TAG_LEN = strlen(START_PKT_PROFILE_TAG);
+			static const char* START_WLAN_PROFILE_TAG = "START_WLAN_PROFILES";										
+			static const int START_WLAN_PROFILE_TAG_LEN = strlen(START_WLAN_PROFILE_TAG);
+     		assert(node_type != NONE && "node type should be NONE");
+			assert(simulator_handler != NULL && "simulator_handler should NOT be NULL");
+			PNOTIFY_FAKE_USREPT_CONFIG_APPLY_CFG notify_fake_usrept_config_apply_cfg = (PNOTIFY_FAKE_USREPT_CONFIG_APPLY_CFG)notify_param;
+			assert(notify_fake_usrept_config_apply_cfg != NULL && "notify_fake_usrept_config_apply_cfg should NOT be NULL");
+
+			char* config_line_list_str = strdup(notify_fake_usrept_config_apply_cfg->get_fake_usrept_config_line_list_str());
+			char* config_line_list_str_tmp = config_line_list_str;
+// De-serialize the new fake acspt config
+			char* rest_config_line_list_str = NULL;
+			char* config_line;
+			list<string> new_config_line_list;
+			list<string> new_pkt_profile_config_line_list;
+			list<string> new_wlan_profile_config_line_list;
+			UsreptConfigType usrept_config_type = NORMAL;
+			int line_cnt = 0;
+			while ((config_line = strtok_r(config_line_list_str, ",", &rest_config_line_list_str)) != NULL)
+			{
+				string config_line_str(config_line);
+				if (config_line_str.compare(0, START_PKT_PROFILE_TAG_LEN, START_PKT_PROFILE_TAG) == 0)
+					usrept_config_type = PKT_PROFILE;
+				else if (config_line_str.compare(0, START_WLAN_PROFILE_TAG_LEN, START_WLAN_PROFILE_TAG) == 0)
+					usrept_config_type = WLAN_PROFILE;
+				// fprintf(stderr, "%d line: %s, type: %d\n", ++line_cnt, config_line, usrept_config_type);
+				switch (usrept_config_type)
+				{
+					case NORMAL:
+					{
+						new_config_line_list.push_back(config_line_str);
+					}
+					break;
+					case PKT_PROFILE:
+					{
+						new_pkt_profile_config_line_list.push_back(config_line_str);
+					}
+					break;
+					case WLAN_PROFILE:
+					{
+						new_wlan_profile_config_line_list.push_back(config_line_str);
+					}
+					break;
+					default:
+					{
+			    		static const int BUF_SIZE = 256;
+			    		char buf[BUF_SIZE];
+			    		snprintf(buf, BUF_SIZE, "Unknown usrept config type: %d", usrept_config_type);
+			    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+			    		throw std::invalid_argument(buf);
+					}
+					break;
+				}
+				
+				if (config_line_list_str != NULL)
+					config_line_list_str = NULL;
+			}
+			free(config_line_list_str_tmp);
+			config_line_list_str_tmp = NULL;
+
+			// fprintf(stderr, "%d: %d, %d\n", new_config_line_list.size(), new_pkt_profile_config_line_list.size(), new_wlan_profile_config_line_list.size());
+			ret = simulator_handler->apply_new_fake_usrept_config(new_config_line_list, new_pkt_profile_config_line_list, new_wlan_profile_config_line_list);
+			if (CHECK_SUCCESS(ret))
+			{
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					ret = cluster_node->send(MSG_APPLY_FAKE_USREPT_CONFIG, (void*)notify_fake_usrept_config_apply_cfg->get_fake_usrept_config_line_list_str());
+				}
+			}
+		}
+		break;
 		case NOTIFY_CONTROL_FAKE_ACSPT:
 		{
 			if (!simulator_installed)
@@ -1377,7 +1454,8 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				{
 		    		static const int BUF_SIZE = 256;
 		    		char buf[BUF_SIZE];
-		    		snprintf(buf, BUF_SIZE, "Unknown simulator ap control type: %d", fake_acspt_control_type);
+		    		snprintf(buf, BUF_SIZE, "Unknown simulator acspt control type: %d", fake_acspt_control_type);
+		    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
 		    		throw std::invalid_argument(buf);
 				}
 				break;
@@ -1490,6 +1568,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1593,6 +1672,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

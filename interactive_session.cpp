@@ -24,6 +24,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_InstallSimulator,
 	InteractiveSessionCommand_ApplyFakeAcsptConfig,
 	InteractiveSessionCommand_GetFakeAcsptConfigValue,
+	InteractiveSessionCommand_ApplyFakeUsreptConfig,
 	InteractiveSessionCommand_StartFakeAcspt,
 	InteractiveSessionCommand_StopFakeAcspt,
 	InteractiveSessionCommand_StartFakeUsrept,
@@ -44,6 +45,7 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"install_simulator",
 	"apply_fake_acspt_config",
 	"get_fake_acspt_config_value",
+	"apply_fake_usrept_config",
 	"start_fake_acspt",
 	"stop_fake_acspt",
 	"start_fake_usrept",
@@ -236,6 +238,7 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 		InteractiveSessionCommand_InstallSimulator,
 		InteractiveSessionCommand_ApplyFakeAcsptConfig,
 		InteractiveSessionCommand_GetFakeAcsptConfigValue,
+		InteractiveSessionCommand_ApplyFakeUsreptConfig,
 		InteractiveSessionCommand_StartFakeAcspt,
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
@@ -484,6 +487,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_install_simulator_command,
 		&InteractiveSession::handle_apply_fake_acspt_config_command,
 		&InteractiveSession::handle_get_fake_acspt_config_value_command,
+		&InteractiveSession::handle_apply_fake_usrept_config_command,
 		&InteractiveSession::handle_start_fake_acspt_command,
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
@@ -525,8 +529,10 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
 		usage_string += string("* apply_fake_acspt_config\n Description: Apply new config to all fake acepts in the cluster\n");
 		usage_string += string("  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)\n");
-		usage_string += string("* get_fake_acspt_config_value\n Description: Get the config value from fake acepts config file\n");
+		usage_string += string("* get_fake_acspt_config_value\n Description: Get the config value from fake acspts config file\n");
 		usage_string += string("  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)\n");
+		usage_string += string("* apply_fake_usrept_config\n Description: Apply new config to all fake usrepts in the cluster\n");
+		usage_string += string("  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)\n");
 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
@@ -907,6 +913,51 @@ unsigned short InteractiveSession::handle_get_fake_acspt_config_value_command(in
 	}
 	ret = print_to_console(fake_acspt_config_value_string);
 
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_apply_fake_usrept_config_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+// Send message to the user
+	// print_to_console(string("Install Simulator in the cluster..."));
+	const char* new_fake_usrept_config_filepath = (const char*)argv[1];
+	unsigned short ret = RET_SUCCESS;
+// Read the new config
+	list<string> new_config_line_list;
+	ret = read_file_lines_ex(new_config_line_list, new_fake_usrept_config_filepath);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to read the new config file[%s], due to: %s", new_fake_usrept_config_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// Serialize the new fake acspt config
+	string new_config_line_list_str;
+	list<string>::iterator iter = new_config_line_list.begin();
+	while (iter != new_config_line_list.end())
+	{
+		string new_config_line = (string)*iter;
+		if (new_config_line_list_str.length() != 0)
+			new_config_line_list_str += string(",");
+		new_config_line_list_str += new_config_line;
+		iter++;
+	}
+
+// Notify the parent
+	size_t notify_param_size = strlen(new_config_line_list_str.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptConfigApplyCfg((void*)new_config_line_list_str.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Synchronous event
+	ret = observer->notify(NOTIFY_APPLY_FAKE_USREPT_CONFIG, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
 	return ret;
 }
 

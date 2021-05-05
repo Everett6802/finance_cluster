@@ -8,10 +8,13 @@ using namespace std;
 const char* SimulatorHandler::SIMULATOR_PACKAGE_FOLDER_PATH = "/dev/shm/simulator";
 const char* SimulatorHandler::SIMULATOR_ROOT_FOLDER_PATH = "/simulator/BUILD";
 const char* SimulatorHandler::SIMULATOR_SCRIPTS_FOLDER_NAME = "scripts";
+const char* SimulatorHandler::SIMULATOR_CONF_FOLDER_NAME = "conf";
 const char* SimulatorHandler::SIMULATOR_VERSION_FILENAME = "VERSION";
 const char* SimulatorHandler::SIMULATOR_BUILD_FILENAME = "BUILD";
 const char* SimulatorHandler::SIMULATOR_UTIL_FILENAME = "simulator_util";
 const char* SimulatorHandler::SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME = "fake_acspt_sim.cfg";
+const char* SimulatorHandler::SIMULATOR_FAKE_USREPT_CFG_FILENAME = "fake_usrept.conf";
+const char* SimulatorHandler::SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG = "START_PKT_PROFILES";
 const char* SimulatorHandler::SIMULATOR_INSTALL_SCRIPT_NAME = "simulator_install.sh";
 const char* SimulatorHandler::FAKE_ACSPT_CONTROL_SCRIPT_NAME = "fake_acspt_control.sh";
 const char* SimulatorHandler::FAKE_USREPT_CONTROL_SCRIPT_NAME = "fake_usrept_control.sh";
@@ -415,6 +418,122 @@ unsigned short SimulatorHandler::get_fake_acspt_config_value(const std::list<std
 	return ret;
 }
 
+unsigned short SimulatorHandler::apply_new_fake_usrept_config(const list<string>& new_config_line_list, const list<string>& new_pkt_profile_config_line_list, const list<string>& new_wlan_profile_config_line_list)
+{
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+	static const int BUF_SIZE = 256;
+	unsigned short ret = RET_SUCCESS;
+	char fake_usrept_cfg_filepath[BUF_SIZE + 1];
+	char fake_usrept_cfg_bak_filepath[BUF_SIZE + 1];
+	char *simulator_conf_folder_path = NULL;
+	assemble_simulator_sub_folder_path(&simulator_conf_folder_path, SIMULATOR_CONF_FOLDER_NAME);
+	memset(fake_usrept_cfg_filepath, 0x0, sizeof(fake_usrept_cfg_filepath) / sizeof(fake_usrept_cfg_filepath[0]));
+	snprintf(fake_usrept_cfg_filepath, BUF_SIZE, "%s/%s", simulator_conf_folder_path, SIMULATOR_FAKE_USREPT_CFG_FILENAME);
+	snprintf(fake_usrept_cfg_bak_filepath, BUF_SIZE, "%s.bak", fake_usrept_cfg_filepath);
+	if (simulator_conf_folder_path != NULL)
+	{
+		delete[] simulator_conf_folder_path;
+		simulator_conf_folder_path = NULL;
+	}
+// Read the config in simulator
+	list<string> simulator_config_line_list;
+	ret = read_file_lines_ex(simulator_config_line_list, fake_usrept_cfg_bak_filepath, "r", ',', false);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// Filter the config lines which are related to UE traffic features and WLAN PROFILES
+	static size_t SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG_LEN = strlen(SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG);
+	list<string>::iterator iter = simulator_config_line_list.begin();
+	bool found = false;
+	list<string> simulator_config_line_sublist;
+	while(iter != simulator_config_line_list.end())
+	{
+		string simulator_config_line = (string)*iter;
+		if (simulator_config_line.compare(0, SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG_LEN, SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG) == 0)
+		{
+			simulator_config_line_sublist.assign(simulator_config_line_list.begin(), iter);
+			found = true;
+			break;
+		}
+		iter++;
+	}
+	if (!found)
+	{
+		WRITE_FORMAT_ERROR("The tag[%s] is NOT found in the config file: %s", SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG, SIMULATOR_FAKE_USREPT_CFG_FILENAME);
+		ret = RET_FAILURE_INCORRECT_CONFIG;
+	}
+// Update the config in simulator
+	list<string>::const_iterator iter_new = new_config_line_list.begin();
+	while (iter_new != new_config_line_list.end())
+	{
+		std::size_t found;
+		string line_new = (string)*iter_new;
+		found = line_new.find('=');
+		if (found == std::string::npos)
+		{
+			WRITE_FORMAT_ERROR("Incorrect new configuration format in line: %s", line_new.c_str());
+			ret = RET_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+		list<string>::iterator iter_simulator = simulator_config_line_sublist.begin();
+		bool update = false;
+		while (iter_simulator != simulator_config_line_sublist.end())
+		{
+			string line_simulator = (string)*iter_simulator;
+			if (line_simulator.compare(0, found, line_new.substr(0, found)) == 0)
+			{
+				// str.replace(str.find(str2), str2.length(),"preposition");
+				simulator_config_line_sublist.insert(iter_simulator, line_new);
+				simulator_config_line_sublist.erase(iter_simulator);
+				update = true;
+				break;
+			}
+			iter_simulator++;
+		}
+		if (!update)
+		{
+			WRITE_FORMAT_ERROR("Undefined config in line: %s", line_new.c_str());
+			ret = RET_FAILURE_INCORRECT_CONFIG;
+			break;
+		}
+		iter_new++;
+	}
+/*
+r 只读方式打开文件，该文件必须存在。
+r+ 以可读写方式打开文件，该文件必须存在。
+rb+ 读写打开一个二进制文件，只允许读写数据。
+w 打开只写文件，若文件存在则文件长度清为0，即该文件内容会消失。若文件不存在则建立该文件。
+w+ 打开可读写文件，若文件存在则文件长度清为零，即该文件内容会消失。若文件不存在则建立该文件。
+a 以附加的方式打开只写文件。若文件不存在，则会建立该文件，如果文件存在，写入的数据会被加到文件尾，即文件原先的内容会被保留。（EOF符保留）
+a+ 以附加方式打开可读写的文件。若文件不存在，则会建立该文件，如果文件存在，写入的数据会被加到文件尾后，即文件原先的内容会被保留。 （原来的EOF符不保留） 
+*/
+// Write the config in simulator
+	ret = write_file_lines_ex(simulator_config_line_sublist, fake_usrept_cfg_filepath);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to write the simulator config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// Write the pkt profile config in simulator
+	ret = write_file_lines_ex(new_pkt_profile_config_line_list, fake_usrept_cfg_filepath, "a");
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to write the simulator PKT profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+// Write the wlan profile config in simulator
+	ret = write_file_lines_ex(new_wlan_profile_config_line_list, fake_usrept_cfg_filepath, "a");
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to write the simulator WLAN profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+	return ret;
+}
+
 unsigned short SimulatorHandler::notify(NotifyType notify_type, void* notify_param)
 {
     unsigned short ret = RET_SUCCESS;
@@ -427,6 +546,7 @@ unsigned short SimulatorHandler::notify(NotifyType notify_type, void* notify_par
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -446,6 +566,7 @@ unsigned short SimulatorHandler::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

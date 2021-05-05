@@ -360,6 +360,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
 // Synchronous event:
     	case NOTIFY_INSTALL_SIMULATOR:
     	case NOTIFY_APPLY_FAKE_ACSPT_CONFIG:
+    	case NOTIFY_APPLY_FAKE_USREPT_CONFIG:
       	case NOTIFY_CONTROL_FAKE_ACSPT:
       	case NOTIFY_CONTROL_FAKE_USREPT:
     	{
@@ -398,6 +399,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -425,6 +427,7 @@ unsigned short InteractiveServer::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in InteractiveServer::async_handle()", buf);
     		throw std::invalid_argument(buf);
     	}
     	break;

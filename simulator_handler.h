@@ -14,10 +14,13 @@ class SimulatorHandler : public INotify
 	static const char* SIMULATOR_PACKAGE_FOLDER_PATH;
 	static const char* SIMULATOR_ROOT_FOLDER_PATH;
 	static const char* SIMULATOR_SCRIPTS_FOLDER_NAME;
+	static const char* SIMULATOR_CONF_FOLDER_NAME;
 	static const char* SIMULATOR_VERSION_FILENAME;
 	static const char* SIMULATOR_BUILD_FILENAME;
 	static const char* SIMULATOR_UTIL_FILENAME;
 	static const char* SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME;
+	static const char* SIMULATOR_FAKE_USREPT_CFG_FILENAME;
+	static const char* SIMULATOR_FAKE_USREPT_CFG_IGNORE_TAG;
 	static const char* SIMULATOR_INSTALL_SCRIPT_NAME;
 	static const char* FAKE_ACSPT_CONTROL_SCRIPT_NAME;
 	static const char* FAKE_USREPT_CONTROL_SCRIPT_NAME;
@@ -59,6 +62,8 @@ public:
 
 	unsigned short apply_new_fake_acspt_config(const std::list<std::string>& new_config_line_list);
 	unsigned short get_fake_acspt_config_value(const std::list<std::string>& config_list, std::list<std::string>& config_line_list)const;
+
+	unsigned short apply_new_fake_usrept_config(const std::list<std::string>& new_config_line_list, const std::list<std::string>& new_pkt_profile_config_line_list, const std::list<std::string>& new_wlan_profile_config_line_list);
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

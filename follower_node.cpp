@@ -419,6 +419,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_get_simulator_version,
 		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_apply_fake_acspt_config,
+		&FollowerNode::recv_apply_fake_acspt_config,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept,
 		&FollowerNode::recv_get_fake_acspt_state,
@@ -446,6 +447,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_get_simulator_version,
 		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_apply_fake_acspt_config,
+		&FollowerNode::send_apply_fake_usrept_config,
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept,
 		&FollowerNode::send_get_fake_acspt_state,
@@ -562,6 +564,23 @@ unsigned short FollowerNode::recv_apply_fake_acspt_config(const std::string& mes
     assert(observer != NULL && "observer should NOT be NULL");
 // Synchronous event
     observer->notify(NOTIFY_APPLY_FAKE_ACSPT_CONFIG, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return ret;
+}
+
+unsigned short FollowerNode::recv_apply_fake_usrept_config(const std::string& message_data)
+{
+// Message format:
+// EventType | Payload: simulator package filepath | EOD
+	unsigned short ret = RET_SUCCESS;
+	const char* fake_usrept_config_line_list_str = (const char*)message_data.c_str();
+	size_t notify_param_size = strlen(fake_usrept_config_line_list_str) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptConfigApplyCfg((void*)fake_usrept_config_line_list_str, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+    observer->notify(NOTIFY_APPLY_FAKE_USREPT_CONFIG, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 	return ret;
 }
@@ -787,6 +806,8 @@ unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, 
 
 unsigned short FollowerNode::send_apply_fake_acspt_config(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_APPLY_FAKE_ACSPT_CONFIG);}
 
+unsigned short FollowerNode::send_apply_fake_usrept_config(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_APPLY_FAKE_USREPT_CONFIG);}
+
 unsigned short FollowerNode::send_control_fake_acspt(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_ACSPT);}
 
 unsigned short FollowerNode::send_control_fake_usrept(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_CONTROL_FAKE_USREPT);}
@@ -888,6 +909,7 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -938,6 +960,7 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -975,6 +998,7 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1005,6 +1029,7 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
