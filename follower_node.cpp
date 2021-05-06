@@ -419,7 +419,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_get_simulator_version,
 		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_apply_fake_acspt_config,
-		&FollowerNode::recv_apply_fake_acspt_config,
+		&FollowerNode::recv_apply_fake_usrept_config,
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept,
 		&FollowerNode::recv_get_fake_acspt_state,

@@ -1370,7 +1370,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			list<string> new_pkt_profile_config_line_list;
 			list<string> new_wlan_profile_config_line_list;
 			UsreptConfigType usrept_config_type = NORMAL;
-			int line_cnt = 0;
+			// int line_cnt = 0;
 			while ((config_line = strtok_r(config_line_list_str, ",", &rest_config_line_list_str)) != NULL)
 			{
 				string config_line_str(config_line);
