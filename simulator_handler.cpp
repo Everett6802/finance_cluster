@@ -1,4 +1,9 @@
+#include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <assert.h>
+#include <signal.h>
+#include <ctype.h>
 #include <stdexcept>
 #include "simulator_handler.h"
 
@@ -7,6 +12,7 @@ using namespace std;
 
 const char* SimulatorHandler::SIMULATOR_PACKAGE_FOLDER_PATH = "/dev/shm/simulator";
 const char* SimulatorHandler::SIMULATOR_ROOT_FOLDER_PATH = "/simulator/BUILD";
+const char* SimulatorHandler::SIMULATOR_FAKE_USREPT_FOLDER_PATH = "/simulator/BUILD/sim";
 const char* SimulatorHandler::SIMULATOR_SCRIPTS_FOLDER_NAME = "scripts";
 const char* SimulatorHandler::SIMULATOR_CONF_FOLDER_NAME = "conf";
 const char* SimulatorHandler::SIMULATOR_VERSION_FILENAME = "VERSION";
@@ -100,11 +106,36 @@ void SimulatorHandler::assemble_simulator_sub_folder_path(char** sub_folder_path
 	static const int BUF_SIZE = 256;
 	char* sub_folder_path_tmp = new char[BUF_SIZE];
 	if (sub_folder_path_tmp == NULL)
-		throw runtime_error("fails to allocate memory: filepath_tmp");
+		throw runtime_error("fails to allocate memory: sub_folder_path_tmp");
 	memset(sub_folder_path_tmp, 0x0, sizeof(char) * BUF_SIZE);
 	snprintf(sub_folder_path_tmp, BUF_SIZE, "%s/%s", SIMULATOR_ROOT_FOLDER_PATH, sub_folder_name);
 	// printf("cwd: %s, filepath: %s\n", cwd, filepath);
 	*sub_folder_path = sub_folder_path_tmp;
+}
+
+void SimulatorHandler::assemble_fake_acspt_process_pid_filepath(char** process_pid_filepath, int ssn, const char* process_name)
+{
+	assert(process_pid_filepath != NULL && "process_pid_filepath should NOT be NULL");
+	assert(process_name != NULL && "process_name should NOT be NULL");	
+	static const int BUF_SIZE = 256;
+	char* process_pid_filepath_tmp = new char[BUF_SIZE];
+	if (process_pid_filepath_tmp == NULL)
+		throw runtime_error("fails to allocate memory: process_pid_filepath_tmp");
+	memset(process_pid_filepath_tmp, 0x0, sizeof(char) * BUF_SIZE);
+	snprintf(process_pid_filepath_tmp, BUF_SIZE, "%s/sim/%d/tmp/%s.pid", SIMULATOR_ROOT_FOLDER_PATH, ssn, process_name);
+	// printf("cwd: %s, filepath: %s\n", cwd, filepath);
+	*process_pid_filepath = process_pid_filepath_tmp;
+}
+
+bool SimulatorHandler::check_digit(const char* check_string)
+{
+	assert(check_string != NULL && "check_string should NOT be NULL");
+	while (*check_string != '\0')
+	{
+		if (!isdigit(*check_string++))
+			return false;
+	}
+	return true;
 }
 
 const char* SimulatorHandler::get_script_filepath(SCRIPT_FILE_TYPE script_file_type)
@@ -128,6 +159,110 @@ unsigned short SimulatorHandler::run_script(SCRIPT_FILE_TYPE script_file_type, c
 		snprintf(cmd, BUF_SIZE, "%s %s", get_script_filepath(script_file_type), param_string);
 	system(cmd);
 	return RET_SUCCESS;
+}
+
+unsigned short SimulatorHandler::get_fake_acspt_process_pid(int& process_pid, int ssn, const char* process_name)const
+{
+	char* process_pid_filepath = NULL;
+	assemble_fake_acspt_process_pid_filepath(&process_pid_filepath, ssn, process_name);
+	unsigned short ret = RET_SUCCESS;
+	list<string> line_list;
+	ret = read_file_lines_ex(line_list, process_pid_filepath);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (line_list.size() != 1)
+		return RET_FAILURE_INCORRECT_CONFIG;
+	list<string>::iterator iter = line_list.begin();
+	string process_pid_string = (string)*iter;
+	process_pid = atoi(process_pid_string.c_str());
+	return ret;
+}
+
+unsigned short SimulatorHandler::check_fake_acspt_process_alive(bool& is_alive, int ssn, const char* process_name)const
+{
+	is_alive = true;
+	int process_pid;
+	unsigned short ret = get_fake_acspt_process_pid(process_pid, ssn, process_name);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (is_alive)
+	{
+		if (process_pid == -1)
+		{
+			WRITE_FORMAT_DEBUG("The process[%d:%s] does NOT exit, due to process_pid == -1", ssn, process_name);
+			is_alive = false;
+		}
+	}
+	if (is_alive)
+	{
+/*
+The signal to be sent is specified by sig and is either one from the list given in <signal.h> or 0. 
+If sig is 0 (the null signal), error checking is performed but no signal is actually sent. 
+The null signal can be used to check the validity of pid.
+*/
+		if (kill(process_pid, 0) != 0)
+		{
+			WRITE_FORMAT_DEBUG("The process[%d:%s] does NOT exit, due to kill(process_pid, 0) != 0", ssn, process_name);
+			is_alive = false;
+		}
+	}
+	if (is_alive)
+	{
+		static const int BUF_SIZE = 256;
+		char process_cmdline[BUF_SIZE + 1];
+		memset(process_cmdline, 0x0, sizeof(process_cmdline)/sizeof(process_cmdline[0]));
+		snprintf(process_cmdline, BUF_SIZE, "/proc/%d/cmdline", process_pid);
+		if (!check_file_exist(process_cmdline))
+		{
+			WRITE_FORMAT_DEBUG("The process[%d:%s] does NOT exit, The cmdline file[%s] is NOT Found", ssn, process_name, process_cmdline);
+			is_alive = false;
+		}
+	}
+	return RET_SUCCESS;
+}
+
+unsigned short SimulatorHandler::find_fake_acspt_dead_process(map<int, list<FAKE_ACSPT_PROCESS_TYPE>>& fake_acspt_dead_process_map)const
+{
+	static const char *PROCESS_PID_FILENAME[] = {"mdproxy", "hostapd", "cubic", "sessionMgr", "collectd"};
+	static const int PROCESS_PID_FILENAME_LEN = sizeof(PROCESS_PID_FILENAME) / sizeof(PROCESS_PID_FILENAME[0]);
+	unsigned short ret = RET_SUCCESS;
+    DIR *dir;
+    struct dirent *entry;
+
+    if (!(dir = opendir(SIMULATOR_FAKE_USREPT_FOLDER_PATH)))
+	{
+		WRITE_FORMAT_DEBUG("opendir() fails in the; folder[%s], due to : %s", SIMULATOR_FAKE_USREPT_FOLDER_PATH, strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+
+    while ((entry = readdir(dir)) != NULL) 
+    {
+        if (entry->d_type != DT_DIR || !check_digit(entry->d_name)) 
+        	continue;
+       	// if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        //     continue;
+        bool first_add = true;
+        for (int i = 0 ; i < PROCESS_PID_FILENAME_LEN ; i++)
+        {
+            bool is_alive;
+            int ssn = atoi(entry->d_name);
+            ret = check_fake_acspt_process_alive(is_alive, ssn, PROCESS_PID_FILENAME[i]);
+            if (CHECK_FAILURE(ret))
+            	return ret;
+            if (!is_alive)
+            {
+            	if (first_add)
+            	{
+	            	list<FAKE_ACSPT_PROCESS_TYPE> fake_acspt_dead_process_list;
+	            	fake_acspt_dead_process_map[ssn] = fake_acspt_dead_process_list;            		
+	            	first_add = false;
+            	}
+            	fake_acspt_dead_process_map[ssn].push_back((FAKE_ACSPT_PROCESS_TYPE)i);
+            }
+        }
+    }
+    closedir(dir);
+    return RET_SUCCESS;
 }
 
 unsigned short SimulatorHandler::initialize()

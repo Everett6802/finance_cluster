@@ -2,6 +2,8 @@
 #define SIMULATOR_HANDLER_H
 
 #include <string>
+#include <list>
+#include <map>
 #include "common.h"
 
 
@@ -10,9 +12,11 @@ class SimulatorHandler : public INotify
 	DECLARE_MSG_DUMPER()
 
 	enum SCRIPT_FILE_TYPE {SIMULATOR_INSTALL, FAKE_ACSPT_CONTROL, FAKE_USREPT_CONTROL, SCRIPT_FILE_TYPE_SIZE};
+	enum FAKE_ACSPT_PROCESS_TYPE {MDPROXY, HOSTAPD, CUBIC, SESSIONMGR, COLLECTD, FAKE_ACSPT_PROCESS_SIZE};
 
 	static const char* SIMULATOR_PACKAGE_FOLDER_PATH;
 	static const char* SIMULATOR_ROOT_FOLDER_PATH;
+	static const char* SIMULATOR_FAKE_USREPT_FOLDER_PATH;
 	static const char* SIMULATOR_SCRIPTS_FOLDER_NAME;
 	static const char* SIMULATOR_CONF_FOLDER_NAME;
 	static const char* SIMULATOR_VERSION_FILENAME;
@@ -30,6 +34,8 @@ private:
 	static bool check_simulator_installed();
 	static void assemble_script_filepath(char** filepath, const char* filename);
 	static void assemble_simulator_sub_folder_path(char** sub_folder_path, const char* sub_folder_name);
+	static void assemble_fake_acspt_process_pid_filepath(char** process_pid_filepath, int ssn, const char* process_name);
+	static bool check_digit(const char* check_string);
 
 	// char* fake_acspt_control_script_filepath;
 	// char* fake_usrept_control_script_filepath;
@@ -40,6 +46,9 @@ private:
 	// const char* get_fake_usrept_control_script_filepath();
 	const char* get_script_filepath(SCRIPT_FILE_TYPE script_file_type);
 	unsigned short run_script(SCRIPT_FILE_TYPE script_file_type, const char* param_string=NULL);
+	unsigned short get_fake_acspt_process_pid(int& process_pid, int ssn, const char* process_name)const;
+	unsigned short check_fake_acspt_process_alive(bool& is_alive, int ssn, const char* process_name)const;
+	unsigned short find_fake_acspt_dead_process(std::map<int, std::list<FAKE_ACSPT_PROCESS_TYPE>>& fake_acspt_dead_process_map)const;
 
 public:
 	SimulatorHandler(PINOTIFY notify);
