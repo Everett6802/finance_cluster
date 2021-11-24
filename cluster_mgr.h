@@ -47,7 +47,7 @@ private:
 	bool simulator_installed;
 
 	unsigned short parse_config();
-	unsigned short find_local_ip();
+	unsigned short find_local_ip(bool need_check_network=false);
 	void set_keepalive_timer_interval(int delay=0, int period=0);
 	unsigned short start_keepalive_timer();
 	void stop_keepalive_timer();

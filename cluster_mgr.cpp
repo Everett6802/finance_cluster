@@ -93,14 +93,26 @@ unsigned short ClusterMgr::parse_config()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::find_local_ip()
+unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 {
+	static const char* LOCAL_INTERFACE_NAME = "lo";
 	unsigned short ret = RET_SUCCESS;
 
 	map<string, string> interface_ip_map;
 	ret = get_local_interface_ip(interface_ip_map);
 	if (CHECK_FAILURE(ret))
 		return ret;
+
+	if (!need_check_network)
+	{
+		if (interface_ip_map.size() != 2)
+		{
+			WRITE_FORMAT_WARN("The network interface[%d] is more than 2, fail to auto-select network interface", interface_ip_map.size());
+			need_check_network = true;
+		}
+	}
+	if (!need_check_network)
+		WRITE_DEBUG("Ignore checking network.....");
 
 	bool found = false;
 	map<string, string>::iterator iter = interface_ip_map.begin();
@@ -109,12 +121,23 @@ unsigned short ClusterMgr::find_local_ip()
 		string interface = iter->first;
       	string ip = iter->second;
       	IPv4Addr ipv4_addr(ip.c_str());
-      	if (ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+
+      	if (need_check_network)
       	{
-      		local_ip = strdup(ip.c_str());
-      		WRITE_FORMAT_DEBUG("The local IP: %s", local_ip);
-      		found = true;
-      		break;
+	      	if (ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+      			found = true;
+      	}
+      	else
+      	{
+      		if (strcmp(interface.c_str(), LOCAL_INTERFACE_NAME) != 0)
+      			found = true;
+      	}
+      	if (found)
+      	{
+	      	local_ip = strdup(ip.c_str());
+	      	char* local_interface = strdup(interface.c_str());
+	      	WRITE_FORMAT_DEBUG("The local IP: %s, local interface: %s", local_ip, local_interface);
+	      	break;
       	}
 		iter++;
 	}

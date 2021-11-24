@@ -34,6 +34,7 @@ unsigned short get_local_interface_ip(map<string, string>& interface_ip_map)
 			string local_ip(addressBuffer);
 			// STATIC_WRITE_FORMAT_DEBUG("%s IPv4 Address %s", local_interface.c_str(), local_ip.c_str());
 			interface_ip_map[local_interface] = local_ip;
+			// fprintf(stderr, "%s IPv4 Address %s\n",  local_interface.c_str(), local_ip.c_str());
 		}
 		else if (ifa->ifa_addr->sa_family == AF_INET6) // check it is IP6
 		{
