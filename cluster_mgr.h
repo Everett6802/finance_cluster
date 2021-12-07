@@ -7,6 +7,7 @@
 #include "common.h"
 #include "interactive_server.h"
 #include "simulator_handler.h"
+#include "system_operator.h"
 
 
 class ClusterMgr : public IManager
@@ -45,6 +46,8 @@ private:
 
 	SimulatorHandler* simulator_handler;
 	bool simulator_installed;
+
+	SystemOperator* system_operator;
 
 	unsigned short parse_config();
 	unsigned short find_local_ip(bool need_check_network=false);

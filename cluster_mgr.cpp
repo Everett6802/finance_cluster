@@ -95,24 +95,41 @@ unsigned short ClusterMgr::parse_config()
 
 unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 {
-	static const char* LOCAL_INTERFACE_NAME = "lo";
+	// static const char* LOCAL_INTERFACE_NAME = "lo";
+	static const char* LINUX_INTERFACE_PREFIX1 = "eth";
+	static const int LINUX_INTERFACE_PREFIX1_LEN = strlen(LINUX_INTERFACE_PREFIX1);
+	static const char* LINUX_INTERFACE_PREFIX2 = "enp";
+	static const int LINUX_INTERFACE_PREFIX2_LEN = strlen(LINUX_INTERFACE_PREFIX2);
 	unsigned short ret = RET_SUCCESS;
 
 	map<string, string> interface_ip_map;
 	ret = get_local_interface_ip(interface_ip_map);
+
 	if (CHECK_FAILURE(ret))
 		return ret;
 
 	if (!need_check_network)
 	{
-		if (interface_ip_map.size() != 2)
+		int cnt = 0;
+		map<string, string>::iterator iter_cnt = interface_ip_map.begin();
+		while (iter_cnt != interface_ip_map.end())
+		{
+			string interface = iter_cnt->first;
+			if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0 || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0)
+				cnt++;
+			iter_cnt++;	
+		}
+		if (cnt >= 2)
 		{
 			WRITE_FORMAT_WARN("The network interface[%d] is more than 2, fail to auto-select network interface", interface_ip_map.size());
 			need_check_network = true;
 		}
+
 	}
 	if (!need_check_network)
 		WRITE_DEBUG("Ignore checking network.....");
+	else
+		WRITE_DEBUG("Need to check network.....");
 
 	bool found = false;
 	map<string, string>::iterator iter = interface_ip_map.begin();
@@ -129,7 +146,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
       	}
       	else
       	{
-      		if (strcmp(interface.c_str(), LOCAL_INTERFACE_NAME) != 0)
+      		if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0 || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0)
       			found = true;
       	}
       	if (found)
@@ -536,7 +553,13 @@ unsigned short ClusterMgr::initialize()
 		return ret;
 	simulator_installed = simulator_handler->is_simulator_installed();
 	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
-
+// Initialize the system operater
+	system_operator = new SystemOperator(this);
+	if (system_operator == NULL)
+		throw bad_alloc();
+	ret = system_operator->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
 	return ret;
 }
 
