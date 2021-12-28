@@ -319,10 +319,10 @@ MessageType NodeMessageParser::get_message_type()const
 
 //////////////////////////////////////////////////////////
 
-ClusterNode::ClusterNode(int id, string ip)
+ClusterNode::ClusterNode(int id, string token)
 {
 	node_id = id;
-	node_ip = ip;
+	node_token = token;
 }
 
 bool ClusterNode::operator== (const ClusterNode &n)
@@ -395,6 +395,7 @@ void ClusterMap::reset_cluster_map_str()
 
 
 ClusterMap::ClusterMap() :
+	cluster_local(false),
 	cluster_map_str(NULL)
 {
 
@@ -425,6 +426,15 @@ bool ClusterMap::is_empty()const
 	return cluster_map.empty();
 }
 
+void ClusterMap::set_cluster_local(bool need_cluster_local)
+{
+	if (need_cluster_local != cluster_local)
+	{
+		cluster_local = need_cluster_local;
+		if (!is_empty()) cleanup_node();
+	}
+}
+
 unsigned short ClusterMap::copy(const ClusterMap& another_cluster_map)
 {
 	unsigned short ret = RET_SUCCESS;
@@ -436,17 +446,17 @@ unsigned short ClusterMap::copy(const ClusterMap& another_cluster_map)
 	{
 		ClusterNode* cluster_node = (ClusterNode*)*iter;
 		iter++;
-		// fprintf(stderr, "id: %d, ip: %s, %d\n", cluster_node->node_id, cluster_node->node_ip.c_str(), strlen(cluster_node->node_ip.c_str()));
-		ret = add_node(cluster_node->node_id, cluster_node->node_ip);
+		// fprintf(stderr, "id: %d, token: %s, %d\n", cluster_node->node_id, cluster_node->node_token.c_str(), strlen(cluster_node->node_token.c_str()));
+		ret = add_node(cluster_node->node_id, cluster_node->node_token);
 		if (CHECK_FAILURE(ret))
 			break;
 	}
 	return ret;
 }
 
-unsigned short ClusterMap::add_node(int node_id, std::string node_ip)
+unsigned short ClusterMap::add_node(int node_id, std::string node_token)
 {
-	ClusterNode* cluster_node = new ClusterNode(node_id, node_ip);
+	ClusterNode* cluster_node = new ClusterNode(node_id, node_token);
 	if (cluster_node == NULL)
 		throw bad_alloc();
 	cluster_map.push_back(cluster_node);
@@ -454,17 +464,17 @@ unsigned short ClusterMap::add_node(int node_id, std::string node_ip)
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMap::add_node(const char* node_id_ip_str)
+unsigned short ClusterMap::add_node(const char* node_id_token_str)
 {
-	assert(node_id_ip_str != NULL && "node_id_ip_str should NOT be NULL");
-	char* node_id_ip_str_tmp = strdup(node_id_ip_str);
-	char* str_ptr = node_id_ip_str_tmp;
+	assert(node_id_token_str != NULL && "node_id_token_str should NOT be NULL");
+	char* node_id_token_str_tmp = strdup(node_id_token_str);
+	char* str_ptr = node_id_token_str_tmp;
 	char* node_id_str = strtok(str_ptr, ",");
-	char* node_ip_str = strtok(NULL, ",");
-	unsigned short ret = add_node(atoi(node_id_str), string(node_ip_str));
+	char* node_token_str = strtok(NULL, ",");
+	unsigned short ret = add_node(atoi(node_id_str), string(node_token_str));
 	if (CHECK_FAILURE(ret))
 		return ret;
-	free(node_id_ip_str_tmp);
+	free(node_id_token_str_tmp);
 	return RET_SUCCESS;
 }
 
@@ -497,11 +507,11 @@ unsigned short ClusterMap::delete_node(int node_id)
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMap::delete_node_by_ip(std::string node_ip)
+unsigned short ClusterMap::delete_node_by_token(std::string node_token)
 {
 	unsigned short ret = RET_SUCCESS;
 	int node_id;
-	ret = get_node_id(node_ip, node_id);
+	ret = get_node_id(node_token, node_id);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	return delete_node(node_id);
@@ -537,7 +547,7 @@ unsigned short ClusterMap::cleanup_node()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMap::get_first_node(int& first_node_id, string& first_node_ip, bool peek_only)
+unsigned short ClusterMap::get_first_node(int& first_node_id, string& first_node_token, bool peek_only)
 {
 	unsigned short ret = RET_SUCCESS;
 	if (peek_only)
@@ -547,7 +557,7 @@ unsigned short ClusterMap::get_first_node(int& first_node_id, string& first_node
 		list<ClusterNode*>::iterator iter = cluster_map.begin();
 		ClusterNode* cluster_node = (ClusterNode*)*iter;
 		first_node_id = cluster_node->node_id;
-		first_node_ip = cluster_node->node_ip;
+		first_node_token = cluster_node->node_token;
 	}
 	else
 	{
@@ -556,27 +566,27 @@ unsigned short ClusterMap::get_first_node(int& first_node_id, string& first_node
 		if (CHECK_FAILURE(ret))
 			return ret;
 		first_node_id = first_node->node_id;
-		first_node_ip = first_node->node_ip;
+		first_node_token = first_node->node_token;
 		delete first_node;
 
 	}
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMap::get_first_node_ip(string& first_node_ip, bool peek_only)
+unsigned short ClusterMap::get_first_node_token(string& first_node_token, bool peek_only)
 {
 	int first_node_id;
-	return get_first_node(first_node_id, first_node_ip, peek_only);
+	return get_first_node(first_node_id, first_node_token, peek_only);
 }
 
-unsigned short ClusterMap::get_node_id(const std::string& node_ip, int& node_id)
+unsigned short ClusterMap::get_node_id(const std::string& node_token, int& node_id)
 {
 	bool found = false;
 	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
 	while(iter_find != cluster_map.end())
 	{
 		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
-		if (cluster_node->node_ip == node_ip)
+		if (cluster_node->node_token == node_token)
 		{
 			node_id = cluster_node->node_id;
 			found = true;
@@ -601,7 +611,7 @@ unsigned short ClusterMap::get_last_node_id(int& node_id)
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMap::get_node_ip(int node_id, std::string& node_ip)
+unsigned short ClusterMap::get_node_token(int node_id, std::string& node_token)
 {
 	bool found = false;
 	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
@@ -610,7 +620,7 @@ unsigned short ClusterMap::get_node_ip(int node_id, std::string& node_ip)
 		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
 		if (cluster_node->node_id == node_id)
 		{
-			node_ip = cluster_node->node_ip;
+			node_token = cluster_node->node_token;
 			found = true;
 			break;
 		}
@@ -632,7 +642,7 @@ const char* ClusterMap::to_string()
 		while (iter != cluster_map.end())
 		{
 			ClusterNode* cluster_node = (ClusterNode*)*iter;
-			snprintf(buf, BUF_SIZE, "%d:%s", cluster_node->node_id, cluster_node->node_ip.c_str());
+			snprintf(buf, BUF_SIZE, "%d:%s", cluster_node->node_id, cluster_node->node_token.c_str());
 			if (!total_str.empty())
 				total_str += ",";
 			total_str += buf;
@@ -655,14 +665,14 @@ unsigned short ClusterMap::from_string(const char* cluster_map_str)
 	// fprintf(stderr, "ClusterMap::from_string %s, %d\n", cluster_map_str_tmp, strlen(cluster_map_str_tmp));
 	char* cluster_map_str_ptr = cluster_map_str_tmp;
 	char* cluster_map_str_rest;
-	char* cluster_node_id_ip;
-	while((cluster_node_id_ip=strtok_r(cluster_map_str_ptr, ",", &cluster_map_str_rest)) != NULL)
+	char* cluster_node_id_token;
+	while((cluster_node_id_token=strtok_r(cluster_map_str_ptr, ",", &cluster_map_str_rest)) != NULL)
 	{
 		char* cluster_node_str_rest;
-		char* cluster_node_id = strtok_r(cluster_node_id_ip, ":", &cluster_node_str_rest);
-		char* cluster_node_ip = strtok_r(NULL, ":", &cluster_node_str_rest);
-		// fprintf(stderr, "ClusterMap::from_string id: %d, ip: %s, %d\n", cluster_node_id, cluster_node_ip, strlen(cluster_node_ip));
-		ret = add_node(atoi(cluster_node_id), string(cluster_node_ip));
+		char* cluster_node_id = strtok_r(cluster_node_id_token, ":", &cluster_node_str_rest);
+		char* cluster_node_token = strtok_r(NULL, ":", &cluster_node_str_rest);
+		// fprintf(stderr, "ClusterMap::from_string id: %d, token: %s, %d\n", cluster_node_id, cluster_node_token, strlen(cluster_node_token));
+		ret = add_node(atoi(cluster_node_id), string(cluster_node_token));
 		if (CHECK_FAILURE(ret))
 			return ret;
 		cluster_map_str_ptr = NULL;
@@ -725,7 +735,7 @@ ClusterDetailParam::~ClusterDetailParam(){}
 
 SystemInfoParam::SystemInfoParam()
 {
-	memset(node_ip_buf, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
+	memset(node_token_buf, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
 }
 
 SystemInfoParam::~SystemInfoParam(){}
@@ -914,12 +924,12 @@ NotifyNodeDieCfg::NotifyNodeDieCfg(const void* param, size_t param_size) :
 {
 	// printf("NotifyNodeDieCfg()\n");
 	// fprintf(stderr, "NotifyNodeDieCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	remote_ip = (char*)notify_param;
+	remote_token = (char*)notify_param;
 }
 
 NotifyNodeDieCfg::~NotifyNodeDieCfg()
 {
-	remote_ip = NULL;
+	remote_token = NULL;
 	// printf("~NotifyNodeDieCfg()\n");
 // No need, since the base destructor is virtual
 	// if(notify_param != NULL)
@@ -930,9 +940,9 @@ NotifyNodeDieCfg::~NotifyNodeDieCfg()
 	// }
 }
 
-const char* NotifyNodeDieCfg::get_remote_ip()const
+const char* NotifyNodeDieCfg::get_remote_token()const
 {
-	return remote_ip;
+	return remote_token;
 }
 
 ///////////////////////////
@@ -1266,17 +1276,17 @@ NotifyFileTransferAbortCfg::NotifyFileTransferAbortCfg(const void* param, size_t
 {
 	// printf("NotifyFileTransferAbortCfg()\n");
 	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	remote_ip = (char*)notify_param;
+	remote_token = (char*)notify_param;
 }
 
 NotifyFileTransferAbortCfg::~NotifyFileTransferAbortCfg()
 {
-	remote_ip = NULL;
+	remote_token = NULL;
 }
 
-const char* NotifyFileTransferAbortCfg::get_remote_ip()const
+const char* NotifyFileTransferAbortCfg::get_remote_token()const
 {
-	return remote_ip;
+	return remote_token;
 }
 
 ///////////////////////////
@@ -1334,17 +1344,17 @@ NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_siz
 {
 	// printf("NotifyFileTransferAbortCfg()\n");
 	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	remote_ip = (char*)notify_param;
+	remote_token = (char*)notify_param;
 }
 
 NotifySendFileDoneCfg::~NotifySendFileDoneCfg()
 {
-	remote_ip = NULL;
+	remote_token = NULL;
 }
 
-const char* NotifySendFileDoneCfg::get_remote_ip()const
+const char* NotifySendFileDoneCfg::get_remote_token()const
 {
-	return remote_ip;
+	return remote_token;
 }
 
 //////////////////////////////////////////////////////////

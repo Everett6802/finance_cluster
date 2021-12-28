@@ -593,17 +593,17 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 // Print data in cosole
 	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
 	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
-	char cluster_node_ip[RSP_BUF_VERY_SHORT_SIZE];
+	char cluster_node_token[RSP_BUF_VERY_SHORT_SIZE];
 	while(iter != cluster_detail_param.cluster_map.end())
 	{
 		const ClusterNode& cluster_node = *iter;
-		// snprintf(cluster_node_ip, RSP_BUF_VERY_SHORT_SIZE, "%s", cluster_node.node_ip.c_str());
-		strcpy(cluster_node_ip, cluster_node.node_ip.c_str());
-		// strcpy(cluster_node_ip, "10.206.24.219");
-		int node_type_index = (strcmp(cluster_node_ip, cluster_detail_param.cluster_ip) == 0 ? LEADER : FOLLOWER);
+		// snprintf(cluster_node_token, RSP_BUF_VERY_SHORT_SIZE, "%s", cluster_node.node_token.c_str());
+		strcpy(cluster_node_token, cluster_node.node_token.c_str());
+		// strcpy(cluster_node_token, "10.206.24.219");
+		int node_type_index = (strcmp(cluster_node_token, cluster_detail_param.cluster_ip) == 0 ? LEADER : FOLLOWER);
 		bool is_local_node = (cluster_detail_param.node_id == cluster_node.node_id ? true : false);
 		char buf[RSP_BUF_SIZE];
-		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_ip, NODE_TYPE_LIST[node_type_index]);
+		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_token, NODE_TYPE_LIST[node_type_index]);
 		++iter;
 		cluster_detail_string += string(buf);
 	}
@@ -649,11 +649,11 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 			// simulator_version_string += string(simulator_version_param->simulator_version);
 			// simulator_version_string += string("\n");
 			int node_id = (int)iter->first;
-			string node_ip;
-			ret = cluster_map.get_node_ip(node_id, node_ip);
+			string node_token;
+			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
 			system_info_string += string(buf);
 			++iter;
 		}
@@ -680,14 +680,14 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 // // Get the data
 // 	SystemInfoParam system_info_param;
 // 	system_info_param.session_id = session_id;
-// 	snprintf(system_info_param.node_ip_buf, VERY_SHORT_STRING_SIZE, "%s", argv[1]);
+// 	snprintf(system_info_param.node_token_buf, VERY_SHORT_STRING_SIZE, "%s", argv[1]);
 //     ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
 // 	if (CHECK_FAILURE(ret))
 // 		return ret;
 // // Print data in cosole
 // 	string node_system_info_string(NODE_SYSTEM_INFO_TITLE);
 // 	char cluster_node[RSP_BUF_VERY_SHORT_SIZE];
-// 	snprintf(cluster_node,  RSP_BUF_VERY_SHORT_SIZE, "Node %s\n", system_info_param.node_ip_buf);
+// 	snprintf(cluster_node,  RSP_BUF_VERY_SHORT_SIZE, "Node %s\n", system_info_param.node_token_buf);
 // 	node_system_info_string += string(cluster_node);
 // 	node_system_info_string += system_info_param.system_info;
 // 	node_system_info_string += string("\n");
@@ -734,11 +734,11 @@ unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int
 	while (iter != clusuter_file_transfer_map.end())
 	{
 		int node_id = (int)iter->first;
-		string node_ip;
-		ret = cluster_map.get_node_ip(node_id, node_ip);
+		string node_token;
+		ret = cluster_map.get_node_token(node_id, node_token);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
 		file_transfer_string += string(buf);
 		++iter;
 	}
@@ -784,11 +784,11 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 			// simulator_version_string += string(simulator_version_param->simulator_version);
 			// simulator_version_string += string("\n");
 			int node_id = (int)iter->first;
-			string node_ip;
-			ret = cluster_map.get_node_ip(node_id, node_ip);
+			string node_token;
+			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
 			simulator_version_string += string(buf);
 			++iter;
 		}
@@ -1090,11 +1090,11 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
 			// simulator_version_string += string(simulator_version_param->simulator_version);
 			// simulator_version_string += string("\n");
 			int node_id = (int)iter->first;
-			string node_ip;
-			ret = cluster_map.get_node_ip(node_id, node_ip);
+			string node_token;
+			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_VERY_LONG_STRING_SIZE, "%s  %s\n", node_ip.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_VERY_LONG_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
 			fake_acspt_state_string += string(buf);
 			++iter;
 		}

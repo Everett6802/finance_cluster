@@ -33,6 +33,7 @@ private:
 // config
 	std::string cluster_network;
 	int cluster_netmask_digits;
+	bool cluster_local;
 
 	PNOTIFY_THREAD notify_thread;
 	char* local_ip;

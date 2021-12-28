@@ -23,7 +23,8 @@ private:
 	PIMANAGER observer;
 	int socketfd;
 	int tx_socketfd; // For file transfer
-	char* local_ip;
+	bool cluster_local;
+	char* local_token;
 // Start from 1, 1 for leader, otherwise for follower
 	int cluster_id;
 	int cluster_node_cnt;
@@ -51,9 +52,9 @@ private:
 	// pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
-	unsigned short send_data(MessageType message_type, const char* data=NULL, const char* remote_ip=NULL);
-	unsigned short remove_follower(const std::string& node_ip);
-	unsigned short remove_file_channel(const std::string& node_ip);
+	unsigned short send_data(MessageType message_type, const char* data=NULL, const char* remote_token=NULL);
+	unsigned short remove_follower(const std::string& node_token);
+	unsigned short remove_file_channel(const std::string& node_token);
 	unsigned short become_file_sender();
 	unsigned short start_file_transfer();
 	unsigned short stop_file_transfer();
@@ -101,7 +102,7 @@ private:
 	void tx_listen_thread_cleanup_handler_internal();
 
 public:
-	LeaderNode(PIMANAGER parent, const char* ip);
+	LeaderNode(PIMANAGER parent, const char* token=NULL); // token is NULL for local cluster
 	virtual ~LeaderNode();
 
 // Interface

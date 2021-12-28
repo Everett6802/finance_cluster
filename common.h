@@ -160,10 +160,12 @@ extern const int CLUSTER_PORT_NO;
 extern const int SESSION_PORT_NO;
 extern const int FILE_TRANSFER_PORT_NO;
 extern const int RECV_BUF_SIZE;
+extern const char* CLUSTER_UDS_FILEPATH;
 
 extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
 extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
+extern const char* CONF_FIELD_CLUSTER_LOCAL;
 
 extern const int PAYLOAD_SESSION_ID_DIGITS;
 extern const char* PAYLOAD_SESSION_ID_STRING_FORMAT;
@@ -200,8 +202,8 @@ enum MessageType{
 enum ParamType{
 	PARAM_CLUSTER_MAP,
 	PARAM_CLUSTER_NODE_COUNT,
-	PARAM_CLUSTER_IP2ID,
-	PARAM_CLUSTER_ID2IP,
+	PARAM_CLUSTER_TOKEN2ID,
+	PARAM_CLUSTER_ID2TOKEN,
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
 	PARAM_CLUSTER_DETAIL,
@@ -402,9 +404,9 @@ class ClusterNode
 {
 public:
 	int node_id;
-	std::string node_ip;
+	std::string node_token;
 
-	ClusterNode(int id, std::string ip);
+	ClusterNode(int id, std::string token);
 
     // friend bool operator== (const ClusterNode &n1, const ClusterNode &n2);
     // friend bool operator== (const ClusterNode* p1, const ClusterNode* p2);
@@ -423,6 +425,7 @@ typedef std::list<ClusterNode*>::iterator CLUSTER_NODE_ITER;
 class ClusterMap
 {
 private:
+	bool cluster_local;
 	std::list<ClusterNode*> cluster_map;
 	char* cluster_map_str;
 
@@ -451,18 +454,19 @@ public:
 
     size_t size()const;
     bool is_empty()const;
+    void set_cluster_local(bool need_cluster_local);
     unsigned short copy(const ClusterMap& another_cluster_map);
-	unsigned short add_node(int node_id, std::string node_ip);
-	unsigned short add_node(const char* node_id_ip_str);
+	unsigned short add_node(int node_id, std::string node_token);
+	unsigned short add_node(const char* node_id_token_str);
 	unsigned short delete_node(int node_id);
-	unsigned short delete_node_by_ip(std::string node_ip);
+	unsigned short delete_node_by_token(std::string node_token);
 	unsigned short pop_node(ClusterNode** first_node);
 	unsigned short cleanup_node();
-	unsigned short get_first_node(int& first_node_id, std::string& first_node_ip, bool peek_only=false);
-	unsigned short get_first_node_ip(std::string& first_node_ip, bool peek_only=false);
-	unsigned short get_node_id(const std::string& node_ip, int& node_id);
+	unsigned short get_first_node(int& first_node_id, std::string& first_node_token, bool peek_only=false);
+	unsigned short get_first_node_token(std::string& first_node_token, bool peek_only=false);
+	unsigned short get_node_id(const std::string& node_token, int& node_id);
 	unsigned short get_last_node_id(int& node_id);
-	unsigned short get_node_ip(int node_id, std::string& node_ip);
+	unsigned short get_node_token(int node_id, std::string& node_token);
 	const char* to_string();
 	unsigned short from_string(const char* cluster_map_str);
 	// unsigned short from_object(const ClusterMap& cluster_map_obj);
@@ -505,7 +509,7 @@ class SystemInfoParam
 {
 public:
 	int session_id;
-	char node_ip_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node ip or id
+	char node_token_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node token or id
 	std::string system_info;
 
 	SystemInfoParam();
@@ -636,13 +640,13 @@ typedef NotifyCfg* PNOTIFY_CFG;
 class NotifyNodeDieCfg : public NotifyCfg
 {
 private:
-	char* remote_ip;
+	char* remote_token;
 
 public:
 	NotifyNodeDieCfg(const void* param, size_t param_size);
 	virtual ~NotifyNodeDieCfg();
 
-	const char* get_remote_ip()const;
+	const char* get_remote_token()const;
 };
 typedef NotifyNodeDieCfg* PNOTIFY_NODE_DIE_CFG;
 
@@ -798,13 +802,13 @@ typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
 class NotifyFileTransferAbortCfg : public NotifyCfg
 {
 private:
-	char* remote_ip;
+	char* remote_token;
 
 public:
 	NotifyFileTransferAbortCfg(const void* param, size_t param_size);
 	virtual ~NotifyFileTransferAbortCfg();
 
-	const char* get_remote_ip()const;
+	const char* get_remote_token()const;
 };
 typedef NotifyFileTransferAbortCfg* PNOTIFY_FILE_TRANSFER_ABORT_CFG;
 
@@ -833,13 +837,13 @@ typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
 class NotifySendFileDoneCfg : public NotifyCfg
 {
 private:
-	char* remote_ip;
+	char* remote_token;
 
 public:
 	NotifySendFileDoneCfg(const void* param, size_t param_size);
 	virtual ~NotifySendFileDoneCfg();
 
-	const char* get_remote_ip()const;
+	const char* get_remote_token()const;
 };
 typedef NotifySendFileDoneCfg* PNOTIFY_SEND_FILE_DONE_CFG;
 

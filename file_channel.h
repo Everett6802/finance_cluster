@@ -23,8 +23,8 @@ class FileChannel
 private:
 	PINODE observer;
 	volatile int exit;
-    std::string node_ip;
-    std::string remote_ip;
+    std::string node_token;
+    std::string remote_token;
     bool is_sender;
 	pthread_t send_tid;
 	pthread_t recv_tid;
@@ -55,11 +55,11 @@ private:
 
 	FileChannel(PINODE node);
 	~FileChannel();
-	unsigned short initialize(const char* filepath, const char* channel_ip, const char* channel_remote_ip, int channel_socket, bool sender=false, bool session_id=-1/*Only for sender*/);
+	unsigned short initialize(const char* filepath, const char* channel_token, const char* channel_remote_token, int channel_socket, bool sender=false, bool session_id=-1/*Only for sender*/);
 	unsigned short deinitialize();
 	void notify_exit();
-	const char* get_ip()const;
-	const char* get_remote_ip()const;
+	const char* get_token()const;
+	const char* get_remote_token()const;
 
 	unsigned short request_transfer();
 	// unsigned short complete_transfer();

@@ -13,7 +13,7 @@ const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
 NodeChannel::NodeChannel(PINODE node) :
 	exit(0),
-//	node_ip(NULL),
+//	node_token(NULL),
 	send_tid(0),
 	recv_tid(0),
 	node_socket(0),
@@ -31,22 +31,22 @@ NodeChannel::~NodeChannel()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short NodeChannel::initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip)
+unsigned short NodeChannel::initialize(int channel_socket, const char* channel_token, const char* channel_remote_token)
 {
-	if (channel_ip == NULL)
+	if (channel_token == NULL)
 	{
-		WRITE_ERROR("channel_ip should NOT be NULL");
+		WRITE_ERROR("channel_token should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
-	if (channel_remote_ip == NULL)
+	if (channel_remote_token == NULL)
 	{
-		WRITE_ERROR("channel_remote_ip should NOT be NULL");
+		WRITE_ERROR("channel_remote_token should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 
 	node_socket = channel_socket;
-	node_ip = string(channel_ip);
-	remote_ip = string(channel_remote_ip);
+	node_token = string(channel_token);
+	remote_token = string(channel_remote_token);
 
 	mtx_buffer = PTHREAD_MUTEX_INITIALIZER;
 	cond_buffer = PTHREAD_COND_INITIALIZER;
@@ -196,14 +196,14 @@ void NodeChannel::notify_exit()
 	pthread_mutex_unlock(&mtx_buffer);
 }
 
-const char* NodeChannel::get_ip()const
+const char* NodeChannel::get_token()const
 {
-	return node_ip.c_str();
+	return node_token.c_str();
 }
 
-const char* NodeChannel::get_remote_ip()const
+const char* NodeChannel::get_remote_token()const
 {
-	return remote_ip.c_str();
+	return remote_token.c_str();
 }
 
 unsigned short NodeChannel::send_msg(const char* msg_data)
@@ -293,7 +293,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 				{
 					static const int ERRMSG_SIZE = 256;
 					char errmsg[ERRMSG_SIZE];
-					snprintf(errmsg, ERRMSG_SIZE, "Error occur while writing message to the Node[%s], due to: %s", remote_ip.c_str(), strerror(errno));
+					snprintf(errmsg, ERRMSG_SIZE, "Error occur while writing message to the Node[%s], due to: %s", remote_token.c_str(), strerror(errno));
 					WRITE_ERROR(errmsg);
 					// fprintf(stderr, errmsg);
 					ret = RET_FAILURE_SYSTEM_API;
@@ -387,7 +387,7 @@ void* NodeChannel::recv_thread_handler(void* pvoid)
 
 unsigned short NodeChannel::recv_thread_handler_internal()
 {
-	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
+	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_token.c_str());
 
 	char buf[RECV_BUF_SIZE];
 	unsigned short ret = RET_SUCCESS;
@@ -415,9 +415,9 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
 			{
 // Allocate the nofity event parameter
-				// const char* notify_param = remote_ip.c_str();
-				size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
-				PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_ip.c_str(), notify_param_size);
+				// const char* notify_param = remote_token.c_str();
+				size_t notify_param_size = strlen(remote_token.c_str()) + 1;
+				PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_token.c_str(), notify_param_size);
 				if (notify_cfg == NULL)
 					throw bad_alloc();
 // Notify the event
@@ -435,7 +435,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 						continue;
 					else
 					{
-						WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
+						WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
 						break;
 					}
 				}
@@ -443,7 +443,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
-					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_ip.c_str(), GetErrorDescription(ret));
+					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
 					break;
 				}
 // Remove the data which is already shown
@@ -465,6 +465,6 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // Segmetation fault occurs while calling WRITE_FORMAT_INFO
 // I don't know why. Perhaps similiar issue as below:
 // https://forum.bitcraze.io/viewtopic.php?t=1089
-	// WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_ip.c_str());
+	// WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is dead !!!", thread_tag, node_token.c_str());
 	return ret;
 }

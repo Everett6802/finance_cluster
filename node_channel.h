@@ -22,8 +22,8 @@ class NodeChannel
 private:
 	PINODE observer;
 	volatile int exit;
-    std::string node_ip;
-    std::string remote_ip;
+    std::string node_token;
+    std::string remote_token;
 	pthread_t send_tid;
 	pthread_t recv_tid;
 	int node_socket;
@@ -48,11 +48,11 @@ private:
 	NodeChannel(PINODE node);
 	~NodeChannel();
 
-	unsigned short initialize(int channel_socket, const char* channel_ip, const char* channel_remote_ip);
+	unsigned short initialize(int channel_socket, const char* channel_token, const char* channel_remote_token);
 	unsigned short deinitialize();
 	void notify_exit();
-	const char* get_ip()const;
-	const char* get_remote_ip()const;
+	const char* get_token()const;
+	const char* get_remote_token()const;
 
 	unsigned short send_msg(const char* msg_data);
 };

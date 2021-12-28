@@ -24,8 +24,9 @@ private:
 	PIMANAGER observer;
 	int socketfd;
 	int tx_socketfd; // For file transfer
-	char* local_ip;
-	char* cluster_ip;
+	bool cluster_local;
+	char* local_token;
+	char* cluster_token;
 // Start from 1, 1 for leader, otherwise for follower
 	int cluster_id;
 	ClusterMap cluster_map;
@@ -73,7 +74,7 @@ private:
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
-	FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip);
+	FollowerNode(PIMANAGER parent, const char* server_token=NULL, const char* token=NULL);  // server_token/token is NULL for local cluster
 	virtual ~FollowerNode();
 
 // Interface

@@ -2,6 +2,7 @@
 #include <fcntl.h>
 // #include <errno.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "follower_node.h"
@@ -15,12 +16,13 @@ const int FollowerNode::TRY_CONNECTION_SLEEP_TIMES = 15;
 const int FollowerNode::CHECK_KEEPALIVE_TIMES = 4;
 const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPALIVE_TIMES;
 
-FollowerNode::FollowerNode(PIMANAGER parent, const char* server_ip, const char* ip) :
+FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const char* token) :
 	observer(parent),
 	socketfd(0),
 	tx_socketfd(0),
-	local_ip(NULL),
-	cluster_ip(NULL),
+	cluster_local(true),
+	local_token(NULL),
+	cluster_token(NULL),
 	cluster_id(0),
 	keepalive_cnt(0),
 	connection_retry(false),
@@ -30,12 +32,17 @@ FollowerNode::FollowerNode(PIMANAGER parent, const char* server_ip, const char* 
 {
 	IMPLEMENT_MSG_DUMPER()
 
-	if (server_ip == NULL || ip == NULL)
-		throw invalid_argument(string("server_ip/ip == NULL"));
-	if (ip == NULL)
-		throw invalid_argument(string("ip == NULL"));
-	local_ip = strdup(ip);
-	cluster_ip = strdup(server_ip);
+	bool check_input = !((server_token == NULL) ^ (token == NULL));
+	assert(check_input && "incorrect input: server_token/token");
+	cluster_local = (token == NULL ? true : false);
+	// if (server_token == NULL || token == NULL)
+	// 	throw invalid_argument(string("server_token/token == NULL"));
+	cluster_local = (token == NULL ? true : false);
+	if (!cluster_local)
+	{
+		local_token = strdup(token);
+		cluster_token = strdup(server_token);
+	}
 }
 
 FollowerNode::~FollowerNode()
@@ -56,10 +63,14 @@ FollowerNode::~FollowerNode()
 
 unsigned short FollowerNode::connect_leader()
 {
-	WRITE_FORMAT_DEBUG("Try to connect to Leader[%s]......", cluster_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to Leader[%s]......", cluster_token);
 
 // Create socket
-	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+	int sock_fd = 0;
+	if (cluster_local)
+		sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	else
+		sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock_fd < 0)
 	{
 		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
@@ -80,12 +91,24 @@ unsigned short FollowerNode::connect_leader()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	sockaddr_in client_address;
-	memset(&client_address, 0x0, sizeof(struct sockaddr_in));
-	client_address.sin_family = AF_INET;
-	client_address.sin_port = htons(CLUSTER_PORT_NO);
-	client_address.sin_addr.s_addr = inet_addr(cluster_ip);
-	int res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	int res;
+	if (cluster_local)
+	{
+		sockaddr_un client_address;
+		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
+		client_address.sun_family = AF_UNIX;
+		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	}
+	else
+	{
+		sockaddr_in client_address;
+		memset(&client_address, 0x0, sizeof(struct sockaddr_in));
+		client_address.sin_family = AF_INET;
+		client_address.sin_port = htons(CLUSTER_PORT_NO);
+		client_address.sin_addr.s_addr = inet_addr(cluster_token);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	}
 	if (res < 0)
 	{
 		if (errno == EINPROGRESS)
@@ -148,7 +171,7 @@ unsigned short FollowerNode::connect_leader()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
 	socketfd = sock_fd;
 
 	return RET_SUCCESS;
@@ -160,7 +183,7 @@ unsigned short FollowerNode::become_follower()
 	unsigned short ret = connect_leader();
 	if (IS_TRY_CONNECTION_TIMEOUT(ret))
 	{
-		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", cluster_ip);
+		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", cluster_token);
 		return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
 	}
 	else
@@ -169,8 +192,8 @@ unsigned short FollowerNode::become_follower()
 			return ret;
 	}
 
-	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_ip);
-	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_ip, cluster_ip);
+	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_token);
+	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
 
 	return ret;
 }
@@ -178,7 +201,7 @@ unsigned short FollowerNode::become_follower()
 
 unsigned short FollowerNode::connect_file_sender()
 {
-	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_token);
 
 // Create socket
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -202,12 +225,24 @@ unsigned short FollowerNode::connect_file_sender()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	sockaddr_in client_address;
-	memset(&client_address, 0x0, sizeof(struct sockaddr_in));
-	client_address.sin_family = AF_INET;
-	client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
-	client_address.sin_addr.s_addr = inet_addr(cluster_ip);
-	int res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	int res;
+	if (cluster_local)
+	{
+		sockaddr_un client_address;
+		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
+		client_address.sun_family = AF_UNIX;
+		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	}
+	else
+	{
+		sockaddr_in client_address;
+		memset(&client_address, 0x0, sizeof(struct sockaddr_in));
+		client_address.sin_family = AF_INET;
+		client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
+		client_address.sin_addr.s_addr = inet_addr(cluster_token);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+	}
 	if (res < 0)
 	{
 		if (errno == EINPROGRESS)
@@ -270,7 +305,7 @@ unsigned short FollowerNode::connect_file_sender()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_ip);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
 	tx_socketfd = sock_fd;
 
 	return RET_SUCCESS;
@@ -280,7 +315,7 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(msg != NULL && "msg should NOT be NULL");
-	// fprintf(stderr, "Follower[%s] Message: type: %d, data: %s\n", local_ip, message_type, data);
+	// fprintf(stderr, "Follower[%s] Message: type: %d, data: %s\n", local_token, message_type, data);
 	NodeMessageAssembler node_message_assembler;
 	ret = node_message_assembler.assemble(message_type, data);
 	if (CHECK_FAILURE(ret))
@@ -294,9 +329,9 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 	assert(node_channel != NULL && "node_channel should NOT be NULL");
 	ret = node_channel->send_msg(node_message_assembler.get_full_message());
 	if (CHECK_FAILURE(ret))
-		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_token, GetErrorDescription(ret));
 	pthread_mutex_unlock(&node_channel_mtx);
-	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_ip, (node_message_assembler.get_full_message() + 1), (int)(*node_message_assembler.get_full_message()));
+	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_token, (node_message_assembler.get_full_message() + 1), (int)(*node_message_assembler.get_full_message()));
 	return ret;
 }
 
@@ -324,7 +359,7 @@ unsigned short FollowerNode::initialize()
 // Check if time-out occurs while trying to connect to the remote node
 			if (IS_TRY_CONNECTION_TIMEOUT(ret) && connection_retry)
 			{
-				WRITE_FORMAT_DEBUG("Re-build the cluster. Node[%s] try to connect to Leader[%s], but no response... %d", local_ip, cluster_ip, i);
+				WRITE_FORMAT_DEBUG("Re-build the cluster. Node[%s] try to connect to Leader[%s], but no response... %d", local_token, cluster_token, i);
 				sleep(TRY_CONNECTION_SLEEP_TIMES);
 			}
 			else
@@ -335,9 +370,9 @@ unsigned short FollowerNode::initialize()
 	if (CHECK_FAILURE(ret))
 	{
 		if (!IS_TRY_CONNECTION_TIMEOUT(ret))
-			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to Leader[%s], due to: %s", local_ip, cluster_ip, GetErrorDescription(ret));
+			WRITE_FORMAT_ERROR("Error occur while Node[%s]'s trying to connect to Leader[%s], due to: %s", local_token, cluster_token, GetErrorDescription(ret));
 		else
-			WRITE_FORMAT_WARN("Node[%s] try to connect to Leader[%s], buf time-out...", local_ip, cluster_ip);
+			WRITE_FORMAT_WARN("Node[%s] try to connect to Leader[%s], buf time-out...", local_token, cluster_token);
 		return ret;
 	}
 // Initialize the synchronization object
@@ -355,7 +390,7 @@ unsigned short FollowerNode::initialize()
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	return node_channel->initialize(socketfd, local_ip, cluster_ip);
+	return node_channel->initialize(socketfd, local_token, cluster_token);
 }
 
 unsigned short FollowerNode::deinitialize()
@@ -368,14 +403,14 @@ unsigned short FollowerNode::deinitialize()
 		delete file_channel;
 		file_channel = NULL;
 		if (CHECK_FAILURE(ret))
-			WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_ip);
+			WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_token);
 	}
 
 	if (node_channel != NULL)
 	{
 		ret = node_channel->deinitialize();
 		if (CHECK_FAILURE(ret))
-			WRITE_FORMAT_WARN("Fail to de-initialize the node channel worker thread[Node: %s]", local_ip);
+			WRITE_FORMAT_WARN("Fail to de-initialize the node channel worker thread[Node: %s]", local_token);
 		delete node_channel;
 		node_channel = NULL;
 	}
@@ -385,16 +420,16 @@ unsigned short FollowerNode::deinitialize()
 		close(socketfd);
 		socketfd = 0;
 	}
-	if (cluster_ip != NULL)
+	if (cluster_token != NULL)
 	{
-		free(cluster_ip);
-		cluster_ip = NULL;
+		free(cluster_token);
+		cluster_token = NULL;
 	}
-	if (local_ip != NULL)
+	if (local_token != NULL)
 	{
-		// delete[] local_ip;
-		free(local_ip);
-		local_ip = NULL;
+		// delete[] local_token;
+		free(local_token);
+		local_token = NULL;
 	}
 	if (notify_thread != NULL)
 	{
@@ -407,7 +442,7 @@ unsigned short FollowerNode::deinitialize()
 
 unsigned short FollowerNode::recv(MessageType message_type, const std::string& message_data)
 {
-	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", ip.c_str(), message.c_str(), (int)message.length());
+	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", token.c_str(), message.c_str(), (int)message.length());
 	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const std::string& message_data);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
@@ -488,7 +523,7 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 	// fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
 	if (CHECK_FAILURE(ret))
 	{
-		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 		goto OUT;
 	}
 	if (cluster_id == 0)
@@ -497,7 +532,7 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 	    ret = cluster_map.get_last_node_id(cluster_id);
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 			goto OUT;
 		}
     }
@@ -649,8 +684,8 @@ unsigned short FollowerNode::recv_request_file_transfer(const std::string& messa
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
-	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_ip);
-	ret = file_channel->initialize(tx_filepath, local_ip, cluster_ip, tx_socketfd);
+	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_token);
+	ret = file_channel->initialize(tx_filepath, local_token, cluster_token, tx_socketfd);
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -682,18 +717,18 @@ unsigned short FollowerNode::recv_complete_file_transfer(const std::string& mess
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
 // Message format:
-// EventType | payload: local_ip | EOD
+// EventType | payload: local_token | EOD
 	// fprintf(stderr, "Recv30: Send Cheek Keepalive\n");
 	if (keepalive_cnt == 0)
 	{
 		// fprintf(stderr, "KeepAlive counter is 0!\n");
 // The leader die !!!
-		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%s]", local_ip, cluster_ip);
+		WRITE_FORMAT_ERROR("Follower[%s] got no response from Leader[%s]", local_token, cluster_token);
 		return RET_FAILURE_CONNECTION_KEEPALIVE_TIMEOUT;
 	}
 
 	// fprintf(stderr, "KeepAlive Sent\n");
-	return send_data(MSG_CHECK_KEEPALIVE, local_ip);
+	return send_data(MSG_CHECK_KEEPALIVE, local_token);
 	// char msg = (char)MSG_CHECK_KEEPALIVE;
 	// return send_data(&msg);
 }
@@ -744,14 +779,14 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 	string system_info;
 	ret = get_system_info(system_info);
 	if (CHECK_FAILURE(ret))
-		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 	else
 		system_info_data += system_info;
-	// fprintf(stderr, "Follower[%s] send_get_system_info message: %s\n", local_ip, system_info_data.c_str());
+	// fprintf(stderr, "Follower[%s] send_get_system_info message: %s\n", local_token, system_info_data.c_str());
 	// char session_id_str[3];
 	// memset(session_id_str, 0x0, sizeof(char) * 3);
 	// memcpy(session_id_str, system_info_data.c_str(), sizeof(char) * 2);
-	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_ip, atoi(session_id_str), (system_info_data.c_str() + 2));
+	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
 }
 
@@ -787,7 +822,7 @@ unsigned short FollowerNode::send_get_simulator_version(void* param1, void* para
 		throw bad_alloc();
     ret = observer->get(PARAM_SIMULATOR_VERSION, (void*)simulator_version_param);
 	if (CHECK_FAILURE(ret))
-		WRITE_FORMAT_ERROR("Fails to get simulaltor version in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fails to get simulaltor version in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 	else
 	{
 		string simulator_version(simulator_version_param->simulator_version);
@@ -844,7 +879,7 @@ unsigned short FollowerNode::send_get_fake_acspt_state(void* param1, void* param
 		throw bad_alloc();
     ret = observer->get(PARAM_FAKE_ACSPT_STATE, (void*)fake_acspt_state_param);
 	if (CHECK_FAILURE(ret))
-		WRITE_FORMAT_ERROR("Fails to get fake acspt state in Follower[%s], due to: %s", local_ip, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fails to get fake acspt state in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 	else
 	{
 		string fake_acspt_state(fake_acspt_state_param->fake_acspt_state);

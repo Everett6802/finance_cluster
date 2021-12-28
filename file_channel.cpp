@@ -14,7 +14,7 @@ const long FileChannel::MAX_BUF_SIZE = 1024 * 100;
 
 FileChannel::FileChannel(PINODE node) :
 	exit(0),
-//	node_ip(NULL),
+//	node_token(NULL),
 	is_sender(false),
 	send_tid(0),
 	recv_tid(0),
@@ -37,28 +37,28 @@ FileChannel::~FileChannel()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short FileChannel::initialize(const char* filepath, const char* channel_ip, const char* channel_remote_ip, int channel_socket, bool sender, bool session_id)
+unsigned short FileChannel::initialize(const char* filepath, const char* channel_token, const char* channel_remote_token, int channel_socket, bool sender, bool session_id)
 {
 	if (filepath == NULL)
 	{
 		WRITE_ERROR("filepath should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}	
-	if (channel_ip == NULL)
+	if (channel_token == NULL)
 	{
-		WRITE_ERROR("channel_ip should NOT be NULL");
+		WRITE_ERROR("channel_token should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
-	if (channel_remote_ip == NULL)
+	if (channel_remote_token == NULL)
 	{
-		WRITE_ERROR("channel_remote_ip should NOT be NULL");
+		WRITE_ERROR("channel_remote_token should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
 	is_sender = sender;
 
 	tx_filepath = strdup(filepath);
-	node_ip = string(channel_ip);
-	remote_ip = string(channel_remote_ip);
+	node_token = string(channel_token);
+	remote_token = string(channel_remote_token);
 	tx_socket = channel_socket;
 	tx_session_id = session_id;
 
@@ -250,21 +250,21 @@ void FileChannel::notify_exit()
 	pthread_mutex_unlock(&mtx_buffer);
 }
 
-const char* FileChannel::get_ip()const
+const char* FileChannel::get_token()const
 {
-	return node_ip.c_str();
+	return node_token.c_str();
 }
 
-const char* FileChannel::get_remote_ip()const
+const char* FileChannel::get_remote_token()const
 {
-	return remote_ip.c_str();
+	return remote_token.c_str();
 }
 
 unsigned short FileChannel::request_transfer()
 {
     if (!is_sender)
     {
-    	WRITE_FORMAT_ERROR("Incorrect operation: Node[%s] is NOT a sender", node_ip.c_str());
+    	WRITE_FORMAT_ERROR("Incorrect operation: Node[%s] is NOT a sender", node_token.c_str());
     	return RET_FAILURE_INCORRECT_OPERATION;
     }
 // Create a worker thread to access data...
@@ -281,7 +281,7 @@ unsigned short FileChannel::request_transfer()
 // {
 //     if (is_sender)
 //     {
-//     	WRITE_FORMAT_ERROR("Incorrect operation: Node[%s] is NOT a receiver", node_ip);
+//     	WRITE_FORMAT_ERROR("Incorrect operation: Node[%s] is NOT a receiver", node_token);
 //     	return RET_FAILURE_INCORRECT_OPERATION;
 //     }
 
@@ -348,7 +348,7 @@ unsigned short FileChannel::send_thread_handler_internal()
    	size_t write_bytes;
    	int start_pos = 0;
 	size_t write_to_byte;
-	WRITE_FORMAT_DEBUG("Start to read data from the file for the Node[%s]...", remote_ip.c_str());
+	WRITE_FORMAT_DEBUG("Start to read data from the file for the Node[%s]...", remote_token.c_str());
    	int read_cnt = 0;
    	int send_cnt = 0;
    	while (!feof(tx_fp))
@@ -357,12 +357,12 @@ unsigned short FileChannel::send_thread_handler_internal()
    		read_bytes = fread(tx_buf, sizeof(char), MAX_BUF_SIZE, tx_fp);
 		if (read_bytes < 0)
 		{
-	    	WRITE_FORMAT_ERROR("Error occurs while reading file for the Node[%s], due to: %s", remote_ip.c_str(), strerror(errno));
+	    	WRITE_FORMAT_ERROR("Error occurs while reading file for the Node[%s], due to: %s", remote_token.c_str(), strerror(errno));
 			ret = RET_FAILURE_SYSTEM_API;
 			goto OUT;
 	   	}
 	   	else
-	   		WRITE_FORMAT_DEBUG("Read %d bytes from the file for the Node[%s]... %d", read_bytes, remote_ip.c_str(), ++read_cnt);
+	   		WRITE_FORMAT_DEBUG("Read %d bytes from the file for the Node[%s]... %d", read_bytes, remote_token.c_str(), ++read_cnt);
 // Send data to the remote
 		start_pos = 0;
 		write_to_byte = read_bytes;
@@ -371,12 +371,12 @@ unsigned short FileChannel::send_thread_handler_internal()
 			write_bytes = send(tx_socket, &tx_buf[start_pos], write_to_byte, 0);
 			if (write_bytes < 0)
 			{
-				WRITE_FORMAT_ERROR("Error occur while writing data to the Node[%s], due to: %s", remote_ip.c_str(), strerror(errno));
+				WRITE_FORMAT_ERROR("Error occur while writing data to the Node[%s], due to: %s", remote_token.c_str(), strerror(errno));
 				ret = RET_FAILURE_SYSTEM_API;
 				goto OUT;
 			}
 		   	else
-		   		WRITE_FORMAT_DEBUG("Send %d bytes to the Node[%s]... %d", write_bytes, remote_ip.c_str(), ++send_cnt);
+		   		WRITE_FORMAT_DEBUG("Send %d bytes to the Node[%s]... %d", write_bytes, remote_token.c_str(), ++send_cnt);
 			start_pos += write_bytes;
 			write_to_byte -= write_bytes;
 		}
@@ -388,14 +388,14 @@ OUT:
 
 	assert(observer != NULL && "observer should NOT be NULL");
 // Notify the follower 
-	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_ip.c_str());
+	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
 // // Close the local file transfer channel
 // 	NodeFileTransferDoneParam node_file_transfer_done_param;
-// 	snprintf(node_file_transfer_done_param.node_ip, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_ip.c_str());
+// 	snprintf(node_file_transfer_done_param.node_token, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_token.c_str());
 // 	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
 // Close the parent to close the local file transfer channel
-	size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(remote_ip.c_str(), notify_param_size);
+	size_t notify_param_size = strlen(remote_token.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(remote_token.c_str(), notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -462,7 +462,7 @@ void* FileChannel::recv_thread_handler(void* pvoid)
 
 unsigned short FileChannel::recv_thread_handler_internal()
 {
-	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_ip.c_str());
+	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_token.c_str());
 	unsigned short ret = RET_SUCCESS;
 	assert(tx_filepath != NULL && "tx_filepath should be NOT NULL");
 	assert(tx_buf == NULL && "tx_buf should be NULL");
@@ -505,9 +505,9 @@ unsigned short FileChannel::recv_thread_handler_internal()
 			if (read_bytes == 0) // if recv() returns zero, that means the connection has been closed
 			{
 // Allocate the nofity event parameter
-				// const char* notify_param = remote_ip.c_str();
-				size_t notify_param_size = strlen(remote_ip.c_str()) + 1;
-				PNOTIFY_CFG notify_cfg = new NotifyFileTransferAbortCfg(remote_ip.c_str(), notify_param_size);
+				// const char* notify_param = remote_token.c_str();
+				size_t notify_param_size = strlen(remote_token.c_str()) + 1;
+				PNOTIFY_CFG notify_cfg = new NotifyFileTransferAbortCfg(remote_token.c_str(), notify_param_size);
 				if (notify_cfg == NULL)
 					throw bad_alloc();
 // Notify the event
@@ -518,7 +518,7 @@ unsigned short FileChannel::recv_thread_handler_internal()
 			}
 			else
 			{
-				WRITE_FORMAT_DEBUG("Recv %d bytes from the Node[%s]", read_bytes, remote_ip.c_str());
+				WRITE_FORMAT_DEBUG("Recv %d bytes from the Node[%s]", read_bytes, remote_token.c_str());
 // Write data from into file
 // When using fwrite() for record output, set size to 1 and count to 
 // the length of the record to obtain the number of bytes written. 

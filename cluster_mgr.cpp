@@ -9,6 +9,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <ctype.h>
 // #include <arpa/inet.h>
 // #include <sys/socket.h>
 #include "cluster_mgr.h"
@@ -74,6 +75,32 @@ unsigned short ClusterMgr::parse_config()
 		{
 			cluster_netmask_digits = atoi(conf_value);
 			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_CLUSTER_NETMASK_DIGITS, cluster_netmask_digits);
+		}
+		else if (strcmp(conf_name, CONF_FIELD_CLUSTER_LOCAL) == 0)
+		{
+			char* conf_value_new = strdup(conf_value);
+			assert (conf_value_new != NULL && "conf_value_new should NOT be NULL");
+			char* conf_value_ptr = conf_value_new;
+			while (*conf_value_ptr != '\0')
+			{
+				*conf_value_ptr = tolower(*conf_value_ptr);
+				conf_value_ptr++;
+			}
+			if (strcmp(conf_value_new, "yes") == 0)
+				cluster_local = true;
+			else if (strcmp(conf_value_new, "no") == 0)
+				cluster_local = false;
+			else
+			{
+				WRITE_FORMAT_ERROR("Incorrect configuration value: %s, should be 'yes' or 'no'", conf_value_new);
+				return RET_FAILURE_INCORRECT_CONFIG;				
+			}
+			if (conf_value_new != NULL)
+			{
+				free(conf_value_new);
+				conf_value_new = NULL;
+			}
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_CLUSTER_LOCAL, (cluster_local ? "yes" : "no"));
 		}
 		else
 		{
@@ -168,6 +195,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 }
 
 ClusterMgr::ClusterMgr() :
+	cluster_local(true),
 	notify_thread(NULL),
 	local_ip(NULL),
 	cluster_ip(NULL),
@@ -251,7 +279,7 @@ void ClusterMgr::stop_keepalive_timer()
 unsigned short ClusterMgr::become_leader()
 {
 	assert(local_ip != NULL && "local_ip should NOT be NULL");
-	cluster_node = new LeaderNode(this, local_ip);
+	cluster_node = (cluster_local ? new LeaderNode(this): new LeaderNode(this, local_ip));
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Leader)");
@@ -272,7 +300,7 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 	assert(local_ip != NULL && "local_ip should NOT be NULL");
 	assert(cluster_ip != NULL && "cluster_ip should NOT be NULL");
 
-	cluster_node = new FollowerNode(this, cluster_ip, local_ip);
+	cluster_node = (cluster_local ? new FollowerNode(this) : new FollowerNode(this, cluster_ip, local_ip));
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
