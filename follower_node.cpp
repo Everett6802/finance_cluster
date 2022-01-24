@@ -20,7 +20,7 @@ FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const cha
 	observer(parent),
 	socketfd(0),
 	tx_socketfd(0),
-	cluster_local(true),
+	local_cluster(true),
 	local_token(NULL),
 	cluster_token(NULL),
 	cluster_id(0),
@@ -32,17 +32,15 @@ FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const cha
 {
 	IMPLEMENT_MSG_DUMPER()
 
-	bool check_input = !((server_token == NULL) ^ (token == NULL));
-	assert(check_input && "incorrect input: server_token/token");
-	cluster_local = (token == NULL ? true : false);
+	// bool check_input = !((server_token == NULL) ^ (token == NULL));
+	// assert(check_input && "incorrect input: server_token/token");
+	assert(server_token != NULL && "server_token should NOT be NULL");
+	assert(token != NULL && "token should NOT be NULL");
+	local_cluster = (token == NULL ? true : false);
 	// if (server_token == NULL || token == NULL)
 	// 	throw invalid_argument(string("server_token/token == NULL"));
-	cluster_local = (token == NULL ? true : false);
-	if (!cluster_local)
-	{
-		local_token = strdup(token);
-		cluster_token = strdup(server_token);
-	}
+	local_token = strdup(token);
+	cluster_token = strdup(server_token);
 }
 
 FollowerNode::~FollowerNode()
@@ -67,7 +65,7 @@ unsigned short FollowerNode::connect_leader()
 
 // Create socket
 	int sock_fd = 0;
-	if (cluster_local)
+	if (local_cluster)
 		sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	else
 		sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -92,7 +90,7 @@ unsigned short FollowerNode::connect_leader()
 	}
 
 	int res;
-	if (cluster_local)
+	if (local_cluster)
 	{
 		sockaddr_un client_address;
 		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
@@ -226,7 +224,7 @@ unsigned short FollowerNode::connect_file_sender()
 	}
 
 	int res;
-	if (cluster_local)
+	if (local_cluster)
 	{
 		sockaddr_un client_address;
 		memset(&client_address, 0x0, sizeof(struct sockaddr_un));

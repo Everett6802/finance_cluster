@@ -395,7 +395,7 @@ void ClusterMap::reset_cluster_map_str()
 
 
 ClusterMap::ClusterMap() :
-	cluster_local(false),
+	local_cluster(false),
 	cluster_map_str(NULL)
 {
 
@@ -426,11 +426,11 @@ bool ClusterMap::is_empty()const
 	return cluster_map.empty();
 }
 
-void ClusterMap::set_cluster_local(bool need_cluster_local)
+void ClusterMap::set_local_cluster(bool need_local_cluster)
 {
-	if (need_cluster_local != cluster_local)
+	if (need_local_cluster != local_cluster)
 	{
-		cluster_local = need_cluster_local;
+		local_cluster = need_local_cluster;
 		if (!is_empty()) cleanup_node();
 	}
 }

@@ -244,6 +244,47 @@ unsigned short get_system_info(string& system_info)
 	return RET_SUCCESS;
 }
 
+unsigned short get_process_count(const char* process_name, int& process_count)
+{
+	assert(process_name != NULL && "process_name should NOT be NULL");
+	static const char* cmd_format = "ps aux | grep %s | grep -v grep | wc -l";
+	static const int CMD_BUFSIZE = 256;
+	char cmd[CMD_BUFSIZE];
+	snprintf(cmd, CMD_BUFSIZE, cmd_format, process_name);
+	unsigned short ret = RET_SUCCESS;
+	FILE *fp = popen(cmd, "r");
+	char *line = NULL;
+	size_t line_len = 0;
+    char* token; 
+    char* rest = NULL;
+    char* line_tmp = NULL; 
+    char* count_str = NULL;
+	if (getline(&line, &line_len, fp) == -1)
+	{
+		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	line_tmp = line;
+	count_str = strtok_r(line_tmp, "\r\n", &rest);
+	if (count_str == NULL)
+	{
+		STATIC_WRITE_FORMAT_ERROR("Fail to parse the line: %s", line);
+		ret = RET_FAILURE_RUNTIME;
+		goto OUT;		
+	}
+// Find the start index of the linux platform
+	process_count = atoi(count_str);
+OUT:
+	if (line != NULL)
+	{
+		free(line);
+		line = NULL;
+	}
+	pclose(fp);
+	return ret;
+}
+
 bool check_string_is_number(const char* input)
 {
 	assert(input != NULL && "input should NOT be NULL");

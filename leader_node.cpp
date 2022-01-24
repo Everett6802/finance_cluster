@@ -23,7 +23,7 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 	observer(parent),
 	socketfd(0),
 	tx_socketfd(0),
-	cluster_local(true),
+	local_cluster(true),
 	local_token(NULL),
 	cluster_id(0),
 	cluster_node_cnt(0),
@@ -38,17 +38,9 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 	tx_filepath(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
-	cluster_local = (token == NULL ? true : false);
-		// throw invalid_argument(string("token == NULL"));
-	if (cluster_local)
-	{
-		srand(time(NULL));   // Initialization, should only be called once.
-		char local_token_tmp[20];
-		snprintf(local_token_tmp, 20, "node_token_%d", rand() % 100000);
-		local_token = strdup(local_token_tmp);
-	}
-	else
-		local_token = strdup(token);
+	local_cluster = (token == NULL ? true : false);
+	// throw invalid_argument(string("token == NULL"));
+	local_token = strdup(token);
 }
 
 LeaderNode::~LeaderNode()
@@ -79,7 +71,7 @@ unsigned short LeaderNode::become_leader()
 	unsigned short ret = RET_SUCCESS;
 // Create socket
 	int listen_sd = 0;
-	if (cluster_local)
+	if (local_cluster)
 		listen_sd = socket(AF_UNIX, SOCK_STREAM, 0);
 	else
 		listen_sd = socket(AF_INET, SOCK_STREAM, 0);
@@ -110,7 +102,7 @@ You can also use ps to find the pid.
 
 SO_REUSEADDR is for servers and TIME_WAIT sockets, so doesn't apply here.
 */
-	if (!cluster_local)
+	if (!local_cluster)
 	{
 	   if (setsockopt(listen_sd, SOL_SOCKET, SO_REUSEADDR, (char*)&on, sizeof(on)) < 0)
 	   {
@@ -131,7 +123,7 @@ since they will inherit that state from the listening socket.
       return RET_FAILURE_SYSTEM_API;
    }
 // Bind
-	if (cluster_local)
+	if (local_cluster)
 	{
 		int server_len;
 		struct sockaddr_un server_address;

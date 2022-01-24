@@ -64,7 +64,7 @@ void show_usage_and_exit()
 {
 	PRINT("====================== Usage ======================\n");
 	PRINT("-h|--help\n Description: The usage\n Caution: Other flags are ignored\n");
-	PRINT("-j|--join\n Description: Join a cluster\n");
+	PRINT("-j|--join\n Description: Join a cluster\n Caution: Only for TCP connection");
 	PRINT("-d|--detach\n Description: Detach from the terminal\n");
 	PRINT("===================================================\n");
 	exit(EXIT_SUCCESS);
@@ -131,7 +131,7 @@ unsigned short setup_param(ClusterMgr& cluster_mgr)
 	unsigned short ret = RET_SUCCESS;
 	if (param_join != NULL)
 	{
-		ret = cluster_mgr.set_cluster_ip(param_join);
+		ret = cluster_mgr.set_cluster_token(param_join);
 		if (CHECK_FAILURE(ret))
 			return ret;
 	}
@@ -169,6 +169,12 @@ void detach_from_terminal()
 
 int main(int argc, char** argv)
 {
+	const char* process_name = "finance_cluster";
+	int process_count;
+	get_process_count(process_name, process_count);
+	fprintf(stderr, "process_count: %d\n", process_count);
+	// exit(EXIT_SUCCESS);
+
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));

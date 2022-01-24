@@ -600,7 +600,7 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 		// snprintf(cluster_node_token, RSP_BUF_VERY_SHORT_SIZE, "%s", cluster_node.node_token.c_str());
 		strcpy(cluster_node_token, cluster_node.node_token.c_str());
 		// strcpy(cluster_node_token, "10.206.24.219");
-		int node_type_index = (strcmp(cluster_node_token, cluster_detail_param.cluster_ip) == 0 ? LEADER : FOLLOWER);
+		int node_type_index = (strcmp(cluster_node_token, cluster_detail_param.cluster_token) == 0 ? LEADER : FOLLOWER);
 		bool is_local_node = (cluster_detail_param.node_id == cluster_node.node_id ? true : false);
 		char buf[RSP_BUF_SIZE];
 		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_token, NODE_TYPE_LIST[node_type_index]);

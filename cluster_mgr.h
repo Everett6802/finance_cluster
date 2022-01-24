@@ -33,11 +33,11 @@ private:
 // config
 	std::string cluster_network;
 	int cluster_netmask_digits;
-	bool cluster_local;
 
 	PNOTIFY_THREAD notify_thread;
-	char* local_ip;
-	char* cluster_ip; // Only for the follower
+	bool local_cluster;
+	char* local_token;
+	char* cluster_token; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;
 
@@ -69,7 +69,7 @@ public:
 
 	unsigned short initialize();
 	unsigned short deinitialize();
-	unsigned short set_cluster_ip(const char* ip);
+	unsigned short set_cluster_token(const char* token);
 	unsigned short transmit_text(const char* data, const char* remote_ip=NULL);
 
 	bool is_leader()const{return node_type == LEADER;}

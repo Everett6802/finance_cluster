@@ -23,7 +23,7 @@ private:
 	PIMANAGER observer;
 	int socketfd;
 	int tx_socketfd; // For file transfer
-	bool cluster_local;
+	bool local_cluster;
 	char* local_token;
 // Start from 1, 1 for leader, otherwise for follower
 	int cluster_id;

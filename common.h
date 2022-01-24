@@ -154,6 +154,7 @@ extern const int MAX_KEEPALIVE_CNT;
 extern const int MAX_CONNECTED_CLIENT;
 // extern const int MAX_INTERACTIVE_SESSION;
 
+extern const char* PROCESS_NAME;
 extern const char* CONF_FODLERNAME;
 extern const char* FINANCE_CLUSTER_CONF_FILENAME;
 extern const int CLUSTER_PORT_NO;
@@ -165,7 +166,7 @@ extern const char* CLUSTER_UDS_FILEPATH;
 extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
 extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
-extern const char* CONF_FIELD_CLUSTER_LOCAL;
+extern const char* CONF_FIELD_LOCAL_CLUSTER;
 
 extern const int PAYLOAD_SESSION_ID_DIGITS;
 extern const char* PAYLOAD_SESSION_ID_STRING_FORMAT;
@@ -288,6 +289,7 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute="w", const char* newline_character="\n");
 unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
+unsigned short get_process_count(const char* process_name, int& process_count);
 bool check_string_is_number(const char* input);
 const char *get_username();
 bool is_root_user();
@@ -425,7 +427,7 @@ typedef std::list<ClusterNode*>::iterator CLUSTER_NODE_ITER;
 class ClusterMap
 {
 private:
-	bool cluster_local;
+	bool local_cluster;
 	std::list<ClusterNode*> cluster_map;
 	char* cluster_map_str;
 
@@ -454,7 +456,7 @@ public:
 
     size_t size()const;
     bool is_empty()const;
-    void set_cluster_local(bool need_cluster_local);
+    void set_local_cluster(bool need_local_cluster);
     unsigned short copy(const ClusterMap& another_cluster_map);
 	unsigned short add_node(int node_id, std::string node_token);
 	unsigned short add_node(const char* node_id_token_str);
@@ -496,8 +498,8 @@ class ClusterDetailParam
 public:
 	NodeType node_type;
 	int node_id;
-	char local_ip[16];
-	char cluster_ip[16];
+	char local_token[16];
+	char cluster_token[16];
 	ClusterMap cluster_map;
 
 	ClusterDetailParam();

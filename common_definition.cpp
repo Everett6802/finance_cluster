@@ -137,6 +137,7 @@ const int MAX_KEEPALIVE_CNT = 3;
 const int MAX_CONNECTED_CLIENT = 5;
 // const int MAX_INTERACTIVE_SESSION = 5;
 
+const char* PROCESS_NAME = "finance_cluster";
 const char* CONF_FODLERNAME = "conf";
 const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
 const int BASE_PORT_NO = 5988;
@@ -149,7 +150,7 @@ const char* CLUSTER_UDS_FILEPATH = "/tmp/finance_cluster.socket";
 const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";
 const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
-const char* CONF_FIELD_CLUSTER_LOCAL = "cluster_local";
+const char* CONF_FIELD_LOCAL_CLUSTER = "local_cluster";
 
 const int PAYLOAD_SESSION_ID_DIGITS = 2;
 const char* PAYLOAD_SESSION_ID_STRING_FORMAT = "%02d";
