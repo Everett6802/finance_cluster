@@ -129,11 +129,36 @@ unsigned short check_param()
 unsigned short setup_param(ClusterMgr& cluster_mgr)
 {
 	unsigned short ret = RET_SUCCESS;
-	if (param_join != NULL)
+	if (local_cluster)
 	{
+		if (param_join != NULL)
+		{
+			fprintf(stderr, "The \'join\' parameter should NOT be set for local cluster\n");
+			return RET_FAILURE_INCORRECT_OPERATION;
+		}
+		int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_RDONLY, 0666);
+  		if (shm_fd < 0) 
+  		{
+    		fprintf(stderr, "shm_open() fails, due to: %s\n", stderror(errno));
+    		return RET_FAILURE_SYSTEM_API;
+  		}
+
+  		char *cluster_token_data = (char *)mmap(0, LOCAL_CLUSTER_SHM_BUFSIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
+  		printf("cluster token, mapped address: %p, data: %s\n", &cluster_token_data, cluster_token_data);
 		ret = cluster_mgr.set_cluster_token(param_join);
+  		munmap(cluster_token_data, LOCAL_CLUSTER_SHM_BUFSIZE);
+  		close(shm_fd);
 		if (CHECK_FAILURE(ret))
-			return ret;
+			return ret;	
+	}
+	else
+	{
+		if (param_join != NULL)
+		{
+			ret = cluster_mgr.set_cluster_token(param_join);
+			if (CHECK_FAILURE(ret))
+				return ret;		
+		}
 	}
 
 	return RET_SUCCESS;

@@ -172,6 +172,10 @@ extern const int PAYLOAD_SESSION_ID_DIGITS;
 extern const char* PAYLOAD_SESSION_ID_STRING_FORMAT;
 extern const int PAYLOAD_CLUSTER_ID_DIGITS;
 extern const char* PAYLOAD_CLUSTER_ID_STRING_FORMAT;
+extern const char* LOCAL_CLUSTER_TOKEN_SHM_FORMOAT
+extern const int LOCAL_CLUSTER_SHM_BUFSIZE;
+extern const char* LOCAL_CLUSTER_TOKEN_SHM_FORMOAT;
+extern const char* LOCAL_CLUSTER_SHM_FILENAME;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration

@@ -536,8 +536,8 @@ unsigned short ClusterMgr::initialize()
 		{
 			fprintf(stderr, "Check01-2\n");
 			srand(time(NULL));   // Initialization, should only be called once.
-			char local_token_tmp[20];
-			snprintf(local_token_tmp, 20, "node_token_%d", rand() % 100000);
+			char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
+			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, rand() % 100000);
 			local_token = strdup(local_token_tmp);
 			fprintf(stderr, "Check01-3%s\n", local_token);
 		}
@@ -574,12 +574,11 @@ unsigned short ClusterMgr::initialize()
 	// ret = start_connection();
 	if (local_cluster)
 	{
-		int process_count = 0;
-		ret = get_process_count(PROCESS_NAME, process_count);
+		bool local_cluster;
+		ret = is_local_follower(local_cluster);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		assert(process_count != 0 && "process_count should NOT be 0");
-		if (process_count > 1)
+		if (local_cluster)
 		{
 			WRITE_DEBUG("Node Try to become follower of cluster...(LOCAL)");
 			fprintf(stderr, "Check03-1\n");
@@ -712,15 +711,43 @@ unsigned short ClusterMgr::deinitialize()
 
 unsigned short ClusterMgr::set_cluster_token(const char* token)
 {
-	if (token == NULL)
+	if (local_cluster)
 	{
-		WRITE_DEBUG("ip should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;
+		if (token != NULL)
+		{
+			WRITE_ERROR("token should be NULL");
+			return RET_FAILURE_INVALID_ARGUMENT;
+		}
 	}
-	if (cluster_token != NULL)
-		free(cluster_token);
-	cluster_token = strdup(token);
+	else
+	{
+		if (token == NULL)
+		{
+			WRITE_ERROR("token should NOT be NULL");
+			return RET_FAILURE_INVALID_ARGUMENT;
+		}
+		if (cluster_token != NULL)
+			free(cluster_token);
+		cluster_token = strdup(token);
+	}
 	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::is_local_follower(bool& local_follower) const
+{
+	unsigned short ret = RET_SUCCESS;
+	local_follower = false;
+	if (local_cluster)
+	{
+		int process_count = 0;
+		ret = get_process_count(PROCESS_NAME, process_count);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		assert(process_count != 0 && "process_count should NOT be 0");
+		if (process_count > 1)
+			local_follower = true;
+	}
+	return ret;
 }
 
 unsigned short ClusterMgr::transmit_text(const char* data, const char* remote_ip)

@@ -158,3 +158,6 @@ const int PAYLOAD_CLUSTER_ID_DIGITS = 2;
 const char* PAYLOAD_CLUSTER_ID_STRING_FORMAT = "%02d";
 //const unsigned short NOTIFY_DEAD_CLIENT = 0;
 //const unsigned short NOTIFY_CHECK_KEEPALIVE = 1;
+const int LOCAL_CLUSTER_SHM_BUFSIZE = 20;
+const char* LOCAL_CLUSTER_TOKEN_SHM_FORMOAT = "node_token_%d";
+const char* LOCAL_CLUSTER_SHM_FILENAME = "finance_cluster_cluster_token";

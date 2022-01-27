@@ -499,6 +499,25 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
+  int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+  if (shm_fd < 0) 
+  {
+    	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", stderror(errno));
+    	return RET_FAILURE_SYSTEM_API;
+  }
+  ftruncate(shm_fd, LOCAL_CLUSTER_SHM_BUFSIZE);
+
+  int *data = (int *)mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  printf("sender mapped address: %p\n", data);
+
+  for (int i = 0; i < NUM; ++i) {
+    data[i] = i;
+  }
+
+  munmap(data, SIZE);
+
+  close(fd);
+
 // Create worker thread
 	if (pthread_create(&listen_tid, NULL, listen_thread_handler, this))
 	{

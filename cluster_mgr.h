@@ -70,6 +70,7 @@ public:
 	unsigned short initialize();
 	unsigned short deinitialize();
 	unsigned short set_cluster_token(const char* token);
+	unsigned short is_local_follower(bool& local_follower)const;
 	unsigned short transmit_text(const char* data, const char* remote_ip=NULL);
 
 	bool is_leader()const{return node_type == LEADER;}
