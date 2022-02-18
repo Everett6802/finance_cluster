@@ -32,13 +32,6 @@ FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const cha
 {
 	IMPLEMENT_MSG_DUMPER()
 
-	// bool check_input = !((server_token == NULL) ^ (token == NULL));
-	// assert(check_input && "incorrect input: server_token/token");
-	assert(server_token != NULL && "server_token should NOT be NULL");
-	assert(token != NULL && "token should NOT be NULL");
-	local_cluster = (token == NULL ? true : false);
-	// if (server_token == NULL || token == NULL)
-	// 	throw invalid_argument(string("server_token/token == NULL"));
 	local_token = strdup(token);
 	cluster_token = strdup(server_token);
 }

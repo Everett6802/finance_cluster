@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <time.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 // #include <stdexcept>
 // #include <string>
 #include <deque>
@@ -38,8 +40,6 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 	tx_filepath(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
-	local_cluster = (token == NULL ? true : false);
-	// throw invalid_argument(string("token == NULL"));
 	local_token = strdup(token);
 }
 
@@ -499,24 +499,21 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
+// The /dev/shm/finance_cluster_cluster_token file is created
   int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
   if (shm_fd < 0) 
   {
-    	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", stderror(errno));
+    	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", strerror(errno));
     	return RET_FAILURE_SYSTEM_API;
   }
   ftruncate(shm_fd, LOCAL_CLUSTER_SHM_BUFSIZE);
 
-  int *data = (int *)mmap(0, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  printf("sender mapped address: %p\n", data);
-
-  for (int i = 0; i < NUM; ++i) {
-    data[i] = i;
-  }
-
-  munmap(data, SIZE);
-
-  close(fd);
+  char *cluster_token_data = (char *)mmap(0, LOCAL_CLUSTER_SHM_BUFSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  WRITE_FORMAT_DEBUG("cluster token, mapped address: %p, data: %s", &cluster_token_data, cluster_token_data);
+  memset(cluster_token_data, 0x0, sizeof(char) * LOCAL_CLUSTER_SHM_BUFSIZE);
+  strncpy(cluster_token_data, local_token, strlen(local_token));
+  munmap(cluster_token_data, LOCAL_CLUSTER_SHM_BUFSIZE);
+  close(shm_fd);
 
 // Create worker thread
 	if (pthread_create(&listen_tid, NULL, listen_thread_handler, this))
@@ -564,6 +561,12 @@ unsigned short LeaderNode::deinitialize()
 			usleep(100000);
 		}
 	}
+
+	if (shm_unlink(LOCAL_CLUSTER_SHM_FILENAME) < 0)
+  	{
+    	WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
+    	return RET_FAILURE_SYSTEM_API;
+  	}
 
 	WRITE_DEBUG("Wait for the worker thread of listening's death...");
 // Should NOT check the thread status in this way.

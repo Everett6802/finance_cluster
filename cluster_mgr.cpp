@@ -1,15 +1,11 @@
-// #include <netdb.h>
-// #include <ifaddrs.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <signal.h>
 #include <assert.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <ctype.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 // #include <arpa/inet.h>
 // #include <sys/socket.h>
 #include "cluster_mgr.h"
@@ -301,25 +297,19 @@ unsigned short ClusterMgr::become_leader()
 
 unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 {
-	fprintf(stderr, "Check10-1: %s\n", local_token);
 	cluster_node = new FollowerNode(this, cluster_token, local_token);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
-	fprintf(stderr, "Check10-2\n");
 	unsigned short ret = RET_SUCCESS;
 	ret = cluster_node->set(PARAM_CONNECTION_RETRY, (void*)&need_rebuild_cluster);
-	fprintf(stderr, "Check10-3\n");
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check10-4\n");
 	ret = cluster_node->initialize();
-	fprintf(stderr, "Check10-5\n");
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check10-6\n");
 	node_type = FOLLOWER;
 	WRITE_FORMAT_DEBUG("This Node[%s] is a Follower !!!", local_token);
 	return ret;
@@ -434,7 +424,9 @@ unsigned short ClusterMgr::rebuild_cluster()
         {
 // Follower
 	        WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", local_token, cluster_token);
-        	set_cluster_token(leader_candidate_node_token.c_str());
+			if (cluster_token != NULL)
+				free(cluster_token);
+			cluster_token = strdup(leader_candidate_node_token.c_str());
         	ret = become_follower(true);
 	        if (IS_TRY_CONNECTION_TIMEOUT(ret))
 	        	continue;
@@ -523,23 +515,18 @@ void ClusterMgr::dump_interactive_session_data_list(int session_id)const
 unsigned short ClusterMgr::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
-	fprintf(stderr, "Check00\n");
 	ret = parse_config();
-	fprintf(stderr, "Check01\n");
 	if (CHECK_FAILURE(ret))
 		return ret;
-// Find local IP
+// Find local token
 	if (local_token == NULL)
 	{
-		fprintf(stderr, "Check01-1\n");
 		if (local_cluster)
 		{
-			fprintf(stderr, "Check01-2\n");
 			srand(time(NULL));   // Initialization, should only be called once.
 			char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
 			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, rand() % 100000);
 			local_token = strdup(local_token_tmp);
-			fprintf(stderr, "Check01-3%s\n", local_token);
 		}
 		else
 		{
@@ -559,7 +546,6 @@ unsigned short ClusterMgr::initialize()
 			}
 		}
 	}
-	fprintf(stderr, "Check02\n");
 // Initialize the worker thread for handling events
 	notify_thread = new NotifyThread(this, "ClusterMgr Notify Thread");
 	if (notify_thread == NULL)
@@ -568,29 +554,37 @@ unsigned short ClusterMgr::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 	// sleep(1);
-	fprintf(stderr, "Check03\n");
 	usleep(100000);
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
+	fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
 	if (local_cluster)
 	{
-		bool local_cluster;
-		ret = is_local_follower(local_cluster);
+		bool local_follower;
+		ret = is_local_follower(local_follower);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		if (local_cluster)
+		if (local_follower)
 		{
+			int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_RDONLY, 0666);
+		  	if (shm_fd < 0) 
+		  	{
+		    	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", strerror(errno));
+		    	return RET_FAILURE_SYSTEM_API;
+		  	}
+		  	char *cluster_token_data = (char *)mmap(0, LOCAL_CLUSTER_SHM_BUFSIZE, PROT_READ, MAP_SHARED, shm_fd, 0);
+		  	WRITE_FORMAT_DEBUG("cluster token, mapped address: %p, data: %s", &cluster_token_data, cluster_token_data);
+			cluster_token = strdup(cluster_token_data);
+		  	munmap(cluster_token_data, LOCAL_CLUSTER_SHM_BUFSIZE);
+		  	close(shm_fd);
+
 			WRITE_DEBUG("Node Try to become follower of cluster...(LOCAL)");
-			fprintf(stderr, "Check03-1\n");
 			ret = become_follower();
-			fprintf(stderr, "Check03-2\n");
 		}
 		else
 		{
 			WRITE_DEBUG("Node Try to become leader...(LOCAL)");
-			fprintf(stderr, "Check03-3\n");
 			ret = become_leader();	
-			fprintf(stderr, "Check03-4\n");	
 		}
 	}
 	else
@@ -598,26 +592,20 @@ unsigned short ClusterMgr::initialize()
 		if (cluster_token != NULL)
 		{
 			WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_token, cluster_token);
-			fprintf(stderr, "Check03-5\n");
 			ret = become_follower();
-			fprintf(stderr, "Check03-6\n");
 		}
 		else
 		{
 			WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_token);
-			fprintf(stderr, "Check03-7\n");
 			ret = become_leader();	
-			fprintf(stderr, "Check03-8\n");	
 		}
 	}
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check04\n");
 // Start a keep-alive timer
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check05\n");
 // Initialize the session server
 	interactive_server = new InteractiveServer(this);
 	if (interactive_server == NULL)
@@ -625,7 +613,6 @@ unsigned short ClusterMgr::initialize()
 	ret = interactive_server->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check06\n");
 // Initialize the simulator handler
 	simulator_handler = new SimulatorHandler(this);
 	if (simulator_handler == NULL)
@@ -633,7 +620,6 @@ unsigned short ClusterMgr::initialize()
 	ret = simulator_handler->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check07\n");
 	simulator_installed = simulator_handler->is_simulator_installed();
 	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
 // Initialize the system operater
@@ -643,7 +629,6 @@ unsigned short ClusterMgr::initialize()
 	ret = system_operator->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	fprintf(stderr, "Check08\n");
 	return ret;
 }
 
@@ -730,6 +715,7 @@ unsigned short ClusterMgr::set_cluster_token(const char* token)
 			free(cluster_token);
 		cluster_token = strdup(token);
 	}
+
 	return RET_SUCCESS;
 }
 

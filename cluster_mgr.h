@@ -22,7 +22,7 @@ class ClusterMgr : public IManager
 
 	struct InteractiveSessionConcurrentParam
 	{
-		pthread_mutex_t mtx;
+		pthread_mutex_t mtx; 
 		pthread_cond_t cond;
 		std::list<PNOTIFY_CFG> data_list;
 		int event_count;
@@ -69,7 +69,7 @@ public:
 
 	unsigned short initialize();
 	unsigned short deinitialize();
-	unsigned short set_cluster_token(const char* token);
+	unsigned short set_cluster_token(const char* token=NULL);
 	unsigned short is_local_follower(bool& local_follower)const;
 	unsigned short transmit_text(const char* data, const char* remote_ip=NULL);
 
