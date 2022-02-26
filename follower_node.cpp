@@ -85,11 +85,15 @@ unsigned short FollowerNode::connect_leader()
 	int res;
 	if (local_cluster)
 	{
+		int socket_len;
 		sockaddr_un client_address;
 		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
 		client_address.sun_family = AF_UNIX;
 		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
-		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+		// socket_len = sizeof(struct sockaddr);
+    	socket_len = sizeof(client_address.sun_family) + strlen(client_address.sun_path);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, socket_len);
+		fprintf(stderr, "client_address.sun_path: %s, res: %d\n", client_address.sun_path, res);
 	}
 	else
 	{
@@ -509,9 +513,9 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&cluster_map_mtx);
 	// fprintf(stderr, "Follower: %s\n", message_data.c_str());
-	// fprintf(stderr, "FollowerNode::recv_update_cluster_map %s, %d\n", message_data.c_str(), strlen(message_data.c_str()));
+	fprintf(stderr, "FollowerNode::recv_update_cluster_map %s, %d\n", message_data.c_str(), strlen(message_data.c_str()));
 	ret = cluster_map.from_string(message_data.c_str());
-	// fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
+	fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
@@ -724,7 +728,7 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 	// return send_data(&msg);
 }
 
-unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
+unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSTER_MAP);}
 
 unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void* param3)
 {

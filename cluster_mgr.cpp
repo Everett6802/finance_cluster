@@ -558,6 +558,7 @@ unsigned short ClusterMgr::initialize()
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
 	fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
+	bool init_interactive_server = true;
 	if (local_cluster)
 	{
 		bool local_follower;
@@ -580,6 +581,7 @@ unsigned short ClusterMgr::initialize()
 
 			WRITE_DEBUG("Node Try to become follower of cluster...(LOCAL)");
 			ret = become_follower();
+			init_interactive_server = false;
 		}
 		else
 		{
@@ -607,12 +609,15 @@ unsigned short ClusterMgr::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 // Initialize the session server
-	interactive_server = new InteractiveServer(this);
-	if (interactive_server == NULL)
-		throw bad_alloc();
-	ret = interactive_server->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
+	if (init_interactive_server)
+	{
+		interactive_server = new InteractiveServer(this);
+		if (interactive_server == NULL)
+			throw bad_alloc();
+		ret = interactive_server->initialize();
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
 // Initialize the simulator handler
 	simulator_handler = new SimulatorHandler(this);
 	if (simulator_handler == NULL)

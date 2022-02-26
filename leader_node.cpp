@@ -125,14 +125,15 @@ since they will inherit that state from the listening socket.
 // Bind
 	if (local_cluster)
 	{
-		int server_len;
+		int socket_len;
 		struct sockaddr_un server_address;
 		memset(&server_address, 0x0, sizeof(struct sockaddr_un));
 		server_address.sun_family = AF_UNIX;
 		strcpy(server_address.sun_path, CLUSTER_UDS_FILEPATH);
 		unlink(server_address.sun_path);
-		server_len = sizeof(server_address);
-		if (bind(listen_sd, (struct sockaddr*)&server_address, server_len) == -1)
+		// socket_len = sizeof(server_address);
+    	socket_len = sizeof(server_address.sun_family) + strlen(server_address.sun_path);
+		if (bind(listen_sd, (struct sockaddr*)&server_address, socket_len) == -1)
 		{
 			WRITE_FORMAT_ERROR("bind() fail(UDS), due to: %s", strerror(errno));
 			close(listen_sd);
@@ -141,14 +142,14 @@ since they will inherit that state from the listening socket.
 	}
 	else
 	{
-		int server_len;
+		int socket_len;
 		struct sockaddr_in server_address;
 		memset(&server_address, 0x0, sizeof(struct sockaddr_in));
 		server_address.sin_family = AF_INET;
 		server_address.sin_addr.s_addr = htonl(INADDR_ANY);
 		server_address.sin_port = htons(CLUSTER_PORT_NO);
-		server_len = sizeof(server_address);
-		if (bind(listen_sd, (struct sockaddr*)&server_address, server_len) == -1)
+		socket_len = sizeof(server_address);
+		if (bind(listen_sd, (struct sockaddr*)&server_address, socket_len) == -1)
 		{
 			WRITE_FORMAT_ERROR("bind() fail(TCP), due to: %s", strerror(errno));
 			close(listen_sd);
@@ -352,14 +353,14 @@ since they will inherit that state from the listening socket.
       return RET_FAILURE_SYSTEM_API;
    }
 // Bind
-	int server_len;
+	int socket_len;
 	struct sockaddr_in server_address;
 	memset(&server_address, 0x0, sizeof(struct sockaddr_in));
 	server_address.sin_family = AF_INET;
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY);
 	server_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
-	server_len = sizeof(server_address);
-	if (bind(listen_sd, (struct sockaddr*)&server_address, server_len) == -1)
+	socket_len = sizeof(server_address);
+	if (bind(listen_sd, (struct sockaddr*)&server_address, socket_len) == -1)
 	{
 		WRITE_FORMAT_ERROR("bind() fail, due to: %s", strerror(errno));
 		close(listen_sd);
@@ -717,7 +718,7 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_update_cluster_map(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+unsigned short LeaderNode::recv_update_cluster_map(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSTER_MAP);}
 
 unsigned short LeaderNode::recv_transmit_text(const std::string& message_data)
 {
@@ -850,7 +851,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 // Update the cluster map to Followers
 	if (follower_dead_found)
 	{
-		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg);
+		ret = send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg);
 		free(cluster_map_msg);
 		if (CHECK_FAILURE(ret))
 		{
@@ -875,10 +876,10 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 // Update the cluster map to Followers
 	if (CHECK_FAILURE(ret))
 	{
-		WRITE_FORMAT_ERROR("Fail to assemble the message[%d, %s], due to: %s", MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str(), GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fail to assemble the message[%d, %s], due to: %s", MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str(), GetErrorDescription(ret));
 		return ret;
 	}
-	return send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
+	return send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
 }
 
 unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* param3)
@@ -1439,7 +1440,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_token);
 // Update the cluster map to Followers
 		// fprintf(stderr, "LeaderNode::listen_thread_handler_internal %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
-		ret = send_data(MSG_UPDATE_CLUSUTER_MAP, cluster_map_msg.c_str());
+		ret = send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
 			WRITE_FORMAT_ERROR("[%s] Fail to send the message of updating the cluster map, due to: %s", listen_thread_tag, GetErrorDescription(ret));

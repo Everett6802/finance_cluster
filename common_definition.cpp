@@ -145,7 +145,7 @@ const int CLUSTER_PORT_NO = BASE_PORT_NO + 0;
 const int SESSION_PORT_NO = BASE_PORT_NO + 1;
 const int FILE_TRANSFER_PORT_NO = BASE_PORT_NO + 2;
 const int RECV_BUF_SIZE = 512;
-const char* CLUSTER_UDS_FILEPATH = "/tmp/finance_cluster.socket";
+const char* CLUSTER_UDS_FILEPATH = "/tmp/finance_cluster.sock";
 
 const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";

@@ -189,7 +189,7 @@ enum NodeType{
 enum MessageType{
 	MSG_CAN_NOT_USE = 0, // 0 can NOT use, due to serialization/deserialization
 	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
-	MSG_UPDATE_CLUSUTER_MAP, // Uni-Direction, Leader -> Follower
+	MSG_UPDATE_CLUSTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_GET_SYSTEM_INFO, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
