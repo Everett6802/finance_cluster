@@ -82,6 +82,7 @@ unsigned short FollowerNode::connect_leader()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
+// http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
 	int res;
 	if (local_cluster)
 	{
@@ -93,7 +94,7 @@ unsigned short FollowerNode::connect_leader()
 		// socket_len = sizeof(struct sockaddr);
     	socket_len = sizeof(client_address.sun_family) + strlen(client_address.sun_path);
 		res = connect(sock_fd, (struct sockaddr*)&client_address, socket_len);
-		fprintf(stderr, "client_address.sun_path: %s, res: %d\n", client_address.sun_path, res);
+		// fprintf(stderr, "client_address.sun_path: %s, socket_len: %d\n", client_address.sun_path, socket_len);
 	}
 	else
 	{
@@ -219,15 +220,18 @@ unsigned short FollowerNode::connect_file_sender()
 		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
-
+// http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
 	int res;
 	if (local_cluster)
 	{
+		int socket_len;
 		sockaddr_un client_address;
 		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
 		client_address.sun_family = AF_UNIX;
 		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
-		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+		socket_len = sizeof(client_address.sun_family) + strlen(client_address.sun_path);
+		// fprintf(stderr, "socket_len: %d, sun_path: %s\n", socket_len, client_address.sun_path);
+		res = connect(sock_fd, (struct sockaddr*)&client_address, socket_len);
 	}
 	else
 	{

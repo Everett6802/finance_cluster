@@ -164,13 +164,16 @@ void detach_from_terminal()
     openlog ("firstdaemon", LOG_PID, LOG_SYSLOG);
 }
 
+#include        <sys/un.h>
 int main(int argc, char** argv)
 {
 	// const char* process_name = "finance_cluster";
 	// int process_count;
 	// get_process_count(process_name, process_count);
 	// fprintf(stderr, "process_count: %d\n", process_count);
-	// // exit(EXIT_SUCCESS);
+	// sockaddr_un un;
+	// fprintf(stderr, "sockaddr_un size: %d\n", sizeof(un));
+	// exit(EXIT_SUCCESS);
 
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;

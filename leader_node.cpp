@@ -1,6 +1,7 @@
 // #include <errno.h>
 // #include <assert.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/in.h>
@@ -869,7 +870,7 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 // EventType | cluster map string | EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&node_channel_mtx);
-	// fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
+	fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 	string cluster_map_msg(cluster_map.to_string());
 	// fprintf(stderr, "Leader: %s\n", cluster_map.to_string());
 	pthread_mutex_unlock(&node_channel_mtx);
@@ -1365,8 +1366,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is running", listen_thread_tag);
 	unsigned short ret = RET_SUCCESS;
 
-	struct sockaddr client_addr;
-	socklen_t client_addr_len = sizeof(client_addr);
+	char *client_token = NULL;
 	while (listen_exit == 0)
 	{
 		struct timeval tv;
@@ -1386,22 +1386,71 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 			// WRITE_DEBUG("Accept timeout");
 			usleep(100000);
 			continue;
-		}		
+		}	
+// http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
+		int client_socketfd = 0;
 // Follower connect to Leader
-		int client_socketfd = accept(socketfd, &client_addr, (socklen_t*)&client_addr_len);
-		if (client_socketfd < 0)
+		if (local_cluster)
 		{
-			WRITE_FORMAT_ERROR("[%s] accept() fails, due to: %s", listen_thread_tag, strerror(errno));
-			return RET_FAILURE_SYSTEM_API;
+			struct sockaddr_un client_addr;
+			struct stat client_statbuf;
+			socklen_t client_addr_len = sizeof(client_addr);
+			// fprintf(stderr, "client_addr_len: %d\n", client_addr_len);
+			client_socketfd = accept(socketfd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_len);
+			if (client_socketfd < 0)
+			{
+				WRITE_FORMAT_ERROR("[%s] accept() fails, due to: %s", listen_thread_tag, strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
+// https://www.itread01.com/content/1549028184.html
+// I don't know why 'sun_path' is empty
+			// fprintf(stderr, "sun_family: %d, sun_path: %s\n", client_addr.sun_family, client_addr.sun_path);
+		 // 	client_addr.sun_path[client_addr_len - offsetof(struct sockaddr_un, sun_path)/* len of pathname */] = '\0'; /* null terminate */
+		 // 	if (stat(client_addr.sun_path, &client_statbuf) < 0) 
+		 //   {
+			// 	WRITE_FORMAT_ERROR("[%s] stat() fails, due to: %s", listen_thread_tag, strerror(errno));
+			// 	return RET_FAILURE_SYSTEM_API;
+		 //   } 
+		 //   else
+		 //   {
+			//    if (S_ISSOCK(client_statbuf.st_mode)) 
+			//    { 
+			// 	  	// if (uidptr != NULL)
+			// 	  	// 	*uidptr = client_statbuf.st_uid;    /* return uid of caller */ 
+			//       unlink(client_addr.sun_path);       /* we're done with pathname now */ 
+			// 	  	// return clifd;		 
+			//    } 
+			//    else
+			//    {
+			// 		WRITE_FORMAT_ERROR("[%s] Not a socket", listen_thread_tag);
+			// 		return RET_FAILURE_INCORRECT_OPERATION;
+			//    }
+		 //   }
+			client_token = strdup(client_addr.sun_path);
+			WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", listen_thread_tag, client_token);
+			// PRINT("Follower[%s] connects to the Leader\n", client_token);
 		}
-		// deal with both IPv4 and IPv6:
-		struct sockaddr_in *client_s = (struct sockaddr_in *)&client_addr;
-		// PRINT("family: %d, port: %d\n", s->sin_family, ntohs(s->sin_port));
-//		port = ntohs(s->sin_port);
-		char client_token[INET_ADDRSTRLEN + 1];
-		inet_ntop(AF_INET, &client_s->sin_addr, client_token, sizeof(client_token));
-		WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", listen_thread_tag, client_token);
-		// PRINT("Follower[%s] connects to the Leader\n", token);
+		else
+		{
+			struct sockaddr_in client_addr;
+			socklen_t client_addr_len = sizeof(client_addr);
+			client_socketfd = accept(socketfd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_len);
+			if (client_socketfd < 0)
+			{
+				WRITE_FORMAT_ERROR("[%s] accept() fails, due to: %s", listen_thread_tag, strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
+// deal with both IPv4 and IPv6:
+			// struct sockaddr_in *client_s = (struct sockaddr_in *)&client_addr;
+			// PRINT("family: %d, port: %d\n", s->sin_family, ntohs(s->sin_port));
+	//		port = ntohs(s->sin_port);
+			client_token = (char*)malloc(INET_ADDRSTRLEN + 1);
+			if (client_token == NULL)
+				throw bad_alloc();
+			inet_ntop(AF_INET, &client_addr.sin_addr, client_token, INET_ADDRSTRLEN + 1);
+			WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", listen_thread_tag, client_token);
+			// PRINT("Follower[%s] connects to the Leader\n", client_token);
+		}
 // Initialize a channel for data transfer between follower
 		PNODE_CHANNEL node_channel = new NodeChannel(this);
 		if (node_channel == NULL)
@@ -1416,7 +1465,8 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		if (CHECK_FAILURE(ret))
 		{
 			// pthread_mutex_unlock(&node_channel_mtx);
-			return ret;
+			// return ret;
+			goto OUT;
 		}
 // Add a channel of the new follower
 		pthread_mutex_lock(&node_channel_mtx);
@@ -1433,7 +1483,8 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		{
 			WRITE_FORMAT_ERROR("[%s] Fail to allocate memory: node_channel", listen_thread_tag);
 			pthread_mutex_unlock(&node_channel_mtx);
-			return ret;
+			// return ret;
+			goto OUT;
 		}
 		string cluster_map_msg(cluster_map.to_string());
 		pthread_mutex_unlock(&node_channel_mtx);
@@ -1443,12 +1494,17 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		ret = send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("[%s] Fail to send the message of updating the cluster map, due to: %s", listen_thread_tag, GetErrorDescription(ret));
-			return ret;
+			// return ret;
+			goto OUT;
 		}
 		WRITE_FORMAT_INFO("[%s] Follower[%s] connects to the Leader...... successfully !!!", listen_thread_tag, client_token);
 	}
-
+OUT:
+	if (client_token != NULL)
+	{
+		free(client_token);
+		client_token = NULL;
+	}
 	WRITE_FORMAT_INFO("[%s] The worker thread of listening socket is dead", listen_thread_tag);
 	return ret;
 }
