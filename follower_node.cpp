@@ -517,7 +517,7 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&cluster_map_mtx);
 	// fprintf(stderr, "Follower: %s\n", message_data.c_str());
-	fprintf(stderr, "FollowerNode::recv_update_cluster_map %s, %d\n", message_data.c_str(), strlen(message_data.c_str()));
+	fprintf(stderr, "FollowerNode::recv_update_cluster_map %s, %ld\n", message_data.c_str(), strlen(message_data.c_str()));
 	ret = cluster_map.from_string(message_data.c_str());
 	fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
 	if (CHECK_FAILURE(ret))

@@ -523,9 +523,10 @@ unsigned short ClusterMgr::initialize()
 	{
 		if (local_cluster)
 		{
-			srand(time(NULL));   // Initialization, should only be called once.
 			char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
-			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, rand() % 100000);
+			// srand(time(NULL));   // Initialization, should only be called once.
+			// snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, rand() % 100000);
+			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, getpid());
 			local_token = strdup(local_token_tmp);
 		}
 		else

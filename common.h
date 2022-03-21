@@ -293,6 +293,7 @@ unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, co
 unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute="w", const char* newline_character="\n");
 unsigned short get_linux_platform(std::string& linux_distribution);
 unsigned short get_system_info(std::string& system_info);
+unsigned short get_process_id_list(const char* process_name, std::list<int>& process_id_list);
 unsigned short get_process_count(const char* process_name, int& process_count);
 bool check_string_is_number(const char* input);
 const char *get_username();
@@ -470,7 +471,10 @@ public:
 	unsigned short cleanup_node();
 	unsigned short get_first_node(int& first_node_id, std::string& first_node_token, bool peek_only=false);
 	unsigned short get_first_node_token(std::string& first_node_token, bool peek_only=false);
-	unsigned short get_node_id(const std::string& node_token, int& node_id);
+	unsigned short get_node_id(const std::string& node_token, int& node_id)const;
+	unsigned short get_node_token(int node_id, std::string& node_token)const;
+	unsigned short check_exist_by_node_id(int node_id, bool& found)const;
+	unsigned short check_exist_by_node_token(const std::string& node_token, bool& found)const;
 	unsigned short get_last_node_id(int& node_id);
 	unsigned short get_node_token(int node_id, std::string& node_token);
 	const char* to_string();

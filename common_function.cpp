@@ -120,6 +120,12 @@ unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char*
 	static const int BUF_SIZE = 512;
 	static char line_buf[BUF_SIZE];
 	int last_character_in_string_index = 0;
+/*
+	gets 不推荐使用，gets(s) 等价于 fgets(s, INT_MAX, stdin)，因为没有对缓冲区溢出做处理，不安全；
+	getline 碰到EOF返回-1，fgets返回NULL；
+	传入getline的buffer指针如果为NULL，函数会分配缓冲区用于存储行字符串，并由调用者释放。如果传入buffer空间不足以存放一行，那么函数会自动扩增缓冲区空间，同时更新其指针及缓冲区大小。
+	传入fgets的buffer空间如果不足以存放一行，fgets提前返回，并在末尾添加null byte（'\0'）。
+*/
 	while (fgets(line_buf, BUF_SIZE, fp) != NULL) 
 	{
 		if (line_buf[0] == '\n' || line_buf[0] == '#')
@@ -244,6 +250,48 @@ unsigned short get_system_info(string& system_info)
 	return RET_SUCCESS;
 }
 
+unsigned short get_process_id_list(const char* process_name, list<int>& process_id_list)
+{
+	assert(process_name != NULL && "process_name should NOT be NULL");
+	static const char* cmd_format = "ps aux | grep %s | grep -v grep | awk '{print $2}'";
+	static const int CMD_BUFSIZE = 256;
+	char cmd[CMD_BUFSIZE];
+	snprintf(cmd, CMD_BUFSIZE, cmd_format, process_name);
+	unsigned short ret = RET_SUCCESS;
+	FILE *fp = popen(cmd, "r");
+	if (fp == NULL)
+	{
+		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+	char *line = NULL;
+	size_t line_len = 0;
+    char* token; 
+    char* rest = NULL;
+    char* line_tmp = NULL; 
+    char* pid_str = NULL;
+/*
+	gets 不推荐使用，gets(s) 等价于 fgets(s, INT_MAX, stdin)，因为没有对缓冲区溢出做处理，不安全；
+	getline 碰到EOF返回-1，fgets返回NULL；
+	传入getline的buffer指针如果为NULL，函数会分配缓冲区用于存储行字符串，并由调用者释放。如果传入buffer空间不足以存放一行，那么函数会自动扩增缓冲区空间，同时更新其指针及缓冲区大小。
+	传入fgets的buffer空间如果不足以存放一行，fgets提前返回，并在末尾添加null byte（'\0'）。
+*/
+	while (getline(&line, &line_len, fp) == -1)
+	{
+		line_tmp = line;
+		pid_str = strtok_r(line_tmp, "\r\n", &rest);
+		int pid = atoi(pid_str);
+		process_id_list.push_back(pid);
+		if (line != NULL)
+		{
+			free(line);
+			line = NULL;
+		}
+	}
+	pclose(fp);
+	return ret;
+}
+
 unsigned short get_process_count(const char* process_name, int& process_count)
 {
 	assert(process_name != NULL && "process_name should NOT be NULL");
@@ -253,6 +301,11 @@ unsigned short get_process_count(const char* process_name, int& process_count)
 	snprintf(cmd, CMD_BUFSIZE, cmd_format, process_name);
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp = popen(cmd, "r");
+	if (fp == NULL)
+	{
+		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
 	char *line = NULL;
 	size_t line_len = 0;
     char* token; 
@@ -261,7 +314,7 @@ unsigned short get_process_count(const char* process_name, int& process_count)
     char* count_str = NULL;
 	if (getline(&line, &line_len, fp) == -1)
 	{
-		STATIC_WRITE_FORMAT_ERROR("popen() fails, due to: %s", strerror(errno));
+		STATIC_WRITE_FORMAT_ERROR("getline() fails, due to: %s", strerror(errno));
 		ret = RET_FAILURE_SYSTEM_API;
 		goto OUT;
 	}

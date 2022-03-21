@@ -174,6 +174,7 @@ int main(int argc, char** argv)
 	// sockaddr_un un;
 	// fprintf(stderr, "sockaddr_un size: %d\n", sizeof(un));
 	// exit(EXIT_SUCCESS);
+	fprintf(stderr, "pid: %d\n", getpid());
 
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;

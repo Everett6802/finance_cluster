@@ -481,6 +481,30 @@ unsigned short LeaderNode::stop_file_transfer()
 	return ret;
 }
 
+unsigned short LeaderNode::find_new_follower_pid(int& new_follower_pid)const
+{
+	unsigned short ret = RET_SUCCESS;
+	list<int> active_process_id_list;
+	ret = get_process_id_list(PROCESS_NAME, active_process_id_list);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	list<int>::const_iterator iter = active_process_id_list.begin();
+	while (iter != active_process_id_list.end())
+	{
+		int pid = (int)*iter;
+		bool found;
+		cluster_map.check_exist_by_node_id(pid, found);
+		if (!found)
+		{
+			new_follower_pid = pid;
+			return RET_SUCCESS;
+		}
+		iter++;
+	} 
+	WRITE_ERROR("The PID of the new follower is NOT found");	
+	return RET_FAILURE_NOT_FOUND;
+}
+
 unsigned short LeaderNode::initialize()
 {
 	unsigned short ret = RET_SUCCESS;
@@ -502,20 +526,21 @@ unsigned short LeaderNode::initialize()
 		return ret;
 
 // The /dev/shm/finance_cluster_cluster_token file is created
-  int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
-  if (shm_fd < 0) 
-  {
+  	int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+  	if (shm_fd < 0) 
+  	{
+
     	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", strerror(errno));
     	return RET_FAILURE_SYSTEM_API;
-  }
-  ftruncate(shm_fd, LOCAL_CLUSTER_SHM_BUFSIZE);
+  	}
+  	ftruncate(shm_fd, LOCAL_CLUSTER_SHM_BUFSIZE);
 
-  char *cluster_token_data = (char *)mmap(0, LOCAL_CLUSTER_SHM_BUFSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-  WRITE_FORMAT_DEBUG("cluster token, mapped address: %p, data: %s", &cluster_token_data, cluster_token_data);
-  memset(cluster_token_data, 0x0, sizeof(char) * LOCAL_CLUSTER_SHM_BUFSIZE);
-  strncpy(cluster_token_data, local_token, strlen(local_token));
-  munmap(cluster_token_data, LOCAL_CLUSTER_SHM_BUFSIZE);
-  close(shm_fd);
+  	char *cluster_token_data = (char *)mmap(0, LOCAL_CLUSTER_SHM_BUFSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  	WRITE_FORMAT_DEBUG("cluster token, mapped address: %p, data: %s", &cluster_token_data, cluster_token_data);
+  	memset(cluster_token_data, 0x0, sizeof(char) * LOCAL_CLUSTER_SHM_BUFSIZE);
+  	strncpy(cluster_token_data, local_token, strlen(local_token));
+  	munmap(cluster_token_data, LOCAL_CLUSTER_SHM_BUFSIZE);
+  	close(shm_fd);
 
 // Create worker thread
 	if (pthread_create(&listen_tid, NULL, listen_thread_handler, this))
@@ -564,11 +589,13 @@ unsigned short LeaderNode::deinitialize()
 		}
 	}
 
-	if (shm_unlink(LOCAL_CLUSTER_SHM_FILENAME) < 0)
-  	{
-    	WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
-    	return RET_FAILURE_SYSTEM_API;
-  	}
+// No need to check return value
+	// if (shm_unlink(LOCAL_CLUSTER_SHM_FILENAME) < 0)
+ //  	{
+ //    	WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
+ //    	// return RET_FAILURE_SYSTEM_API;
+ //  	}
+	shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
 
 	WRITE_DEBUG("Wait for the worker thread of listening's death...");
 // Should NOT check the thread status in this way.
@@ -870,7 +897,7 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 // EventType | cluster map string | EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&node_channel_mtx);
-	fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
+	fprintf(stderr, "LeaderNode::send_update_cluster_map %s, %ld\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 	string cluster_map_msg(cluster_map.to_string());
 	// fprintf(stderr, "Leader: %s\n", cluster_map.to_string());
 	pthread_mutex_unlock(&node_channel_mtx);
@@ -1405,28 +1432,15 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 // https://www.itread01.com/content/1549028184.html
 // I don't know why 'sun_path' is empty
 			// fprintf(stderr, "sun_family: %d, sun_path: %s\n", client_addr.sun_family, client_addr.sun_path);
-		 // 	client_addr.sun_path[client_addr_len - offsetof(struct sockaddr_un, sun_path)/* len of pathname */] = '\0'; /* null terminate */
-		 // 	if (stat(client_addr.sun_path, &client_statbuf) < 0) 
-		 //   {
-			// 	WRITE_FORMAT_ERROR("[%s] stat() fails, due to: %s", listen_thread_tag, strerror(errno));
-			// 	return RET_FAILURE_SYSTEM_API;
-		 //   } 
-		 //   else
-		 //   {
-			//    if (S_ISSOCK(client_statbuf.st_mode)) 
-			//    { 
-			// 	  	// if (uidptr != NULL)
-			// 	  	// 	*uidptr = client_statbuf.st_uid;    /* return uid of caller */ 
-			//       unlink(client_addr.sun_path);       /* we're done with pathname now */ 
-			// 	  	// return clifd;		 
-			//    } 
-			//    else
-			//    {
-			// 		WRITE_FORMAT_ERROR("[%s] Not a socket", listen_thread_tag);
-			// 		return RET_FAILURE_INCORRECT_OPERATION;
-			//    }
-		 //   }
-			client_token = strdup(client_addr.sun_path);
+			// client_addr.sun_path[client_addr_len - offsetof(struct sockaddr_un, sun_path) len of pathname ] = '\0'; /* null terminate */
+			// client_token = strdup(client_addr.sun_path);
+			int new_follower_pid;
+			ret = find_new_follower_pid(new_follower_pid);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
+			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, new_follower_pid);
+			client_token = strdup(local_token_tmp);
 			WRITE_FORMAT_INFO("[%s] Follower[%s] request connecting to the Leader", listen_thread_tag, client_token);
 			// PRINT("Follower[%s] connects to the Leader\n", client_token);
 		}

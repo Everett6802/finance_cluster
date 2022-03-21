@@ -579,23 +579,65 @@ unsigned short ClusterMap::get_first_node_token(string& first_node_token, bool p
 	return get_first_node(first_node_id, first_node_token, peek_only);
 }
 
-unsigned short ClusterMap::get_node_id(const std::string& node_token, int& node_id)
+unsigned short ClusterMap::get_node_id(const std::string& node_token, int& node_id)const
 {
-	bool found = false;
-	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+	list<ClusterNode*>::const_iterator iter_find = cluster_map.begin();
 	while(iter_find != cluster_map.end())
 	{
 		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
 		if (cluster_node->node_token == node_token)
 		{
 			node_id = cluster_node->node_id;
-			found = true;
-			break;
+			return RET_SUCCESS;
 		}
 		iter_find++;
 	}
-	if (!found)
-		return RET_FAILURE_NOT_FOUND;
+	return RET_FAILURE_NOT_FOUND;
+}
+
+unsigned short ClusterMap::get_node_token(int node_id, string& node_token)const
+{
+	list<ClusterNode*>::const_iterator iter_find = cluster_map.begin();
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_id == node_id)
+		{
+			node_token = cluster_node->node_token;
+			return RET_SUCCESS;
+		}
+		iter_find++;
+	}
+	return RET_FAILURE_NOT_FOUND;
+}
+
+unsigned short ClusterMap::check_exist_by_node_id(int node_id, bool& found)const
+{
+	string node_token;
+	unsigned short ret = get_node_token(node_id, node_token);
+	if (CHECK_FAILURE(ret))
+	{
+		assert(ret == RET_FAILURE_NOT_FOUND && "ret should be RET_FAILURE_NOT_FOUND");
+		if (ret == RET_FAILURE_NOT_FOUND)
+			found = false;
+	}
+	else
+		found = true;
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::check_exist_by_node_token(const string& node_token, bool& found)const
+{
+	int node_id;
+	unsigned short ret = get_node_id(node_token, node_id);
+	if (CHECK_FAILURE(ret))
+	{
+		assert(ret == RET_FAILURE_NOT_FOUND && "ret should be RET_FAILURE_NOT_FOUND");
+		if (ret == RET_FAILURE_NOT_FOUND)
+			found = false;
+	}
+	else
+		found = true;
 	return RET_SUCCESS;
 }
 

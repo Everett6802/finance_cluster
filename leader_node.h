@@ -58,6 +58,7 @@ private:
 	unsigned short become_file_sender();
 	unsigned short start_file_transfer();
 	unsigned short stop_file_transfer();
+	unsigned short find_new_follower_pid(int& new_follower_pid)const;
 // events
 // recv
 	unsigned short recv_check_keepalive(const std::string& message_data);
