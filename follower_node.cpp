@@ -516,10 +516,8 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 // EventType | Payload: Cluster map string| EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&cluster_map_mtx);
-	// fprintf(stderr, "Follower: %s\n", message_data.c_str());
-	fprintf(stderr, "FollowerNode::recv_update_cluster_map %s, %ld\n", message_data.c_str(), strlen(message_data.c_str()));
 	ret = cluster_map.from_string(message_data.c_str());
-	fprintf(stderr, "!Follower: %s\n", cluster_map.to_string());
+	// fprintf(stderr, "Follower: message_data: %s, cluster_map: %s\n", message_data.c_str(), cluster_map.to_string());
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));

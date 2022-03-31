@@ -233,12 +233,22 @@ const char* NodeMessageAssembler::get_full_message()const
 	return full_message_buf;
 }
 
+//////////////////////////////////////////////////////////
+
 NodeMessageParser::NodeMessageParser() :
-	full_message_found(false)
+	full_message_found(false),
+	message(NULL)
 {
 }
 
-NodeMessageParser::~NodeMessageParser(){}
+NodeMessageParser::~NodeMessageParser()
+{
+	if (message != NULL)
+	{
+		free(message);
+		message = NULL;
+	}
+}
 
 unsigned short NodeMessageParser::parse(const char* new_message)
 {
@@ -254,6 +264,7 @@ unsigned short NodeMessageParser::parse(const char* new_message)
     }
 
 	data_buffer += string(new_message);
+	// fprintf(stderr, "data_buffer: %s\n", data_buffer.c_str());
 // Check if the data is completely sent from the remote site
 	data_end_pos = data_buffer.find(END_OF_MESSAGE);
 	if (data_end_pos == string::npos)
@@ -269,7 +280,22 @@ unsigned short NodeMessageParser::parse(const char* new_message)
 		PRINT_ERROR("The message type[%d] is NOT in range [0, %d)\n", message_type, MSG_SIZE);
 		return RET_FAILURE_RUNTIME;	
 	}
+
+	if (message != NULL)
+	{
+		free(message);
+		message = NULL;
+	}
+	message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
+
 	full_message_found = true;
+#if 0
+	fprintf(stderr, "get_message() => data_buffer: %s\n", data_buffer.c_str());
+	fprintf(stderr, "get_message() => data_end_pos: %d\n", data_end_pos);
+	fprintf(stderr, "get_message() => message: %s\n", data_buffer.substr(1, data_end_pos - 1).c_str());
+	fprintf(stderr, "get_message() => message len: %d\n", strlen(data_buffer.substr(1, data_end_pos - 1).c_str()));
+	fprintf(stderr, "message_type: %d, message: %s\n", get_message_type(), get_message());
+#endif
 	return RET_SUCCESS;
 }
 
@@ -303,7 +329,12 @@ const char* NodeMessageParser::get_message()const
 	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
 	// 	return RET_FAILURE_INCORRECT_OPERATION;
 	// }
-	return data_buffer.substr(1, data_end_pos - 1).c_str();
+	// fprintf(stderr, "get_message() => data_buffer: %s\n", data_buffer.c_str());
+	// fprintf(stderr, "get_message() => data_end_pos: %d\n", data_end_pos);
+	// fprintf(stderr, "get_message() => message: %s\n", data_buffer.substr(1, data_end_pos - 1).c_str());
+	// fprintf(stderr, "get_message() => message len: %d\n", strlen(data_buffer.substr(1, data_end_pos - 1).c_str()));
+	// return (data_buffer.substr(1, data_end_pos - 1)).c_str();
+	return message;
 }
 
 MessageType NodeMessageParser::get_message_type()const
@@ -673,14 +704,14 @@ unsigned short ClusterMap::get_node_token(int node_id, std::string& node_token)
 	return RET_SUCCESS;
 }
 
-const char* ClusterMap::to_string()
+const char* ClusterMap::to_string()const
 {
 	if (cluster_map_str == NULL)
 	{
 		string total_str;
 		static const int BUF_SIZE = 64;
 		char buf[BUF_SIZE];
-		list<ClusterNode*>::iterator iter = cluster_map.begin();
+		list<ClusterNode*>::const_iterator iter = cluster_map.begin();
 		while (iter != cluster_map.end())
 		{
 			ClusterNode* cluster_node = (ClusterNode*)*iter;

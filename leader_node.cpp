@@ -207,6 +207,7 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 // Send to single node
 		PNODE_CHANNEL node_channel = node_channel_map[remote_token];
 		assert(node_channel != NULL && "node_channel should NOT be NULL");
+		fprintf(stderr, "send_msg: %s\n", node_message_assembler.get_full_message());
 		ret = node_channel->send_msg(node_message_assembler.get_full_message());
 		if (CHECK_FAILURE(ret))
 			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_token, GetErrorDescription(ret));
@@ -486,14 +487,31 @@ unsigned short LeaderNode::find_new_follower_pid(int& new_follower_pid)const
 	unsigned short ret = RET_SUCCESS;
 	list<int> active_process_id_list;
 	ret = get_process_id_list(PROCESS_NAME, active_process_id_list);
+#if 0
+	int process_count;
+	get_process_count(PROCESS_NAME, process_count);
+	fprintf(stderr, "===== Active Process ID =====\n");
+	fprintf(stderr, "Count: %d\n", process_count);
+	list<int>::const_iterator iter_check = active_process_id_list.begin();
+	while (iter_check != active_process_id_list.end())
+	{
+		fprintf(stderr, "Pid: %d\n", (int)*iter_check);
+		iter_check++;
+	}
+	fprintf(stderr, "ClusterMap: %s\n", cluster_map.to_string());
+#endif
 	if (CHECK_FAILURE(ret))
 		return ret;
 	list<int>::const_iterator iter = active_process_id_list.begin();
+	bool found;
+	char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
 	while (iter != active_process_id_list.end())
 	{
 		int pid = (int)*iter;
-		bool found;
-		cluster_map.check_exist_by_node_id(pid, found);
+		memset(local_token_tmp, 0x0, sizeof(char) * LOCAL_CLUSTER_SHM_BUFSIZE);
+		snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, pid);
+		string node_token_str(local_token_tmp);
+		cluster_map.check_exist_by_node_token(node_token_str.c_str(), found);
 		if (!found)
 		{
 			new_follower_pid = pid;
@@ -1416,11 +1434,11 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		}	
 // http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
 		int client_socketfd = 0;
-// Follower connect to Leader
+// Follower connects to Leader
 		if (local_cluster)
 		{
 			struct sockaddr_un client_addr;
-			struct stat client_statbuf;
+			// struct stat client_statbuf;
 			socklen_t client_addr_len = sizeof(client_addr);
 			// fprintf(stderr, "client_addr_len: %d\n", client_addr_len);
 			client_socketfd = accept(socketfd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_len);
@@ -1501,6 +1519,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 			goto OUT;
 		}
 		string cluster_map_msg(cluster_map.to_string());
+		// fprintf(stderr, "New Cluster Map: %s\n", cluster_map_msg.c_str());
 		pthread_mutex_unlock(&node_channel_mtx);
 		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_token);
 // Update the cluster map to Followers

@@ -391,6 +391,7 @@ private:
 	std::string data_buffer;
 	size_t data_end_pos;
 	MessageType message_type;
+	char* message;
 
 public:
 	NodeMessageParser();
@@ -434,7 +435,7 @@ class ClusterMap
 private:
 	bool local_cluster;
 	std::list<ClusterNode*> cluster_map;
-	char* cluster_map_str;
+	mutable char* cluster_map_str;
 
 	void reset_cluster_map_str();
 
@@ -477,7 +478,7 @@ public:
 	unsigned short check_exist_by_node_token(const std::string& node_token, bool& found)const;
 	unsigned short get_last_node_id(int& node_id);
 	unsigned short get_node_token(int node_id, std::string& node_token);
-	const char* to_string();
+	const char* to_string()const;
 	unsigned short from_string(const char* cluster_map_str);
 	// unsigned short from_object(const ClusterMap& cluster_map_obj);
 };

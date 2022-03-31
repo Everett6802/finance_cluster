@@ -257,6 +257,7 @@ unsigned short get_process_id_list(const char* process_name, list<int>& process_
 	static const int CMD_BUFSIZE = 256;
 	char cmd[CMD_BUFSIZE];
 	snprintf(cmd, CMD_BUFSIZE, cmd_format, process_name);
+	// fprintf(stderr, "(get_process_id_list) cmd: %s\n", cmd);
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp = popen(cmd, "r");
 	if (fp == NULL)
@@ -276,11 +277,13 @@ unsigned short get_process_id_list(const char* process_name, list<int>& process_
 	传入getline的buffer指针如果为NULL，函数会分配缓冲区用于存储行字符串，并由调用者释放。如果传入buffer空间不足以存放一行，那么函数会自动扩增缓冲区空间，同时更新其指针及缓冲区大小。
 	传入fgets的buffer空间如果不足以存放一行，fgets提前返回，并在末尾添加null byte（'\0'）。
 */
-	while (getline(&line, &line_len, fp) == -1)
+	while (getline(&line, &line_len, fp) != -1)
 	{
+		// fprintf(stderr, "(get_process_id_list) line: %s\n", line);
 		line_tmp = line;
 		pid_str = strtok_r(line_tmp, "\r\n", &rest);
 		int pid = atoi(pid_str);
+		// fprintf(stderr, "(get_process_id_list) pid: %d\n", pid);
 		process_id_list.push_back(pid);
 		if (line != NULL)
 		{

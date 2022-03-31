@@ -285,6 +285,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 			// printf("NodeChannel::send_thread_handler_internal(), message sent: %s\n", msg_data);
 			assert(msg_data != NULL && "msg_data should NOT be NULL in send_access_list");
 			int start_pos = 0;
+			// fprintf(stderr, "===> send: %s\n", msg_data);
 			int write_to_byte = strlen(msg_data);
 			while (write_to_byte > 0)
 			{
@@ -302,6 +303,7 @@ unsigned short NodeChannel::send_thread_handler_internal()
 				start_pos += write_bytes;
 				write_to_byte -= write_bytes;
 			}
+			// fprintf(stderr, "===> send...... DONE\n");
 			iter_access++;
 			free(msg_data);
 		}
@@ -411,6 +413,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // Read the data from the remote
 			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
 			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
+			// fprintf(stderr, "===> recv: %s\n", buf);
 			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 			if (ret == 0) // if recv() returns zero, that means the connection has been closed
 			{
@@ -440,6 +443,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 					}
 				}
 // Send the message to the observer
+				// fprintf(stderr, "===> recv: message: (%d, %s)\n", node_message_parser.get_message_type(), node_message_parser.get_message());
 				ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 				if (CHECK_FAILURE(ret))
 				{
@@ -450,6 +454,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
 				node_message_parser.remove_old();
 			}
+			// fprintf(stderr, "===> recv...... DONE\n");
 		}
 		else
 		{

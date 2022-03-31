@@ -558,7 +558,7 @@ unsigned short ClusterMgr::initialize()
 	usleep(100000);
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
-	fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
+	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
 	bool init_interactive_server = true;
 	if (local_cluster)
 	{
