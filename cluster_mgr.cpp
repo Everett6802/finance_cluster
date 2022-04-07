@@ -433,10 +433,49 @@ unsigned short ClusterMgr::rebuild_cluster()
         }
         break;
     }
+	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
+	if (local_cluster && node_type == LEADER)
+	{
+		ret = initialize_components();
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
     if (CHECK_FAILURE(ret))
     {
     	WRITE_FORMAT_ERROR("Node[%s] fails to rebuild the cluster, due to: %s", local_token, GetErrorDescription(ret));
     }
+	return ret;
+}
+
+unsigned short ClusterMgr::initialize_components()
+{
+	unsigned short ret= RET_SUCCESS;
+// Initialize the session server
+	assert(interactive_server == NULL && "interactive_server should be NULL");
+	interactive_server = new InteractiveServer(this);
+	if (interactive_server == NULL)
+		throw bad_alloc();
+	ret = interactive_server->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+// Initialize the simulator handler
+	assert(simulator_handler == NULL && "simulator_handler should be NULL");
+	simulator_handler = new SimulatorHandler(this);
+	if (simulator_handler == NULL)
+		throw bad_alloc();
+	ret = simulator_handler->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+	simulator_installed = simulator_handler->is_simulator_installed();
+	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
+// Initialize the system operater
+	assert(system_operator == NULL && "system_operator should be NULL");
+	system_operator = new SystemOperator(this);
+	if (system_operator == NULL)
+		throw bad_alloc();
+	ret = system_operator->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
 	return ret;
 }
 
@@ -559,7 +598,7 @@ unsigned short ClusterMgr::initialize()
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
 	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
-	bool init_interactive_server = true;
+	bool init_components = true;
 	if (local_cluster)
 	{
 		bool local_follower;
@@ -582,7 +621,7 @@ unsigned short ClusterMgr::initialize()
 
 			WRITE_DEBUG("Node Try to become follower of cluster...(LOCAL)");
 			ret = become_follower();
-			init_interactive_server = false;
+			init_components = false;
 		}
 		else
 		{
@@ -609,32 +648,12 @@ unsigned short ClusterMgr::initialize()
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
 		return ret;
-// Initialize the session server
-	if (init_interactive_server)
+	if (init_components)
 	{
-		interactive_server = new InteractiveServer(this);
-		if (interactive_server == NULL)
-			throw bad_alloc();
-		ret = interactive_server->initialize();
+		ret = initialize_components();
 		if (CHECK_FAILURE(ret))
 			return ret;
 	}
-// Initialize the simulator handler
-	simulator_handler = new SimulatorHandler(this);
-	if (simulator_handler == NULL)
-		throw bad_alloc();
-	ret = simulator_handler->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
-	simulator_installed = simulator_handler->is_simulator_installed();
-	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
-// Initialize the system operater
-	system_operator = new SystemOperator(this);
-	if (system_operator == NULL)
-		throw bad_alloc();
-	ret = system_operator->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
 	return ret;
 }
 
