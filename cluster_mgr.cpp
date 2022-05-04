@@ -1477,7 +1477,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			if (CHECK_SUCCESS(ret))
 			{
 				simulator_installed = true;
-				if (node_type == LEADER)
+				if ((!local_cluster) && (node_type == LEADER))
 				{
 					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 					ret = cluster_node->send(MSG_INSTALL_SIMULATOR, (void*)simulator_package_filepath);
@@ -1509,7 +1509,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			config_line_list_str_tmp = NULL;
 
 			ret = simulator_handler->apply_new_fake_acspt_config(new_config_line_list);
-			if (CHECK_SUCCESS(ret))
+			if (CHECK_SUCCESS(ret) && (!local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -1584,7 +1584,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 
 			// fprintf(stderr, "%d: %d, %d\n", new_config_line_list.size(), new_pkt_profile_config_line_list.size(), new_wlan_profile_config_line_list.size());
 			ret = simulator_handler->apply_new_fake_usrept_config(new_config_line_list, new_pkt_profile_config_line_list, new_wlan_profile_config_line_list);
-			if (CHECK_SUCCESS(ret))
+			if (CHECK_SUCCESS(ret) && (!local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -1629,10 +1629,13 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				}
 				break;
 			}
-			if (CHECK_SUCCESS(ret) && node_type == LEADER)
+			if (CHECK_SUCCESS(ret) && (!local_cluster))
 			{
-				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				ret = cluster_node->send(MSG_CONTROL_FAKE_ACSPT, (void*)&fake_acspt_control_type);
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					ret = cluster_node->send(MSG_CONTROL_FAKE_ACSPT, (void*)&fake_acspt_control_type);	
+				}
 			}
 		}
 		break;
@@ -1669,10 +1672,13 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				}
 				break;
 			}
-			if (CHECK_SUCCESS(ret) && node_type == LEADER)
+			if (CHECK_SUCCESS(ret) && (!local_cluster))
 			{
-				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				ret = cluster_node->send(MSG_CONTROL_FAKE_USREPT, (void*)&fake_usrept_control_type);
+				if (node_type == LEADER)
+				{
+					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+					ret = cluster_node->send(MSG_CONTROL_FAKE_USREPT, (void*)&fake_usrept_control_type);					
+				}
 			}
 		}
 		break;

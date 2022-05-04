@@ -524,9 +524,9 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	{
 		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
 		usage_string += string("* transfer_simulator_package\n Description: Leader transfers the simulator package to each follower\n");
-		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
+		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
 		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
-		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator-v5.2-23-u1804.tar.xz)\n");
+		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
 		usage_string += string("* apply_fake_acspt_config\n Description: Apply new config to all fake acepts in the cluster\n");
 		usage_string += string("  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)\n");
 		usage_string += string("* get_fake_acspt_config_value\n Description: Get the config value from fake acspts config file\n");
