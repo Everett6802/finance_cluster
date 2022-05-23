@@ -132,7 +132,7 @@ InteractiveServer::~InteractiveServer()
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in InteractiveServer::deinitialize(), due to :%s", GetErrorDescription(ret));
-		throw runtime_error(string(errmsg));
+		throw runtime_error(errmsg);
 	}
 	if (interactive_session_id_assigner != NULL)
 	{

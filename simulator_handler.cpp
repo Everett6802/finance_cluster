@@ -43,7 +43,7 @@ SimulatorHandler::~SimulatorHandler()
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in SimulatorHandler::deinitialize(), due to :%s", GetErrorDescription(ret));
-		throw runtime_error(string(errmsg));
+		throw runtime_error(errmsg);
 	}
 	if (script_filepath_array != NULL)
 	{
@@ -73,7 +73,7 @@ SimulatorHandler::~SimulatorHandler()
 
 bool SimulatorHandler::check_simulator_installed()
 {
-	bool file_exist = check_file_exist(SIMULATOR_PACKAGE_FOLDER_PATH);
+	// bool file_exist = check_file_exist(SIMULATOR_PACKAGE_FOLDER_PATH);
 	// printf("Check folder[%s] exist: %s\n", SIMULATOR_PACKAGE_FOLDER_PATH, (file_exist ? "True" : "False"));
 	return check_file_exist(SIMULATOR_PACKAGE_FOLDER_PATH);
 }
@@ -367,7 +367,7 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 		STATIC_WRITE_FORMAT_ERROR("Fail to open the file[%s], due to: %s", fake_acspt_sim_cfg_filepath, strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
-	int line_cnt = 0;
+	// int line_cnt = 0;
 	list<string>::iterator iter_simulator_tmp = simulator_config_line_list.begin();
 	while (iter_simulator_tmp != simulator_config_line_list.end())
 	{
