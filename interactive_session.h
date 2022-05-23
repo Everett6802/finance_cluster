@@ -69,6 +69,7 @@ private:
 	unsigned short handle_start_fake_usrept_command(int argc, char **argv);
 	unsigned short handle_stop_fake_usrept_command(int argc, char **argv);
 	unsigned short handle_get_fake_acspt_state_command(int argc, char **argv);
+	unsigned short handle_get_fake_acspt_detail_command(int argc, char **argv);
 	unsigned short print_to_console(std::string response)const;
 	unsigned short print_prompt_to_console()const;
 

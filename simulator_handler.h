@@ -57,6 +57,7 @@ public:
 
 	unsigned short start_fake_usrept(bool need_reset=true);
 	unsigned short stop_fake_usrept();
+	unsigned short get_fake_acspt_detail(std::string& fake_acspt_detail)const;
 
 	unsigned short get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const;
 

@@ -700,6 +700,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_control_fake_acspt,
 		&LeaderNode::recv_control_fake_usrept,
 		&LeaderNode::recv_get_fake_acspt_state,
+		&LeaderNode::recv_get_fake_acspt_detail,
 		&LeaderNode::recv_request_file_transfer,
 		&LeaderNode::recv_complete_file_transfer
 	};
@@ -729,6 +730,7 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_control_fake_acspt,
 		&LeaderNode::send_control_fake_usrept,
 		&LeaderNode::send_get_fake_acspt_state,
+		&LeaderNode::send_get_fake_acspt_detail,
 		&LeaderNode::send_request_file_transfer,
 		&LeaderNode::send_complete_file_transfer
 	};
@@ -819,6 +821,21 @@ unsigned short LeaderNode::recv_get_fake_acspt_state(const std::string& message_
 	assert(observer != NULL && "observer should NOT be NULL");
 	size_t notify_param_size = strlen(message_data.c_str()) + 1;
 	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptStateCfg((void*)message_data.c_str(), notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_GET_FAKE_ACSPT_STATE, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short LeaderNode::recv_get_fake_acspt_detail(const std::string& message_data)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|fake acspt detail) | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptDetailCfg((void*)message_data.c_str(), notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -1073,6 +1090,20 @@ unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2,
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
 	return send_data(MSG_GET_FAKE_ACSPT_STATE, buf);
+}
+
+unsigned short LeaderNode::send_get_fake_acspt_detail(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// Message format:
+// EventType | session ID | EOD
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int session_id = *(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", session_id);
+	return send_data(MSG_GET_FAKE_ACSPT_DETAIL, buf);
 }
 
 unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2, void* param3)

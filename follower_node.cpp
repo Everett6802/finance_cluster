@@ -457,6 +457,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_control_fake_acspt,
 		&FollowerNode::recv_control_fake_usrept,
 		&FollowerNode::recv_get_fake_acspt_state,
+		&FollowerNode::recv_get_fake_acspt_detail,
 		&FollowerNode::recv_request_file_transfer,
 		&FollowerNode::recv_complete_file_transfer
 	};
@@ -485,6 +486,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_control_fake_acspt,
 		&FollowerNode::send_control_fake_usrept,
 		&FollowerNode::send_get_fake_acspt_state,
+		&FollowerNode::send_get_fake_acspt_detail,
 		&FollowerNode::send_request_file_transfer,
 		&FollowerNode::send_complete_file_transfer
 	};
@@ -658,6 +660,16 @@ unsigned short FollowerNode::recv_get_fake_acspt_state(const std::string& messag
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
 	ret = send_get_fake_acspt_state((void*)&session_id, (void*)&cluster_id);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_get_fake_acspt_detail(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int session_id = atoi(message_data.c_str());
+	ret = send_get_fake_acspt_detail((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
@@ -889,6 +901,53 @@ unsigned short FollowerNode::send_get_fake_acspt_state(void* param1, void* param
 	}
 
 	return send_data(MSG_GET_FAKE_ACSPT_STATE, fake_acspt_state_data.c_str());
+}
+
+unsigned short FollowerNode::send_get_fake_acspt_detail(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: The session id
+// param2: The cluster id
+// Message format:
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|fake acspt detail) | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+    unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Serialize: convert the type of cluster id from integer to string  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, *(int*)param2);
+
+// Combine the payload
+	string fake_acspt_detail_data = string(session_id_buf) + string(cluster_id_buf);
+// Get the data
+	PFAKE_ACSPT_DETAIL_PARAM fake_acspt_detail_param = new FakeAcsptDetailParam();
+	if (fake_acspt_detail_param  == NULL)
+		throw bad_alloc();
+    ret = observer->get(PARAM_FAKE_ACSPT_DETAIL, (void*)fake_acspt_detail_param);
+	if (CHECK_FAILURE(ret))
+		WRITE_FORMAT_ERROR("Fails to get fake acspt detail in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
+	else
+	{
+		string fake_acspt_detail(fake_acspt_detail_param->fake_acspt_detail);
+		fake_acspt_detail_data += fake_acspt_detail;
+	}
+	if (fake_acspt_detail_param != NULL)
+	{
+		delete fake_acspt_detail_param;
+		fake_acspt_detail_param = NULL;
+	}
+
+	return send_data(MSG_GET_FAKE_ACSPT_DETAIL, fake_acspt_detail_data.c_str());
 }
 
 unsigned short FollowerNode::send_request_file_transfer(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REQUEST_FILE_TRANSFER);}

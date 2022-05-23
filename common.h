@@ -199,6 +199,7 @@ enum MessageType{
 	MSG_CONTROL_FAKE_ACSPT, // Uni-Direction, Leader -> Follower
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_GET_FAKE_ACSPT_DETAIL, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Leader -> Follower
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_SIZE
@@ -217,6 +218,7 @@ enum ParamType{
 	PARAM_SIMULATOR_VERSION,
 	PARAM_FAKE_ACSPT_CONFIG_VALUE,
 	PARAM_FAKE_ACSPT_STATE,
+	PARAM_FAKE_ACSPT_DETAIL,
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
 	// PARAM_NODE_FILE_TRANSFER_DONE,
@@ -237,6 +239,7 @@ enum NotifyType{
 	NOTIFY_CONTROL_FAKE_ACSPT,
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_GET_FAKE_ACSPT_STATE,
+	NOTIFY_GET_FAKE_ACSPT_DETAIL,
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SEND_FILE_DONE,
@@ -520,7 +523,7 @@ class SystemInfoParam
 {
 public:
 	int session_id;
-	char node_token_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node token or id
+	// char node_token_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node token or id
 	std::string system_info;
 
 	SystemInfoParam();
@@ -588,6 +591,31 @@ public:
 
 };
 typedef ClusterFakeAcsptStateParam* PCLUSTER_FAKE_ACSPT_STATE_PARAM;
+
+class FakeAcsptDetailParam
+{
+public:
+	int session_id;
+	// char node_token_buf[DEF_VERY_SHORT_STRING_SIZE]; // the string of node token or id
+	std::string fake_acspt_detail;
+
+	FakeAcsptDetailParam();
+	~FakeAcsptDetailParam();
+};
+typedef FakeAcsptDetailParam* PFAKE_ACSPT_DETAIL_PARAM;
+
+class ClusterFakeAcsptDetailParam
+{
+public:
+	int session_id;
+// (cluster id, fake acspt detail)
+	std::map<int, std::string> clusuter_fake_acspt_detail_map;
+
+	ClusterFakeAcsptDetailParam();
+	~ClusterFakeAcsptDetailParam();
+
+};
+typedef ClusterFakeAcsptDetailParam* PCLUSTER_FAKE_ACSPT_DETAIL_PARAM;
 
 class FileTransferParam
 {
@@ -807,6 +835,23 @@ public:
 	const char* get_fake_acspt_state()const;
 };
 typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
+
+class NotifyFakeAcsptDetailCfg : public NotifyCfg
+{
+private:
+	int session_id;
+	int cluster_id;
+	char* fake_acspt_detail;
+
+public:
+	NotifyFakeAcsptDetailCfg(const void* param, size_t param_size);
+	virtual ~NotifyFakeAcsptDetailCfg();
+
+	int get_session_id()const;
+	int get_cluster_id()const;
+	const char* get_fake_acspt_detail()const;
+};
+typedef NotifyFakeAcsptDetailCfg* PNOTIFY_FAKE_ACSPT_DETAIL_CFG;
 
 ///////////////////////////
 

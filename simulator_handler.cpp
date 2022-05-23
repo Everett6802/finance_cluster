@@ -219,6 +219,11 @@ unsigned short SimulatorHandler::stop_fake_usrept()
 	return RET_SUCCESS;
 }
 
+unsigned short SimulatorHandler::get_fake_acspt_detail(std::string& fake_acspt_detail)const
+{
+	return RET_SUCCESS;
+}
+
 unsigned short SimulatorHandler::get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const
 {
 	assert(fake_acspt_state != NULL && "fake_acspt_state should NOT be NULL");

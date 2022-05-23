@@ -56,6 +56,7 @@ private:
 	unsigned short recv_control_fake_acspt(const std::string& message_data);
 	unsigned short recv_control_fake_usrept(const std::string& message_data);
 	unsigned short recv_get_fake_acspt_state(const std::string& message_data);
+	unsigned short recv_get_fake_acspt_detail(const std::string& message_data);
 	unsigned short recv_request_file_transfer(const std::string& message_data);
 	unsigned short recv_complete_file_transfer(const std::string& message_data);
 // send
@@ -70,6 +71,7 @@ private:
 	unsigned short send_control_fake_acspt(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_control_fake_usrept(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_fake_acspt_state(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_fake_acspt_detail(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 

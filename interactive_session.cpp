@@ -30,6 +30,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_StartFakeUsrept,
 	InteractiveSessionCommand_StopFakeUsrept,
 	InteractiveSessionCommand_GetFakeAcsptState,
+	InteractiveSessionCommand_ShowFakeAcsptDetail,
 	InteractiveSessionCommandSize
 };
 
@@ -50,7 +51,8 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"stop_fake_acspt",
 	"start_fake_usrept",
 	"stop_fake_usrept",
-	"get_fake_acspt_state"
+	"get_fake_acspt_state",
+	"get_fake_acspt_detail"
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
@@ -243,7 +245,8 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 		InteractiveSessionCommand_StopFakeAcspt,
 		InteractiveSessionCommand_StartFakeUsrept,
 		InteractiveSessionCommand_StopFakeUsrept,
-		InteractiveSessionCommand_GetFakeAcsptState
+		InteractiveSessionCommand_GetFakeAcsptState,
+		InteractiveSessionCommand_ShowFakeAcsptDetail
 	};
 	static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
 	for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
@@ -492,7 +495,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_stop_fake_acspt_command,
 		&InteractiveSession::handle_start_fake_usrept_command,
 		&InteractiveSession::handle_stop_fake_usrept_command,
-		&InteractiveSession::handle_get_fake_acspt_state_command
+		&InteractiveSession::handle_get_fake_acspt_state_command,
+		&InteractiveSession::handle_get_fake_acspt_detail_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -538,6 +542,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
 		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts in the cluster\n");
 		usage_string += string("* get_fake_acspt_state\n Description: Get the states of all fake acepts in the cluster\n");
+		usage_string += string("* get_fake_acspt_detail\n Description: Get the details of all fake acepts in the cluster\n");
 	}
 	usage_string += string("===================================================\n");
 
@@ -1100,6 +1105,55 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
 		}
 		fake_acspt_state_string += string("\n");
 		ret = print_to_console(fake_acspt_state_string);
+	}
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+// Get the data
+	ClusterFakeAcsptDetailParam cluster_fake_acspt_detail_param;
+    ret = manager->get(PARAM_FAKE_ACSPT_DETAIL, (void*)&cluster_fake_acspt_detail_param);
+ 	if (CHECK_FAILURE(ret))
+		return ret;
+    // SAFE_RELEASE(notify_cfg)
+	if (CHECK_SUCCESS(ret))
+	{
+		ClusterDetailParam cluster_detail_param;
+	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+		char buf[DEF_VERY_SHORT_STRING_SIZE];
+		map<int, string>& clusuter_fake_acspt_detail_map = cluster_fake_acspt_detail_param.clusuter_fake_acspt_detail_map;
+// Print data in cosole
+		string fake_acspt_detail_string("*** Fake Acspt Detail ***\n");
+		map<int, string>::iterator iter = clusuter_fake_acspt_detail_map.begin();
+		string newline_str("\n");
+		while (iter != clusuter_fake_acspt_detail_map.end())
+		{
+			int node_id = (int)iter->first;
+			string node_token;
+			ret = cluster_map.get_node_token(node_id, node_token);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			// snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%s  ", node_token.c_str());
+			fake_acspt_detail_string += (string(buf) + (string)iter->second + newline_str);
+			++iter;
+		}
+		fake_acspt_detail_string += newline_str;
+		ret = print_to_console(fake_acspt_detail_string);
 	}
 	return RET_SUCCESS;
 }
