@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdexcept>
+#include <dirent.h>
 #include "simulator_handler.h"
 
 
@@ -219,11 +220,6 @@ unsigned short SimulatorHandler::stop_fake_usrept()
 	return RET_SUCCESS;
 }
 
-unsigned short SimulatorHandler::get_fake_acspt_detail(std::string& fake_acspt_detail)const
-{
-	return RET_SUCCESS;
-}
-
 unsigned short SimulatorHandler::get_fake_acspt_state(char* fake_acspt_state, int fake_acspt_state_size)const
 {
 	assert(fake_acspt_state != NULL && "fake_acspt_state should NOT be NULL");
@@ -293,17 +289,80 @@ unsigned short SimulatorHandler::get_fake_acspt_state(char* fake_acspt_state, in
 	return ret;
 }
 
+unsigned short SimulatorHandler::get_fake_acspt_detail(std::string& fake_acspt_detail)const
+{
+	if (!is_simulator_installed())
+		return RET_FAILURE_INCORRECT_OPERATION;
+    struct dirent *entry = nullptr;
+    DIR *dp = nullptr;
+
+// wsgclient_param
+    static const char *WSGCLIENT_FOLDER = "wsgclientsim";
+    static const char *WSGCLIENT_PARAM[] = {"ssn", "dev-ip", "dev-mac", "model", "fw-ver"};
+    static const int WSGCLIENT_PARAM_LEN = sizeof(WSGCLIENT_PARAM) / sizeof(WSGCLIENT_PARAM[0]);
+    dp = opendir(SHM_FOLDERPATH);
+    if (dp == nullptr) 
+    {
+		WRITE_FORMAT_ERROR("opendir() fails(%s), due to: %s", SHM_FOLDERPATH, strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+    }
+
+    fake_acspt_detail = string("");
+    while ((entry = readdir(dp)))
+    {
+// You can't (usefully) compare strings using != or ==, you need to use strcmp
+// The reason for this is because != and == will only compare the base addresses of those strings. 
+// Not the contents of the strings themselves.
+        if (strcmp(entry->d_name, "apgroup") == 0 || strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        	continue;
+        // printf ("%s\n", entry->d_name);
+// /dev/shm/sim/00:01:88:01:35:64/rpm/wsgclientsim
+        char rpm_data_filepath[DEF_LONG_STRING_SIZE];
+        for (int i = 0 ; i < WSGCLIENT_PARAM_LEN ; i++)
+        {
+        	snprintf(rpm_data_filepath, DEF_LONG_STRING_SIZE, RPM_DATA_FILEPATH_FORMAT, entry->d_name, WSGCLIENT_FOLDER, WSGCLIENT_PARAM[i]);
+		 	FILE* fp = fopen(rpm_data_filepath, "r");
+			if (fp == NULL)
+			{
+				fprintf(stderr, "fopen() fails: %s, due to: %s\n", rpm_data_filepath, strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
+			static const int BUF_SIZE = 512;
+			static char line_buf[BUF_SIZE];
+			int last_character_in_string_index = 0;
+			static char fake_acspt_detail_line[BUF_SIZE];
+			while (fgets(line_buf, BUF_SIZE, fp) != NULL) 
+			{
+				last_character_in_string_index = strlen(line_buf) - 1;
+				if (line_buf[last_character_in_string_index] == '\n')
+					line_buf[last_character_in_string_index] = '\0';
+				snprintf(fake_acspt_detail_line, BUF_SIZE, "%s   ", line_buf);
+				fake_acspt_detail += fake_acspt_detail_line;
+				// printf("line: %s\n", line_buf);
+			}
+	// OUT:
+			if (fp != NULL)
+			{
+				fclose(fp);
+				fp = NULL;
+			}
+        }
+		fake_acspt_detail += string("\n");        
+    }
+	return RET_SUCCESS;
+}
+
 unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>& new_config_line_list)
 {
 	if (!is_simulator_installed())
 		return RET_FAILURE_INCORRECT_OPERATION;
 	static const int BUF_SIZE = 256;
 	unsigned short ret = RET_SUCCESS;
-	char fake_acspt_sim_cfg_filepath[BUF_SIZE + 1];
+	char fake_acspt_cfg_filepath[BUF_SIZE + 1];
 	char *simulator_scripts_folder_path = NULL;
 	assemble_simulator_sub_folder_path(&simulator_scripts_folder_path, SIMULATOR_SCRIPTS_FOLDER_NAME);
-	memset(fake_acspt_sim_cfg_filepath, 0x0, sizeof(fake_acspt_sim_cfg_filepath) / sizeof(fake_acspt_sim_cfg_filepath[0]));
-	snprintf(fake_acspt_sim_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
+	memset(fake_acspt_cfg_filepath, 0x0, sizeof(fake_acspt_cfg_filepath) / sizeof(fake_acspt_cfg_filepath[0]));
+	snprintf(fake_acspt_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
 	if (simulator_scripts_folder_path != NULL)
 	{
 		delete[] simulator_scripts_folder_path;
@@ -311,10 +370,10 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 	}
 // Read the config in simulator
 	list<string> simulator_config_line_list;
-	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath, "r", ',', false);
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r", ',', false);
 	if (CHECK_FAILURE(ret))
 	{
-		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_sim_cfg_filepath, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_cfg_filepath, GetErrorDescription(ret));
 		return ret;
 	}
 // // Read the new config
@@ -361,10 +420,10 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 		}
 		iter_new++;
 	}
-	FILE* fp = fopen(fake_acspt_sim_cfg_filepath, "w");
+	FILE* fp = fopen(fake_acspt_cfg_filepath, "w");
 	if (fp == NULL)
 	{
-		STATIC_WRITE_FORMAT_ERROR("Fail to open the file[%s], due to: %s", fake_acspt_sim_cfg_filepath, strerror(errno));
+		STATIC_WRITE_FORMAT_ERROR("Fail to open the file[%s], due to: %s", fake_acspt_cfg_filepath, strerror(errno));
 		return RET_FAILURE_SYSTEM_API;
 	}
 	// int line_cnt = 0;
@@ -376,7 +435,7 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 		fputs("\n", fp);
 		iter_simulator_tmp++;
 	}
-	// printf("fake_acspt_sim_cfg_filepath: %s\n", fake_acspt_sim_cfg_filepath);
+	// printf("fake_acspt_cfg_filepath: %s\n", fake_acspt_cfg_filepath);
 	if (fp != NULL)
 	{
 		fclose(fp);
@@ -391,11 +450,11 @@ unsigned short SimulatorHandler::get_fake_acspt_config_value(const std::list<std
 		return RET_FAILURE_INCORRECT_OPERATION;
 	static const int BUF_SIZE = 256;
 	unsigned short ret = RET_SUCCESS;
-	char fake_acspt_sim_cfg_filepath[BUF_SIZE + 1];
+	char fake_acspt_cfg_filepath[BUF_SIZE + 1];
 	char *simulator_scripts_folder_path = NULL;
 	assemble_simulator_sub_folder_path(&simulator_scripts_folder_path, SIMULATOR_SCRIPTS_FOLDER_NAME);
-	memset(fake_acspt_sim_cfg_filepath, 0x0, sizeof(fake_acspt_sim_cfg_filepath) / sizeof(fake_acspt_sim_cfg_filepath[0]));
-	snprintf(fake_acspt_sim_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
+	memset(fake_acspt_cfg_filepath, 0x0, sizeof(fake_acspt_cfg_filepath) / sizeof(fake_acspt_cfg_filepath[0]));
+	snprintf(fake_acspt_cfg_filepath, BUF_SIZE, "%s/%s", simulator_scripts_folder_path, SIMULATOR_FAKE_ACSPT_SIM_CFG_FILENAME);
 	if (simulator_scripts_folder_path != NULL)
 	{
 		delete[] simulator_scripts_folder_path;
@@ -403,10 +462,10 @@ unsigned short SimulatorHandler::get_fake_acspt_config_value(const std::list<std
 	}
 // Read the config in simulator
 	list<string> simulator_config_line_list;
-	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_sim_cfg_filepath, "r", ',', false);
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r", ',', false);
 	if (CHECK_FAILURE(ret))
 	{
-		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_sim_cfg_filepath, GetErrorDescription(ret));
+		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_cfg_filepath, GetErrorDescription(ret));
 		return ret;
 	}
 // Update the config in simulator
@@ -451,6 +510,7 @@ unsigned short SimulatorHandler::apply_new_fake_usrept_config(const list<string>
 	assemble_simulator_sub_folder_path(&simulator_conf_folder_path, SIMULATOR_CONF_FOLDER_NAME);
 	memset(fake_usrept_cfg_filepath, 0x0, sizeof(fake_usrept_cfg_filepath) / sizeof(fake_usrept_cfg_filepath[0]));
 	snprintf(fake_usrept_cfg_filepath, BUF_SIZE, "%s/%s", simulator_conf_folder_path, SIMULATOR_FAKE_USREPT_CFG_FILENAME);
+// Need to manually backup the fake_usrept.conf.bak file in the source codes of the simulaltor
 	snprintf(fake_usrept_cfg_bak_filepath, BUF_SIZE, "%s.bak", fake_usrept_cfg_filepath);
 	if (simulator_conf_folder_path != NULL)
 	{
@@ -531,27 +591,67 @@ w+ 打开可读写文件，若文件存在则文件长度清为零，即该文�
 a 以附加的方式打开只写文件。若文件不存在，则会建立该文件，如果文件存在，写入的数据会被加到文件尾，即文件原先的内容会被保留。（EOF符保留）
 a+ 以附加方式打开可读写的文件。若文件不存在，则会建立该文件，如果文件存在，写入的数据会被加到文件尾后，即文件原先的内容会被保留。 （原来的EOF符不保留） 
 */
-// Write the config in simulator
-	ret = write_file_lines_ex(simulator_config_line_sublist, fake_usrept_cfg_filepath);
-	if (CHECK_FAILURE(ret))
+
+	FILE* fp = fopen(fake_usrept_cfg_filepath, "w");
+	if (fp == NULL)
 	{
-		WRITE_FORMAT_ERROR("Fail to write the simulator config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
-		return ret;
+		STATIC_WRITE_FORMAT_ERROR("Fail to open the file[%s], due to: %s", fake_usrept_cfg_filepath, strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
 	}
-// Write the pkt profile config in simulator
-	ret = write_file_lines_ex(new_pkt_profile_config_line_list, fake_usrept_cfg_filepath, "a");
-	if (CHECK_FAILURE(ret))
+	// int line_cnt = 0;
+	list<string>::iterator iter_simulator_tmp = simulator_config_line_sublist.begin();
+	while (iter_simulator_tmp != simulator_config_line_sublist.end())
 	{
-		WRITE_FORMAT_ERROR("Fail to write the simulator PKT profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
-		return ret;
+		// printf("%d, %s\n", ++line_cnt, ((string)*iter_simulator_tmp).c_str());
+		fputs(((string)*iter_simulator_tmp).c_str(), fp);
+		fputs("\n", fp);
+		iter_simulator_tmp++;
 	}
-// Write the wlan profile config in simulator
-	ret = write_file_lines_ex(new_wlan_profile_config_line_list, fake_usrept_cfg_filepath, "a");
-	if (CHECK_FAILURE(ret))
+	list<string>::const_iterator iter_new_pkt_profile_tmp = new_pkt_profile_config_line_list.begin();
+	while (iter_new_pkt_profile_tmp != new_pkt_profile_config_line_list.end())
 	{
-		WRITE_FORMAT_ERROR("Fail to write the simulator WLAN profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
-		return ret;
+		// printf("%d, %s\n", ++line_cnt, ((string)*iter_new_pkt_profile_tmp).c_str());
+		fputs(((string)*iter_new_pkt_profile_tmp).c_str(), fp);
+		fputs("\n", fp);
+		iter_new_pkt_profile_tmp++;
 	}
+	list<string>::const_iterator iter_new_wlan_profile_tmp = new_wlan_profile_config_line_list.begin();
+	while (iter_new_wlan_profile_tmp != new_wlan_profile_config_line_list.end())
+	{
+		// printf("%d, %s\n", ++line_cnt, ((string)*iter_new_wlan_profile_tmp).c_str());
+		fputs(((string)*iter_new_wlan_profile_tmp).c_str(), fp);
+		fputs("\n", fp);
+		iter_new_wlan_profile_tmp++;
+	}
+
+	// printf("fake_usrept_cfg_filepath: %s\n", fake_usrept_cfg_filepath);
+	if (fp != NULL)
+	{
+		fclose(fp);
+		fp = NULL;
+	}
+
+// // Write the config in simulator
+// 	ret = write_file_lines_ex(simulator_config_line_sublist, fake_usrept_cfg_filepath);
+// 	if (CHECK_FAILURE(ret))
+// 	{
+// 		WRITE_FORMAT_ERROR("Fail to write the simulator config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+// 		return ret;
+// 	}
+// // Write the pkt profile config in simulator
+// 	ret = write_file_lines_ex(new_pkt_profile_config_line_list, fake_usrept_cfg_filepath, "a");
+// 	if (CHECK_FAILURE(ret))
+// 	{
+// 		WRITE_FORMAT_ERROR("Fail to write the simulator PKT profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+// 		return ret;
+// 	}
+// // Write the wlan profile config in simulator
+// 	ret = write_file_lines_ex(new_wlan_profile_config_line_list, fake_usrept_cfg_filepath, "a");
+// 	if (CHECK_FAILURE(ret))
+// 	{
+// 		WRITE_FORMAT_ERROR("Fail to write the simulator WLAN profile config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));
+// 		return ret;
+// 	}
 	return ret;
 }
 

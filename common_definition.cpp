@@ -140,12 +140,14 @@ const int MAX_CONNECTED_CLIENT = 5;
 const char* PROCESS_NAME = "finance_cluster";
 const char* CONF_FODLERNAME = "conf";
 const char* FINANCE_CLUSTER_CONF_FILENAME = "finance_cluster.conf";
-const int BASE_PORT_NO = 5988;
+const int BASE_PORT_NO = 8588;
 const int CLUSTER_PORT_NO = BASE_PORT_NO + 0;
 const int SESSION_PORT_NO = BASE_PORT_NO + 1;
 const int FILE_TRANSFER_PORT_NO = BASE_PORT_NO + 2;
 const int RECV_BUF_SIZE = 512;
 const char* CLUSTER_UDS_FILEPATH = "/tmp/finance_cluster.sock";
+const char* SHM_FOLDERPATH = "/dev/shm/sim";
+const char* RPM_DATA_FILEPATH_FORMAT = "/dev/shm/sim/%s/rpm/%s/%s";
 
 const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";

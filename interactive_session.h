@@ -37,6 +37,9 @@ private:
 	volatile int session_exit;
 	pthread_t session_tid;
 	volatile unsigned short session_thread_ret;
+	pthread_t multi_clis_tid;
+	volatile unsigned short multi_clis_thread_ret;
+	char* multi_clis_filepath;
 
 	int sock_fd;
 	sockaddr_in sock_addr;
@@ -48,6 +51,10 @@ private:
 
 	static void* session_thread_handler(void* void_tr);
 	unsigned short session_thread_handler_internal();
+	static void* multi_clis_thread_handler(void* void_tr);
+	unsigned short multi_clis_thread_handler_internal();
+	static void multi_clis_thread_cleanup_handler(void* pvoid);
+	void multi_clis_thread_cleanup_handler_internal();
 
 	// unsigned short print_single_stock_support_resistance_string(const char* stock_support_resistance_entry, int stock_support_resistance_entry_len);
 	// void reset_search_param();
@@ -70,6 +77,7 @@ private:
 	unsigned short handle_stop_fake_usrept_command(int argc, char **argv);
 	unsigned short handle_get_fake_acspt_state_command(int argc, char **argv);
 	unsigned short handle_get_fake_acspt_detail_command(int argc, char **argv);
+	unsigned short handle_run_multi_clis_command(int argc, char **argv);
 	unsigned short print_to_console(std::string response)const;
 	unsigned short print_prompt_to_console()const;
 

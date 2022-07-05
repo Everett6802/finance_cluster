@@ -30,7 +30,8 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_StartFakeUsrept,
 	InteractiveSessionCommand_StopFakeUsrept,
 	InteractiveSessionCommand_GetFakeAcsptState,
-	InteractiveSessionCommand_ShowFakeAcsptDetail,
+	InteractiveSessionCommand_GetFakeAcsptDetail,
+	InteractiveSessionCommand_RunMultiClis,
 	InteractiveSessionCommandSize
 };
 
@@ -52,7 +53,8 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"start_fake_usrept",
 	"stop_fake_usrept",
 	"get_fake_acspt_state",
-	"get_fake_acspt_detail"
+	"get_fake_acspt_detail",
+	"run_multi_clis"
 };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
@@ -109,6 +111,9 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	session_exit(0),
 	session_tid(0),
 	session_thread_ret(RET_SUCCESS),
+	multi_clis_tid(0),
+	multi_clis_thread_ret(RET_SUCCESS),
+	multi_clis_filepath(NULL),
 	sock_fd(client_fd),
 	session_id(interactive_session_id),
 	is_root(false)
@@ -169,12 +174,12 @@ unsigned short InteractiveSession::deinitialize()
 		}
 		else if(kill_ret == EINVAL)
 		{
-			WRITE_FORMAT_ERROR("The signal to the worker thread of interactive session[%s] is invalid", session_tag);
+			WRITE_FORMAT_ERROR("The worker thread of interactive session[%s] is invalid", session_tag);
 			ret = RET_FAILURE_HANDLE_THREAD;
 		}
 		else
 		{
-			WRITE_FORMAT_DEBUG("The signal to the worker thread of interactive session[%s] is STILL alive", session_tag);
+			WRITE_FORMAT_DEBUG("The worker thread of interactive session[%s] is STILL alive", session_tag);
 // Kill the thread
 		    if (pthread_cancel(session_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
@@ -246,7 +251,8 @@ bool InteractiveSession::is_privilege_user_command(int command_type)
 		InteractiveSessionCommand_StartFakeUsrept,
 		InteractiveSessionCommand_StopFakeUsrept,
 		InteractiveSessionCommand_GetFakeAcsptState,
-		InteractiveSessionCommand_ShowFakeAcsptDetail
+		InteractiveSessionCommand_GetFakeAcsptDetail,
+		InteractiveSessionCommand_RunMultiClis
 	};
 	static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
 	for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
@@ -387,13 +393,13 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 			{
 				WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
 				ret = handle_command(cur_argc_inner, argv_inner);
-				if (!CHECK_SUCCESS(ret))
-					WRITE_FORMAT_DEBUG("Execute the %s command, ret: %s", argv_inner[0], GetErrorDescription(ret));
-				if (CHECK_FAILURE(ret))
+				if (CHECK_SUCCESS(ret))
+					WRITE_FORMAT_DEBUG("Execute the %s command...... DONE", argv_inner[0]);
+				else if (CHECK_FAILURE(ret))
 				{
 					char rsp_buf[RSP_BUF_SIZE + 1];
 					memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-					snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command, due to: %s\n Close the session: %s\n", argv_inner[0], GetErrorDescription(ret), session_tag);
+					snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if error occurs while executing the command and then exit
 					WRITE_ERROR(rsp_buf);
 					snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
@@ -443,6 +449,132 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 		SAFE_RELEASE(notify_cfg)
 	}
 	return ret;
+}
+
+void* InteractiveSession::multi_clis_thread_handler(void* pvoid)
+{
+	InteractiveSession* pthis = (InteractiveSession*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->multi_clis_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
+
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->multi_clis_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
+
+	if (CHECK_SUCCESS(pthis->multi_clis_thread_ret))
+	{
+		pthread_cleanup_push(multi_clis_thread_cleanup_handler, pthis);
+		pthis->multi_clis_thread_ret = pthis->multi_clis_thread_handler_internal();
+		pthread_cleanup_pop(1);
+	}
+
+// No need to send data to pthread_join
+	// pthread_exit((CHECK_SUCCESS(pthis->session_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->session_thread_ret)));
+	pthread_exit(NULL);
+}
+
+unsigned short InteractiveSession::multi_clis_thread_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] The worker thread of multiple CLIs is running", session_tag);
+	unsigned short ret = RET_SUCCESS;
+// Read the new config
+	list<string> multi_clis_line_list;
+	ret = read_file_lines_ex(multi_clis_line_list, multi_clis_filepath);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fail to read the multiple CLIs file[%s], due to: %s", multi_clis_filepath, GetErrorDescription(ret));
+		return ret;
+	}
+	string line_list_str;
+	list<string>::iterator iter = multi_clis_line_list.begin();
+	int multi_clis_line_index = 0;
+	while (iter != multi_clis_line_list.end())
+	{
+// Get one command line
+		string multi_clis_line = (string)*iter;
+		char* cli_line = strdup(multi_clis_line.c_str());
+		if (cli_line == NULL)
+		{
+			WRITE_FORMAT_ERROR("Fail to allocate memroy: %s", multi_clis_line.c_str());
+			return RET_FAILURE_INSUFFICIENT_MEMORY;
+		}
+// Parse the command line
+		char *cli_line_tmp = cli_line; 
+		char *rest_cli_line =  NULL;
+		char *cli_argv[MAX_ARGC];
+		int cli_argc = 0;
+		while ((cli_argv[cli_argc] = strtok_r(cli_line_tmp, " ", &rest_cli_line)) != NULL)
+		{
+			// WRITE_FORMAT_DEBUG("Command Argument: %s, rest: %s", cli_argv[cli_argc], rest_cli_line);
+			if (cli_line_tmp != NULL)
+				cli_line_tmp = NULL;
+			cli_argc++;
+		}
+		// printf("CLI: %s  ", cli_line);
+		// for (int i = 0 ; i < cli_argc ; i++)
+		// 	printf("[%d]: %s ", i + 1, cli_argv[i]);
+		// printf("\n");
+// Execute the command
+		WRITE_FORMAT_DEBUG("CLI[%d]: Try to execute the %s command...... ", multi_clis_line_index, cli_argv[0]);
+		ret = handle_command(cli_argc, cli_argv);
+		if (CHECK_SUCCESS(ret))
+			WRITE_FORMAT_DEBUG("CLI[%d]: Execute the %s command...... DONE", multi_clis_line_index, cli_argv[0]);
+		else if (CHECK_FAILURE(ret))
+		{
+			char rsp_buf[RSP_BUF_SIZE + 1];
+			memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+			snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Error occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+// Show warning if error occurs while executing the command and then exit
+			WRITE_ERROR(rsp_buf);
+			snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+			print_to_console(string(rsp_buf));
+		}
+		else if (CHECK_WARN(ret))
+		{
+			char rsp_buf[RSP_BUF_SIZE + 1];
+			memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+			snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Warning occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+// Show warning if warn occurs while executing the command
+			WRITE_WARN(rsp_buf);
+			snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+			print_to_console(string(rsp_buf));
+		}
+		multi_clis_line_index++;
+
+		free(cli_line);
+		iter++;
+	}
+	return ret;
+}
+
+void InteractiveSession::multi_clis_thread_cleanup_handler(void* pvoid)
+{
+	InteractiveSession* pthis = (InteractiveSession*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+	pthis->multi_clis_thread_cleanup_handler_internal();
+}
+
+void InteractiveSession::multi_clis_thread_cleanup_handler_internal()
+{
+	WRITE_INFO("Cleanup the resource in the multi clis thread......");
+	if (multi_clis_filepath != NULL)
+	{
+		free(multi_clis_filepath);
+		multi_clis_filepath = NULL;
+	}
 }
 
 unsigned short InteractiveSession::print_to_console(string response)const
@@ -496,7 +628,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_start_fake_usrept_command,
 		&InteractiveSession::handle_stop_fake_usrept_command,
 		&InteractiveSession::handle_get_fake_acspt_state_command,
-		&InteractiveSession::handle_get_fake_acspt_detail_command
+		&InteractiveSession::handle_get_fake_acspt_detail_command,
+		&InteractiveSession::handle_run_multi_clis_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -543,6 +676,8 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts in the cluster\n");
 		usage_string += string("* get_fake_acspt_state\n Description: Get the states of all fake acepts in the cluster\n");
 		usage_string += string("* get_fake_acspt_detail\n Description: Get the details of all fake acepts in the cluster\n");
+		usage_string += string("* run_multi_clis\n Description: Run multiple CLI commands at a time\n");
+		usage_string += string("  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)\n");
 	}
 	usage_string += string("===================================================\n");
 
@@ -1149,11 +1284,77 @@ unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc
 				return ret;
 			// snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
 			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%s  ", node_token.c_str());
-			fake_acspt_detail_string += (string(buf) + (string)iter->second + newline_str);
+			fake_acspt_detail_string += (string(buf) + newline_str + (string)iter->second);
 			++iter;
 		}
 		fake_acspt_detail_string += newline_str;
 		ret = print_to_console(fake_acspt_detail_string);
 	}
 	return RET_SUCCESS;
+}
+
+
+unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	if (multi_clis_tid != 0)
+	{
+
+		int kill_ret = pthread_kill(multi_clis_tid, 0);
+		if(kill_ret == ESRCH)
+		{
+			WRITE_WARN("The worker thread of running multiple CLIs did NOT exist......");
+			multi_clis_tid = 0;
+		}
+		else if(kill_ret == EINVAL)
+		{
+			WRITE_ERROR("The worker thread of running multiple CLIs is invalid");
+			multi_clis_tid = 0;
+		}
+		else
+		{
+			WRITE_ERROR("The worker thread of running multiple CLIs is STILL alive");
+			return RET_FAILURE_INCORRECT_OPERATION;
+		}
+	}
+	const char* filepath = (const char*)argv[1];
+	if (!check_file_exist(filepath))
+	{
+		WRITE_FORMAT_WARN("The multiple CLIs file[%s] does NOT exist", filepath);
+		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+	}
+	assert(multi_clis_filepath == NULL && "multi_clis_filepath should be NULL");
+	multi_clis_filepath = strdup(filepath);
+	if (multi_clis_filepath == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: multi_clis_filepath");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+
+	if (pthread_create(&multi_clis_tid, NULL, multi_clis_thread_handler, this) != 0)
+	{
+		WRITE_FORMAT_ERROR("Fail to create a handler thread of running multiple CLIs, due to: %s", strerror(errno));
+		return RET_FAILURE_HANDLE_THREAD;
+	}
+
+
+	WRITE_DEBUG("Wait for the worker thread of running multiple CLIs's death...");
+// Wait for interactive session thread's death
+	pthread_join(multi_clis_tid, NULL);
+	if (CHECK_SUCCESS(multi_clis_thread_ret))
+		WRITE_DEBUG("Wait for the worker thread of running multiple CLIs's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of running multiple CLIs's death, due to: %s", GetErrorDescription(session_thread_ret));
+		ret = multi_clis_thread_ret;
+	}
+
+	return ret;
 }

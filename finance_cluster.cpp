@@ -164,6 +164,9 @@ void detach_from_terminal()
     openlog ("firstdaemon", LOG_PID, LOG_SYSLOG);
 }
 
+#include <stdio.h>
+#include <dirent.h>
+
 int main(int argc, char** argv)
 {
 	// const char* process_name = "finance_cluster";
@@ -174,6 +177,57 @@ int main(int argc, char** argv)
 	// fprintf(stderr, "sockaddr_un size: %d\n", sizeof(un));
 	// exit(EXIT_SUCCESS);
 	// fprintf(stderr, "pid: %d\n", getpid());
+
+//     struct dirent *entry = nullptr;
+//     DIR *dp = nullptr;
+
+//     dp = opendir("/dev/shm/sim");
+//     if (dp != nullptr) {
+//         while ((entry = readdir(dp)))
+//         {
+// // You can't (usefully) compare strings using != or ==, you need to use strcmp
+// // The reason for this is because != and == will only compare the base addresses of those strings. 
+// // Not the contents of the strings themselves.
+//         	if (strcmp(entry->d_name, "apgroup") == 0 || strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+//         		continue;
+//             printf ("%s\n", entry->d_name);
+//         }
+//     }
+
+//     closedir(dp);
+// 	exit(0);
+
+//  	char* filepath = "/dev/shm/sim/00:01:88:01:35:64/rpm/wsgclientsim/ssn";
+//  	FILE* fp = fopen(filepath, "r");
+// 	if (fp == NULL)
+// 	{
+// 		fprintf(stderr, "fopen() fails\n");
+// 		exit(0);
+// 	}
+// 	static const int BUF_SIZE = 512;
+// 	static char line_buf[BUF_SIZE];
+// 	int last_character_in_string_index = 0;
+// 	while (fgets(line_buf, BUF_SIZE, fp) != NULL) 
+// 	{
+// 		// if (line_buf[0] == '\n' || line_buf[0] == '#')
+// 		// {
+// 		// 	if (ignore_comment)
+// 		// 		continue;
+// 		// }
+// 		last_character_in_string_index = strlen(line_buf) - 1;
+// 		if (line_buf[last_character_in_string_index] == '\n')
+// 			line_buf[last_character_in_string_index] = '\0';
+// 		printf("line: %s\n", line_buf);
+// 		// string line_str(line_buf);
+// 		// line_list.push_back(line_str);
+// 	}
+// // OUT:
+// 	if (fp != NULL)
+// 	{
+// 		fclose(fp);
+// 		fp = NULL;
+// 	}
+// 	exit(0);
 
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;

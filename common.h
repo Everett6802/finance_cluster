@@ -162,6 +162,8 @@ extern const int SESSION_PORT_NO;
 extern const int FILE_TRANSFER_PORT_NO;
 extern const int RECV_BUF_SIZE;
 extern const char* CLUSTER_UDS_FILEPATH;
+extern const char* SHM_FOLDERPATH;
+extern const char* RPM_DATA_FILEPATH_FORMAT;
 
 extern const char* CONFIG_FOLDER_NAME;
 extern const char* CONF_FIELD_CLUSTER_NETWORK;
