@@ -526,31 +526,41 @@ unsigned short InteractiveSession::multi_clis_thread_handler_internal()
 		// for (int i = 0 ; i < cli_argc ; i++)
 		// 	printf("[%d]: %s ", i + 1, cli_argv[i]);
 		// printf("\n");
+		if (strcasecmp(cli_argv[0], "sleep") == 0) 
+		{
+			int sleep_time_in_sec = atoi(cli_argv[1]);
+			WRITE_FORMAT_DEBUG("CLI: Sleep %d seconds...... ", sleep_time_in_sec);
+			sleep(sleep_time_in_sec);
+		}
+		else
+		{
 // Execute the command
-		WRITE_FORMAT_DEBUG("CLI[%d]: Try to execute the %s command...... ", multi_clis_line_index, cli_argv[0]);
-		ret = handle_command(cli_argc, cli_argv);
-		if (CHECK_SUCCESS(ret))
-			WRITE_FORMAT_DEBUG("CLI[%d]: Execute the %s command...... DONE", multi_clis_line_index, cli_argv[0]);
-		else if (CHECK_FAILURE(ret))
-		{
-			char rsp_buf[RSP_BUF_SIZE + 1];
-			memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-			snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Error occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+			WRITE_FORMAT_DEBUG("CLI[%d]: Try to execute the %s command...... ", multi_clis_line_index, cli_argv[0]);
+			ret = handle_command(cli_argc, cli_argv);
+			if (CHECK_SUCCESS(ret))
+				WRITE_FORMAT_DEBUG("CLI[%d]: Execute the %s command...... DONE", multi_clis_line_index, cli_argv[0]);
+			else if (CHECK_FAILURE(ret))
+			{
+				char rsp_buf[RSP_BUF_SIZE + 1];
+				memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Error occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
 // Show warning if error occurs while executing the command and then exit
-			WRITE_ERROR(rsp_buf);
-			snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
-			print_to_console(string(rsp_buf));
-		}
-		else if (CHECK_WARN(ret))
-		{
-			char rsp_buf[RSP_BUF_SIZE + 1];
-			memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-			snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Warning occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+				WRITE_ERROR(rsp_buf);
+				snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+				print_to_console(string(rsp_buf));
+			}
+			else if (CHECK_WARN(ret))
+			{
+				char rsp_buf[RSP_BUF_SIZE + 1];
+				memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Warning occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
-			WRITE_WARN(rsp_buf);
-			snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
-			print_to_console(string(rsp_buf));
+				WRITE_WARN(rsp_buf);
+				snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+				print_to_console(string(rsp_buf));
+			}
 		}
+
 		multi_clis_line_index++;
 
 		free(cli_line);
@@ -1338,12 +1348,12 @@ unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char 
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 
+	multi_clis_thread_ret = RET_SUCCESS;
 	if (pthread_create(&multi_clis_tid, NULL, multi_clis_thread_handler, this) != 0)
 	{
 		WRITE_FORMAT_ERROR("Fail to create a handler thread of running multiple CLIs, due to: %s", strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
-
 
 	WRITE_DEBUG("Wait for the worker thread of running multiple CLIs's death...");
 // Wait for interactive session thread's death
@@ -1352,7 +1362,7 @@ unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char 
 		WRITE_DEBUG("Wait for the worker thread of running multiple CLIs's death Successfully !!!");
 	else
 	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of running multiple CLIs's death, due to: %s", GetErrorDescription(session_thread_ret));
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of running multiple CLIs's death, due to: %s", GetErrorDescription(multi_clis_thread_ret));
 		ret = multi_clis_thread_ret;
 	}
 
