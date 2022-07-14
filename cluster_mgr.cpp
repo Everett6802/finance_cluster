@@ -1571,7 +1571,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 // Synchronous event
 		case NOTIFY_CHECK_KEEPALIVE:
 		{
-// Cautin: Don't carray any parameters, no need to pass PNOTIFY_XXX_CFG object
+// Cautin: Don't carry any parameters, no need to pass PNOTIFY_XXX_CFG object
 			check_keepalive();
 		}
 		break;

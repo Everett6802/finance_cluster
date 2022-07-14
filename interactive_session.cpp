@@ -497,6 +497,7 @@ unsigned short InteractiveSession::multi_clis_thread_handler_internal()
 		WRITE_FORMAT_ERROR("Fail to read the multiple CLIs file[%s], due to: %s", multi_clis_filepath, GetErrorDescription(ret));
 		return ret;
 	}
+
 	string line_list_str;
 	list<string>::iterator iter = multi_clis_line_list.begin();
 	int multi_clis_line_index = 0;
@@ -1302,7 +1303,6 @@ unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc
 	}
 	return RET_SUCCESS;
 }
-
 
 unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char **argv)
 {

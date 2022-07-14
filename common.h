@@ -242,6 +242,7 @@ enum NotifyType{
 	NOTIFY_CONTROL_FAKE_USREPT,
 	NOTIFY_GET_FAKE_ACSPT_STATE,
 	NOTIFY_GET_FAKE_ACSPT_DETAIL,
+	NOTIFY_RUN_MULTI_CLIS,
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SEND_FILE_DONE,
@@ -838,6 +839,8 @@ public:
 };
 typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
 
+///////////////////////////////////////////////////
+
 class NotifyFakeAcsptDetailCfg : public NotifyCfg
 {
 private:
@@ -855,7 +858,7 @@ public:
 };
 typedef NotifyFakeAcsptDetailCfg* PNOTIFY_FAKE_ACSPT_DETAIL_CFG;
 
-///////////////////////////
+///////////////////////////////////////////////////
 
 class NotifyFileTransferAbortCfg : public NotifyCfg
 {

@@ -1415,6 +1415,7 @@ const char* NotifyFakeAcsptDetailCfg::get_fake_acspt_detail()const
 	return fake_acspt_detail;
 }
 
+
 ///////////////////////////
 
 NotifyFileTransferAbortCfg::NotifyFileTransferAbortCfg(const void* param, size_t param_size) :
