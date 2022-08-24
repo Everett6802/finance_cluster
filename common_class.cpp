@@ -250,7 +250,9 @@ NodeMessageParser::~NodeMessageParser()
 	}
 }
 
-unsigned short NodeMessageParser::parse(const char* new_message)
+
+
+unsigned short NodeMessageParser::add(const char* new_message)
 {
 	if (full_message_found)
 	{
@@ -265,6 +267,11 @@ unsigned short NodeMessageParser::parse(const char* new_message)
 
 	data_buffer += string(new_message);
 	// fprintf(stderr, "data_buffer: %s\n", data_buffer.c_str());
+	return RET_SUCCESS;
+}
+
+unsigned short NodeMessageParser::check_completion()
+{
 // Check if the data is completely sent from the remote site
 	data_end_pos = data_buffer.find(END_OF_MESSAGE);
 	if (data_end_pos == string::npos)
@@ -297,6 +304,16 @@ unsigned short NodeMessageParser::parse(const char* new_message)
 	fprintf(stderr, "message_type: %d, message: %s\n", get_message_type(), get_message());
 #endif
 	return RET_SUCCESS;
+}
+
+unsigned short NodeMessageParser::parse(const char* new_message)
+{
+	unsigned short ret = RET_SUCCESS;
+	ret = add(new_message);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ret = check_completion();
+	return ret;
 }
 
 unsigned short NodeMessageParser::remove_old()

@@ -839,7 +839,7 @@ unsigned short LeaderNode::recv_get_fake_acspt_detail(const std::string& message
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
-	observer->notify(NOTIFY_GET_FAKE_ACSPT_STATE, notify_cfg);
+	observer->notify(NOTIFY_GET_FAKE_ACSPT_DETAIL, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }

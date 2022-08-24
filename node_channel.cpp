@@ -389,6 +389,7 @@ void* NodeChannel::recv_thread_handler(void* pvoid)
 
 unsigned short NodeChannel::recv_thread_handler_internal()
 {
+	static int MAX_RECV_COUNT = 50;
 	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_token.c_str());
 
 	char buf[RECV_BUF_SIZE];
@@ -400,7 +401,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		struct pollfd pfd;
 		pfd.fd = node_socket;
 		pfd.events = POLLIN | POLLHUP | POLLRDNORM;
-	    pfd.revents = 0;
+		pfd.revents = 0;
 		int ret = poll(&pfd, 1, WAIT_DATA_TIMEOUT); // call poll with a timeout of 3000 ms
 // WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "poll() return value: %d", ret);
 		if (ret < 0)
@@ -410,50 +411,67 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		}
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
+			int recv_count = 0;
+			do{
 // Read the data from the remote
-			memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
-			ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
-			// fprintf(stderr, "===> recv: %s\n", buf);
-			// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
-			if (ret == 0) // if recv() returns zero, that means the connection has been closed
-			{
-// Allocate the nofity event parameter
-				// const char* notify_param = remote_token.c_str();
-				size_t notify_param_size = strlen(remote_token.c_str()) + 1;
-				PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_token.c_str(), notify_param_size);
-				if (notify_cfg == NULL)
-					throw bad_alloc();
-// Notify the event
-				WRITE_FORMAT_WARN("[%s] The connection is closed......", thread_tag);
-				observer->notify(NOTIFY_NODE_DIE, notify_cfg);
-				return RET_FAILURE_CONNECTION_CLOSE;
-			}
-			else
-			{
-// Parse the message
-				ret = node_message_parser.parse(buf);
-				if (CHECK_FAILURE(ret))
+				memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
+				ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
+				// fprintf(stderr, "===> recv: %s, %d\n", buf, ret);
+				// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
+				if (ret == 0) // if recv() returns zero, that means the connection has been closed
 				{
-					if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
-						continue;
+// Allocate the nofity event parameter
+					// const char* notify_param = remote_token.c_str();
+					size_t notify_param_size = strlen(remote_token.c_str()) + 1;
+					PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_token.c_str(), notify_param_size);
+					if (notify_cfg == NULL)
+						throw bad_alloc();
+// Notify the event
+					WRITE_FORMAT_WARN("[%s] The connection is closed......", thread_tag);
+					observer->notify(NOTIFY_NODE_DIE, notify_cfg);
+					return RET_FAILURE_CONNECTION_CLOSE;
+				}
+				else
+				{
+// Parse the message
+					ret = node_message_parser.parse(buf);
+					if (CHECK_FAILURE(ret))
+					{
+						if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
+						{
+							recv_count++;
+							if (recv_count >= MAX_RECV_COUNT)
+							{
+								WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s. Max retries exprie......", thread_tag, node_token.c_str(), GetErrorDescription(ret));
+								goto OUT;
+							}
+							else 
+								continue;
+						}
+						else
+						{
+							WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
+							goto OUT;
+							// break;
+						}
+					}
+// Send the message to the observer
+					// fprintf(stderr, "===> recv: message: (%d, %s)\n", node_message_parser.get_message_type(), node_message_parser.get_message());
+					ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
+					if (CHECK_FAILURE(ret))
+					{
+						WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
+						goto OUT;
+					}
 					else
 					{
-						WRITE_FORMAT_ERROR("[%s] Node[%s] fails to parse message, due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
+// Remove the data which is already shown
+						// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
+						node_message_parser.remove_old();
 						break;
 					}
 				}
-// Send the message to the observer
-				// fprintf(stderr, "===> recv: message: (%d, %s)\n", node_message_parser.get_message_type(), node_message_parser.get_message());
-				ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
-				if (CHECK_FAILURE(ret))
-				{
-					WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
-					break;
-				}
-// Remove the data which is already shown
-				// data_buffer = data_buffer.substr(beg_pos + END_OF_MESSAGE_LEN);
-				node_message_parser.remove_old();
-			}
+			}while(true);
 			// fprintf(stderr, "===> recv...... DONE\n");
 		}
 		else
@@ -467,6 +485,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			}
 		}
 	}
+OUT:
 // Segmetation fault occurs while calling WRITE_FORMAT_INFO
 // I don't know why. Perhaps similiar issue as below:
 // https://forum.bitcraze.io/viewtopic.php?t=1089

@@ -403,6 +403,9 @@ public:
 	NodeMessageParser();
 	~NodeMessageParser();
 
+	unsigned short add(const char* new_message);
+	unsigned short check_completion();
+
 	unsigned short parse(const char* new_message);
 	unsigned short remove_old();
 
