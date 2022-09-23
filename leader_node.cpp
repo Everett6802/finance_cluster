@@ -131,7 +131,11 @@ since they will inherit that state from the listening socket.
 		memset(&server_address, 0x0, sizeof(struct sockaddr_un));
 		server_address.sun_family = AF_UNIX;
 		strcpy(server_address.sun_path, CLUSTER_UDS_FILEPATH);
-		unlink(server_address.sun_path);
+		if (access(server_address.sun_path, F_OK))
+		{
+			WRITE_FORMAT_ERROR("The old socket file[%s] still exists. Remove it !!!", server_address.sun_path);
+			unlink(server_address.sun_path);	
+		}
 		// socket_len = sizeof(server_address);
     	socket_len = sizeof(server_address.sun_family) + strlen(server_address.sun_path);
 		if (bind(listen_sd, (struct sockaddr*)&server_address, socket_len) == -1)

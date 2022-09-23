@@ -786,11 +786,13 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 // Combine the payload
 	string system_info_data = string(session_id_buf) + string(cluster_id_buf);
 	string system_info;
-	ret = get_system_info(system_info);
+	SystemInfoParam system_info_param;
+	ret = observer->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
+	// ret = get_system_info(system_info);
 	if (CHECK_FAILURE(ret))
 		WRITE_FORMAT_ERROR("Fails to get system info in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 	else
-		system_info_data += system_info;
+		system_info_data += system_info_param.system_info;
 	// fprintf(stderr, "Follower[%s] send_get_system_info message: %s\n", local_token, system_info_data.c_str());
 	// char session_id_str[3];
 	// memset(session_id_str, 0x0, sizeof(char) * 3);

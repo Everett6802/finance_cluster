@@ -229,6 +229,16 @@ int main(int argc, char** argv)
 // 	}
 // 	exit(0);
 
+	// char* token;
+	// char* line = "Model name:                      Intel(R) Core(TM) i7-3770 CPU @ 3.40GHz";
+	// char* line_tmp = strdup(line);
+	// char* rest;
+	// token = strtok_r(line_tmp, ":", &rest);
+	// printf("token: %s, rest: %s\n", token, rest);
+	// token = strtok_r(NULL, ":", &rest);
+	// printf("token: %s, rest: %s\n", token, rest);
+	// exit(0);
+
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));

@@ -790,7 +790,6 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 			return ret;
 		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
-		char buf[DEF_STRING_SIZE];
 		map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
 // Print data in cosole
 		string system_info_string("*** System Info ***\n");
@@ -804,8 +803,11 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
 			system_info_string += string(buf);
+			system_info_string += ((string)iter->second);
+			system_info_string += string("\n**********\n");
 			++iter;
 		}
 		system_info_string += string("\n");

@@ -447,35 +447,44 @@ unsigned short ClusterMgr::rebuild_cluster()
 	return ret;
 }
 
-unsigned short ClusterMgr::initialize_components()
+unsigned short ClusterMgr::initialize_components(bool local_follower)
 {
 	unsigned short ret= RET_SUCCESS;
+	if (!local_follower)
+	{
 // Initialize the session server
-	assert(interactive_server == NULL && "interactive_server should be NULL");
-	interactive_server = new InteractiveServer(this);
-	if (interactive_server == NULL)
-		throw bad_alloc();
-	ret = interactive_server->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
+		WRITE_DEBUG("Initialize the session server......");
+		assert(interactive_server == NULL && "interactive_server should be NULL");
+		interactive_server = new InteractiveServer(this);
+		if (interactive_server == NULL)
+			throw bad_alloc();
+		ret = interactive_server->initialize();
+		if (CHECK_FAILURE(ret))
+			return ret;
 // Initialize the simulator handler
-	assert(simulator_handler == NULL && "simulator_handler should be NULL");
-	simulator_handler = new SimulatorHandler(this);
-	if (simulator_handler == NULL)
-		throw bad_alloc();
-	ret = simulator_handler->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
-	simulator_installed = simulator_handler->is_simulator_installed();
-	WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
+		WRITE_DEBUG("Initialize the simulator handler......");
+		assert(simulator_handler == NULL && "simulator_handler should be NULL");
+		simulator_handler = new SimulatorHandler(this);
+		if (simulator_handler == NULL)
+			throw bad_alloc();
+		ret = simulator_handler->initialize();
+		if (CHECK_FAILURE(ret))
+			return ret;
+		simulator_installed = simulator_handler->is_simulator_installed();
+		WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
+	}
 // Initialize the system operater
-	assert(system_operator == NULL && "system_operator should be NULL");
-	system_operator = new SystemOperator(this);
 	if (system_operator == NULL)
-		throw bad_alloc();
-	ret = system_operator->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
+	{
+		WRITE_DEBUG("Initialize the system operater......");
+		// assert(system_operator == NULL && "system_operator should be NULL");
+		system_operator = new SystemOperator(this);
+		if (system_operator == NULL)
+			throw bad_alloc();
+		ret = system_operator->initialize(cluster_network.c_str(), cluster_netmask_digits);
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
 	return ret;
 }
 
@@ -598,10 +607,9 @@ unsigned short ClusterMgr::initialize()
 // Define a leader/follower and establish the connection
 	// ret = start_connection();
 	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
-	bool init_components = true;
+	bool local_follower = false;
 	if (local_cluster)
 	{
-		bool local_follower;
 		ret = is_local_follower(local_follower);
 		if (CHECK_FAILURE(ret))
 			return ret;
@@ -621,7 +629,7 @@ unsigned short ClusterMgr::initialize()
 
 			WRITE_DEBUG("Node Try to become follower of cluster...(LOCAL)");
 			ret = become_follower();
-			init_components = false;
+			// init_components = false;
 		}
 		else
 		{
@@ -648,17 +656,21 @@ unsigned short ClusterMgr::initialize()
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	if (init_components)
-	{
-		ret = initialize_components();
-		if (CHECK_FAILURE(ret))
-			return ret;
-	}
+	ret = initialize_components(local_follower);
+	if (CHECK_FAILURE(ret))
+		return ret;
 	return ret;
 }
 
 unsigned short ClusterMgr::deinitialize()
 {
+// Deinitialize the system operator
+	if (system_operator != NULL)
+	{
+		system_operator->deinitialize();
+		delete system_operator;
+		system_operator = NULL;	
+	}
 // Deinitialize the simulator handler
 	if (simulator_handler != NULL)
 	{
@@ -905,11 +917,13 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			}
 			else if (node_type == FOLLOWER)
 			{
-	    		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
-	    		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
-				ret = get_system_info(system_info_param->system_info);
-				if (CHECK_FAILURE(ret))
-					return ret;
+	   //  		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
+	   //  		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
+				// ret = system_operator->get_system_info(system_info_param->system_info);
+				// if (CHECK_FAILURE(ret))
+				// 	return ret;
+	    		WRITE_ERROR("Unable to transfer data from follower");
+	    		return RET_FAILURE_INCORRECT_OPERATION;	
 			}
 			else
 			{
@@ -970,6 +984,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
+   			assert(system_operator != NULL && "system_operator should NOT be NULL");
 
 			if (node_type == LEADER)
 			{
@@ -979,7 +994,8 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				PSYSTEM_INFO_PARAM system_info_param = new SystemInfoParam();
 				if (system_info_param  == NULL)
 					throw bad_alloc();
-				ret = get_system_info(system_info_param->system_info);
+				ret = system_operator->get_system_info(system_info_param->system_info);
+				// printf("* system_info: %s\n", system_info_param->system_info.c_str());
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Cluster ID of the Leader node: 1
@@ -1060,7 +1076,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			{
 	    		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
 	    		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
-				ret = get_system_info(system_info_param->system_info);
+				ret = system_operator->get_system_info(system_info_param->system_info);
 				if (CHECK_FAILURE(ret))
 					return ret;
 			}

@@ -9,13 +9,24 @@ class SystemOperator : public INotify
 	DECLARE_MSG_DUMPER()
 private:
 	PINOTIFY observer;
+	char* host_network;
+	int host_netmask_digits;
+
+	unsigned short get_line_info(const char* line, std::string& data_info);
+	unsigned short get_cpu_info(std::string& cpu_info);
+	unsigned short get_memory_info(std::string& memory_info);
+	unsigned short get_disk_info(std::string& disk_info);
+	unsigned short get_network_info(std::string& network_info);
+	unsigned short get_os_info(std::string& os_info);
 
 public:
 	SystemOperator(PINOTIFY notify);
 	virtual ~SystemOperator();
 
-	unsigned short initialize();
+	unsigned short initialize(const char* network, int netmask_digits);
 	unsigned short deinitialize();
+
+	unsigned short get_system_info(std::string& system_info);
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

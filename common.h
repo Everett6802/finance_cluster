@@ -297,8 +297,6 @@ unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char*
 unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
 unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute="w", const char* newline_character="\n");
-unsigned short get_linux_platform(std::string& linux_distribution);
-unsigned short get_system_info(std::string& system_info);
 unsigned short get_process_id_list(const char* process_name, std::list<int>& process_id_list);
 unsigned short get_process_count(const char* process_name, int& process_count);
 bool check_string_is_number(const char* input);
