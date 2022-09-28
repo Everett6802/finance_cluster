@@ -51,6 +51,7 @@ private:
 	SystemOperator* system_operator;
 
 	unsigned short parse_config();
+	bool check_interface_exist(const char* network_interface)const;
 	unsigned short find_local_ip(bool need_check_network=false);
 	void set_keepalive_timer_interval(int delay=0, int period=0);
 	unsigned short start_keepalive_timer();

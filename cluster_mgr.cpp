@@ -62,6 +62,7 @@ unsigned short ClusterMgr::parse_config()
 			return RET_FAILURE_INCORRECT_CONFIG;
 		}
 
+		// fprintf(stderr, "conf_name: %s, conf_value: %s\n", conf_name, conf_value);
 		if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
 		{
 			cluster_network = string(conf_value);
@@ -82,6 +83,7 @@ unsigned short ClusterMgr::parse_config()
 				*conf_value_ptr = tolower(*conf_value_ptr);
 				conf_value_ptr++;
 			}
+			// fprintf(stderr, "conf_value_new: %s\n", conf_value_new);
 			if (strcmp(conf_value_new, "yes") == 0)
 				local_cluster = true;
 			else if (strcmp(conf_value_new, "no") == 0)
@@ -97,6 +99,7 @@ unsigned short ClusterMgr::parse_config()
 				conf_value_new = NULL;
 			}
 			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
+			// fprintf(stderr, "CONF Name: %s, Value: %s\n", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
 		}
 		else
 		{
@@ -116,18 +119,48 @@ unsigned short ClusterMgr::parse_config()
 	return RET_SUCCESS;
 }
 
+bool ClusterMgr::check_interface_exist(const char* network_interface)const
+{
+	assert(network_interface != NULL && "network_interface should NOT be NULL");
+	static const char* LINUX_INTERFACE_PREFIX1 = "eth";
+	static const int LINUX_INTERFACE_PREFIX1_LEN = strlen(LINUX_INTERFACE_PREFIX1);
+	static const char* LINUX_INTERFACE_PREFIX2 = "enp";
+	static const int LINUX_INTERFACE_PREFIX2_LEN = strlen(LINUX_INTERFACE_PREFIX2);
+	static const char* LINUX_INTERFACE_PREFIX3 = "ens";
+	static const int LINUX_INTERFACE_PREFIX3_LEN = strlen(LINUX_INTERFACE_PREFIX3);
+	static const char* LINUX_INTERFACE_PREFIX_LIST[] = {
+		LINUX_INTERFACE_PREFIX1,
+		LINUX_INTERFACE_PREFIX2,
+		LINUX_INTERFACE_PREFIX3
+	};
+	static const int LINUX_INTERFACE_PREFIX_LEN_LIST[] = {
+		LINUX_INTERFACE_PREFIX1_LEN,
+		LINUX_INTERFACE_PREFIX2_LEN,
+		LINUX_INTERFACE_PREFIX3_LEN
+	};
+	static int LINUX_INTERFACE_PREFIX_LIST_SIZE = sizeof(LINUX_INTERFACE_PREFIX_LIST) / sizeof(LINUX_INTERFACE_PREFIX_LIST[0]);
+	for (int i = 0; i < LINUX_INTERFACE_PREFIX_LIST_SIZE ; i++)
+	{
+		if (strncmp(network_interface, LINUX_INTERFACE_PREFIX_LIST[i], LINUX_INTERFACE_PREFIX_LEN_LIST[i]) == 0)
+			return true;
+	}
+	return false;
+}
+
 unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 {
-	if (!local_cluster)
+	if (local_cluster)
 	{
 		WRITE_ERROR("Should NOT find local IP for local cluster");
 		return RET_FAILURE_INCORRECT_OPERATION;		
 	}
 	// static const char* LOCAL_INTERFACE_NAME = "lo";
-	static const char* LINUX_INTERFACE_PREFIX1 = "eth";
-	static const int LINUX_INTERFACE_PREFIX1_LEN = strlen(LINUX_INTERFACE_PREFIX1);
-	static const char* LINUX_INTERFACE_PREFIX2 = "enp";
-	static const int LINUX_INTERFACE_PREFIX2_LEN = strlen(LINUX_INTERFACE_PREFIX2);
+	// static const char* LINUX_INTERFACE_PREFIX1 = "eth";
+	// static const int LINUX_INTERFACE_PREFIX1_LEN = strlen(LINUX_INTERFACE_PREFIX1);
+	// static const char* LINUX_INTERFACE_PREFIX2 = "enp";
+	// static const int LINUX_INTERFACE_PREFIX2_LEN = strlen(LINUX_INTERFACE_PREFIX2);
+	// static const char* LINUX_INTERFACE_PREFIX3 = "ens";
+	// static const int LINUX_INTERFACE_PREFIX3_LEN = strlen(LINUX_INTERFACE_PREFIX3);
 	unsigned short ret = RET_SUCCESS;
 
 	map<string, string> interface_ip_map;
@@ -143,7 +176,10 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 		while (iter_cnt != interface_ip_map.end())
 		{
 			string interface = iter_cnt->first;
-			if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0 || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0)
+			// if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0
+			//  || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0
+			//  || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX3, LINUX_INTERFACE_PREFIX3_LEN) == 0)
+			if (check_interface_exist(interface.c_str()))
 				cnt++;
 			iter_cnt++;	
 		}
@@ -151,6 +187,11 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 		{
 			WRITE_FORMAT_WARN("The network interface[%d] is more than 2, fail to auto-select network interface", interface_ip_map.size());
 			need_check_network = true;
+		}
+		else if (cnt == 0)
+		{
+			WRITE_ERROR("No interfaces are found");
+			return RET_FAILURE_NOT_FOUND;
 		}
 
 	}
@@ -174,7 +215,10 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
       	}
       	else
       	{
-      		if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0 || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0)
+      		// if (strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX1, LINUX_INTERFACE_PREFIX1_LEN) == 0
+      		//  || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX2, LINUX_INTERFACE_PREFIX2_LEN) == 0
+      		//  || strncmp(interface.c_str(), LINUX_INTERFACE_PREFIX3, LINUX_INTERFACE_PREFIX3_LEN) == 0)
+      		if (check_interface_exist(interface.c_str()))
       			found = true;
       	}
       	if (found)
@@ -285,8 +329,11 @@ unsigned short ClusterMgr::become_leader()
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Leader)");
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
-
-	unsigned short ret = cluster_node->initialize();
+	unsigned short ret = RET_SUCCESS;
+	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ret = cluster_node->initialize();
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -304,6 +351,9 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 	unsigned short ret = RET_SUCCESS;
+	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	if (CHECK_FAILURE(ret))
+		return ret;
 	ret = cluster_node->set(PARAM_CONNECTION_RETRY, (void*)&need_rebuild_cluster);
 	if (CHECK_FAILURE(ret))
 		return ret;

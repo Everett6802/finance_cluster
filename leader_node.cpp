@@ -1153,6 +1153,11 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_LOCAL_CLUSTER:
+    	{
+    		local_cluster = *(bool*)param1;
+    	}
+    	break;
     	case PARAM_FILE_TRANSFER:
     	{
     		if (param1 == NULL)

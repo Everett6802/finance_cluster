@@ -997,6 +997,11 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		connection_retry = *(bool*)param1;
     	}
     	break;
+    	case PARAM_LOCAL_CLUSTER:
+    	{
+    		local_cluster = *(bool*)param1;
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
