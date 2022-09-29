@@ -783,25 +783,29 @@ unsigned short ClusterMgr::deinitialize()
 
 unsigned short ClusterMgr::set_cluster_token(const char* token)
 {
-	if (local_cluster)
-	{
-		if (token != NULL)
-		{
-			WRITE_ERROR("token should be NULL");
-			return RET_FAILURE_INVALID_ARGUMENT;
-		}
-	}
-	else
-	{
-		if (token == NULL)
-		{
-			WRITE_ERROR("token should NOT be NULL");
-			return RET_FAILURE_INVALID_ARGUMENT;
-		}
-		if (cluster_token != NULL)
-			free(cluster_token);
-		cluster_token = strdup(token);
-	}
+	assert(token != NULL && "token should NOT be NULL");
+	// if (local_cluster)
+	// {
+	// 	if (token != NULL)
+	// 	{
+	// 		WRITE_ERROR("token should be NULL");
+	// 		return RET_FAILURE_INVALID_ARGUMENT;
+	// 	}
+	// }
+	// else
+	// {
+	// 	if (token == NULL)
+	// 	{
+	// 		WRITE_ERROR("token should NOT be NULL");
+	// 		return RET_FAILURE_INVALID_ARGUMENT;
+	// 	}
+	// 	if (cluster_token != NULL)
+	// 		free(cluster_token);
+	// 	cluster_token = strdup(token);
+	// }
+	cluster_token = strdup(token);
+	if (cluster_token == NULL)
+		throw bad_alloc();
 
 	return RET_SUCCESS;
 }

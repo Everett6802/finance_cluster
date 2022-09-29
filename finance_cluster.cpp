@@ -129,9 +129,12 @@ unsigned short check_param()
 unsigned short setup_param(ClusterMgr& cluster_mgr)
 {
 	unsigned short ret = RET_SUCCESS;
-	ret = cluster_mgr.set_cluster_token(param_join);
-	if (CHECK_FAILURE(ret))
-		goto OUT;	
+	if (param_join != NULL)
+	{
+		ret = cluster_mgr.set_cluster_token(param_join);
+		if (CHECK_FAILURE(ret))
+			goto OUT;			
+	}
 OUT:
 	return ret;
 }
