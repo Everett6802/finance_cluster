@@ -1004,6 +1004,16 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+    	case PARAM_NODE_TYPE:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		*((NodeType*)param1) = node_type;
+    	}
+    	break;
     	case PARAM_CLUSTER_DETAIL:
     	{
         	if (param1 == NULL)

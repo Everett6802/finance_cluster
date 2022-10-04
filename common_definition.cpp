@@ -32,6 +32,7 @@ const unsigned short RET_FAILURE_IO_OPERATION = RET_FAILURE_BASE + 10;
 const unsigned short RET_FAILURE_HANDLE_THREAD = RET_FAILURE_BASE + 11;
 const unsigned short RET_FAILURE_SYSTEM_API = RET_FAILURE_BASE + 12;
 const unsigned short RET_FAILURE_INTERNAL_ERROR = RET_FAILURE_BASE + 13;
+const unsigned short RET_FAILURE_INCORRECT_VALUE = RET_FAILURE_BASE + 14;
 const unsigned short RET_FAILURE_END = 0xFF;
 
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
@@ -70,7 +71,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"Failure IO Operation",
 		"Failure Handle Thread",
 		"Failure System API",
-		"Failure Internal Error"
+		"Failure Internal Error",
+		"Failure Incorrect Value"
 	};
 	static const char *connection_ret_failure_description[] =
 	{

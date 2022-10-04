@@ -547,6 +547,8 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
+// Remove the old token if required
+	shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
 // The /dev/shm/finance_cluster_cluster_token file is created
   	int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
   	if (shm_fd < 0) 

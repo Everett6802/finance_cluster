@@ -774,44 +774,69 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 	}
 
 	unsigned short ret = RET_SUCCESS;
-// Get the data
-	ClusterSystemInfoParam cluster_system_info_param; // = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
-	// if (simulator_version_param  == NULL)
-	// 	throw bad_alloc();
-    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&cluster_system_info_param);
+	NodeType node_type = NONE;
+    ret = manager->get(PARAM_NODE_TYPE, (void*)&node_type);
  	if (CHECK_FAILURE(ret))
-		return ret;
-    // SAFE_RELEASE(notify_cfg)
-	if (CHECK_SUCCESS(ret))
+		return ret;	
+// Get the data
+	switch (node_type)
 	{
-		ClusterDetailParam cluster_detail_param;
-	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
-		if (CHECK_FAILURE(ret))
-			return ret;
-		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
-
-		map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
-// Print data in cosole
-		string system_info_string("*** System Info ***\n");
-		map<int, string>::iterator iter = clusuter_system_info_map.begin();
-		while (iter != clusuter_system_info_map.end())
+		case LEADER:
 		{
-			// simulator_version_string += string(simulator_version_param->simulator_version);
-			// simulator_version_string += string("\n");
-			int node_id = (int)iter->first;
-			string node_token;
-			ret = cluster_map.get_node_token(node_id, node_token);
+			ClusterSystemInfoParam cluster_system_info_param; // = new SimulatorVersionParam(DEF_VERY_SHORT_STRING_SIZE);
+			// if (simulator_version_param  == NULL)
+			// 	throw bad_alloc();
+		    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&cluster_system_info_param);
+		 	if (CHECK_FAILURE(ret))
+				return ret;
+		    // SAFE_RELEASE(notify_cfg)
+			ClusterDetailParam cluster_detail_param;
+		    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			char buf[DEF_STRING_SIZE];
-			snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
-			system_info_string += string(buf);
-			system_info_string += ((string)iter->second);
-			system_info_string += string("\n**********\n");
-			++iter;
+			ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+			map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
+	// Print data in cosole
+			string system_info_string("*** System Info ***\n");
+			map<int, string>::iterator iter = clusuter_system_info_map.begin();
+			while (iter != clusuter_system_info_map.end())
+			{
+				// simulator_version_string += string(simulator_version_param->simulator_version);
+				// simulator_version_string += string("\n");
+				int node_id = (int)iter->first;
+				string node_token;
+				ret = cluster_map.get_node_token(node_id, node_token);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				char buf[DEF_STRING_SIZE];
+				snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
+				system_info_string += string(buf);
+				system_info_string += ((string)iter->second);
+				system_info_string += string("\n**********\n");
+				++iter;
+			}
+			system_info_string += string("\n");
+			ret = print_to_console(system_info_string);
 		}
-		system_info_string += string("\n");
-		ret = print_to_console(system_info_string);
+		break;
+		case FOLLOWER:
+		{
+			SystemInfoParam system_info_param;
+		    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
+		 	if (CHECK_FAILURE(ret))
+				return ret;
+			string system_info_string("*** System Info (Local) ***\n");
+			system_info_string += system_info_param.system_info;
+			system_info_string += string("\n**********\n");
+		}
+		break;
+		default:
+		{
+			WRITE_FORMAT_ERROR("Unknow node type: %d", node_type);
+			return RET_FAILURE_INCORRECT_VALUE;
+		}
+		break;
 	}
 	return RET_SUCCESS;
 }

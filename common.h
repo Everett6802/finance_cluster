@@ -120,6 +120,7 @@ extern const unsigned short RET_FAILURE_IO_OPERATION;
 extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
 extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
+extern const unsigned short RET_FAILURE_INCORRECT_VALUE;
 extern const unsigned short RET_FAILURE_END;
 
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
@@ -212,6 +213,7 @@ enum ParamType{
 	PARAM_CLUSTER_NODE_COUNT,
 	PARAM_CLUSTER_TOKEN2ID,
 	PARAM_CLUSTER_ID2TOKEN,
+	PARAM_NODE_TYPE,
 	PARAM_NODE_ID,
 	PARAM_CONNECTION_RETRY,
 	PARAM_LOCAL_CLUSTER,
