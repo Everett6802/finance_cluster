@@ -364,6 +364,13 @@ unsigned short SystemOperator::get_system_info(string& system_info)
 	return RET_SUCCESS;
 }
 
+unsigned short SystemOperator::get_system_monitor_data(std::string& system_monitor_data)
+{
+	unsigned short ret = RET_SUCCESS;
+	system_monitor_data = string("This is only a test\n");
+	return ret;
+}
+
 unsigned short SystemOperator::notify(NotifyType notify_type, void* notify_param)
 {
     unsigned short ret = RET_SUCCESS;

@@ -167,9 +167,6 @@ void detach_from_terminal()
     openlog ("firstdaemon", LOG_PID, LOG_SYSLOG);
 }
 
-#include <stdio.h>
-#include <dirent.h>
-
 int main(int argc, char** argv)
 {
 	// const char* process_name = "finance_cluster";

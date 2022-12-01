@@ -195,6 +195,7 @@ enum MessageType{
 	MSG_UPDATE_CLUSTER_MAP, // Uni-Direction, Leader -> Follower
 	MSG_TRANSMIT_TEXT, // Uni-Direction, Leader -> Follower or Follower -> Leader
 	MSG_GET_SYSTEM_INFO, // Bi-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_GET_SYSTEM_MONITOR, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_GET_SIMULATOR_VERSION, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_INSTALL_SIMULATOR, // Uni-Direction, Leader -> Follower
 	MSG_APPLY_FAKE_ACSPT_CONFIG, // Uni-Direction, Leader -> Follower
@@ -210,7 +211,7 @@ enum MessageType{
 
 enum ParamType{
 	PARAM_CLUSTER_MAP,
-	PARAM_CLUSTER_NODE_COUNT,
+	PARAM_CLUSTER_NODE_AMOUNT,
 	PARAM_CLUSTER_TOKEN2ID,
 	PARAM_CLUSTER_ID2TOKEN,
 	PARAM_NODE_TYPE,
@@ -220,6 +221,7 @@ enum ParamType{
 	PARAM_CLUSTER_DETAIL,
 	PARAM_SYSTEM_INFO,
 	// PARAM_NODE_SYSTEM_INFO,
+	PARAM_SYSTEM_MONITOR,
 	PARAM_SIMULATOR_VERSION,
 	PARAM_FAKE_ACSPT_CONFIG_VALUE,
 	PARAM_FAKE_ACSPT_STATE,
@@ -237,6 +239,7 @@ enum NotifyType{
 	NOTIFY_SESSION_EXIT,
 /*	NOTIFY_RECV_DATA,*/
 	NOTIFY_GET_SYSTEM_INFO,
+	NOTIFY_GET_SYSTEM_MONITOR,
 	NOTIFY_GET_SIMULATOR_VERSION,
 	NOTIFY_INSTALL_SIMULATOR,
 	NOTIFY_APPLY_FAKE_ACSPT_CONFIG,
@@ -512,6 +515,18 @@ public:
 
 ///////////////////////////////////////////////////
 
+class ClusterParam
+{
+public:
+	int session_id;
+// (cluster id, data)
+	std::map<int, std::string> cluster_data_map;
+
+	ClusterParam();
+	~ClusterParam();
+};
+typedef ClusterParam* PCLUSTER_PARAM;
+
 class ClusterDetailParam
 {
 public:
@@ -538,18 +553,40 @@ public:
 };
 typedef SystemInfoParam* PSYSTEM_INFO_PARAM;
 
-class ClusterSystemInfoParam
+class ClusterSystemInfoParam : public ClusterParam
+{
+public:
+// 	int session_id;
+// // (cluster id, system info)
+// 	std::map<int, std::string> cluster_data_map;
+
+	ClusterSystemInfoParam();
+	virtual ~ClusterSystemInfoParam();
+};
+typedef ClusterSystemInfoParam* PCLUSTER_SYSTEM_INFO_PARAM;
+
+class SystemMonitorParam
 {
 public:
 	int session_id;
-// (cluster id, system info)
-	std::map<int, std::string> clusuter_system_info_map;
+	std::string system_monitor_data;
 
-	ClusterSystemInfoParam();
-	~ClusterSystemInfoParam();
-
+	SystemMonitorParam();
+	~SystemMonitorParam();
 };
-typedef ClusterSystemInfoParam* PCLUSTER_SYSTEM_INFO_PARAM;
+typedef SystemMonitorParam* PSYSTEM_MONITOR_PARAM;
+
+class ClusterSystemMonitorParam : public ClusterParam
+{
+public:
+// 	int session_id;
+// // (cluster id, system monitor data)
+// 	std::map<int, std::string> clusuter_system_monitor_data_map;
+
+	ClusterSystemMonitorParam();
+	virtual ~ClusterSystemMonitorParam();
+};
+typedef ClusterSystemMonitorParam* PCLUSTER_SYSTEM_MONITOR_PARAM;
 
 class SimulatorVersionParam
 {
@@ -562,16 +599,15 @@ public:
 };
 typedef SimulatorVersionParam* PSIMULATOR_VERSION_PARAM;
 
-class ClusterSimulatorVersionParam
+class ClusterSimulatorVersionParam : public ClusterParam
 {
 public:
-	int session_id;
-// (cluster id, simulator version)
-	std::map<int, std::string> clusuter_simulator_version_map;
+// 	int session_id;
+// // (cluster id, simulator version)
+// 	std::map<int, std::string> clusuter_simulator_version_map;
 
 	ClusterSimulatorVersionParam();
-	~ClusterSimulatorVersionParam();
-
+	virtual ~ClusterSimulatorVersionParam();
 };
 typedef ClusterSimulatorVersionParam* PCLUSTER_SIMULATOR_VERSION_PARAM;
 
@@ -586,16 +622,15 @@ public:
 };
 typedef FakeAcsptStateParam* PFAKE_ACSPT_STATE_PARAM;
 
-class ClusterFakeAcsptStateParam
+class ClusterFakeAcsptStateParam : public ClusterParam
 {
 public:
-	int session_id;
-// (cluster id, fake acspt state)
-	std::map<int, std::string> cluster_fake_acspt_state_map;
+// 	int session_id;
+// // (cluster id, fake acspt state)
+// 	std::map<int, std::string> cluster_fake_acspt_state_map;
 
 	ClusterFakeAcsptStateParam();
-	~ClusterFakeAcsptStateParam();
-
+	virtual ~ClusterFakeAcsptStateParam();
 };
 typedef ClusterFakeAcsptStateParam* PCLUSTER_FAKE_ACSPT_STATE_PARAM;
 
@@ -611,16 +646,15 @@ public:
 };
 typedef FakeAcsptDetailParam* PFAKE_ACSPT_DETAIL_PARAM;
 
-class ClusterFakeAcsptDetailParam
+class ClusterFakeAcsptDetailParam : public ClusterParam
 {
 public:
-	int session_id;
-// (cluster id, fake acspt detail)
-	std::map<int, std::string> clusuter_fake_acspt_detail_map;
+// 	int session_id;
+// // (cluster id, fake acspt detail)
+// 	std::map<int, std::string> clusuter_fake_acspt_detail_map;
 
 	ClusterFakeAcsptDetailParam();
-	~ClusterFakeAcsptDetailParam();
-
+	virtual ~ClusterFakeAcsptDetailParam();
 };
 typedef ClusterFakeAcsptDetailParam* PCLUSTER_FAKE_ACSPT_DETAIL_PARAM;
 
@@ -635,16 +669,15 @@ public:
 };
 typedef FileTransferParam* PFILE_TRANSFER_PARAM;
 
-class ClusterFileTransferParam
+class ClusterFileTransferParam : public ClusterParam
 {
 public:
-	int session_id;
-// (cluster id, system info)
-	std::map<int, std::string> clusuter_file_transfer_map;
+// 	int session_id;
+// // (cluster id, system info)
+// 	std::map<int, std::string> clusuter_file_transfer_map;
 
 	ClusterFileTransferParam();
-	~ClusterFileTransferParam();
-
+	virtual ~ClusterFileTransferParam();
 };
 typedef ClusterFileTransferParam* PCLUSTER_FILE_TRANSFER_PARAM;
 
@@ -683,6 +716,23 @@ typedef NotifyCfg* PNOTIFY_CFG;
 
 ///////////////////////////
 
+class NotifyCfgEx : public NotifyCfg
+{
+protected:
+	int session_id;
+	int cluster_id;
+
+public:
+	NotifyCfgEx(NotifyType type, const void* param, size_t param_size);
+	virtual ~NotifyCfgEx();
+
+	int get_session_id()const;
+	int get_cluster_id()const;
+};
+typedef NotifyCfgEx* PNOTIFY_CFG_EX;
+
+///////////////////////////
+
 class NotifyNodeDieCfg : public NotifyCfg
 {
 private:
@@ -713,38 +763,57 @@ typedef NotifySessionExitCfg* PNOTIFY_SESSION_EXIT_CFG;
 
 ///////////////////////////
 
-class NotifySystemInfoCfg : public NotifyCfg
+class NotifySystemInfoCfg : public NotifyCfgEx
 {
 private:
-	int session_id;
-	int cluster_id;
+	// int session_id;
+	// int cluster_id;
 	char* system_info;
 
 public:
 	NotifySystemInfoCfg(const void* param, size_t param_size);
 	virtual ~NotifySystemInfoCfg();
 
-	int get_session_id()const;
-	int get_cluster_id()const;
+	// int get_session_id()const;
+	// int get_cluster_id()const;
 	const char* get_system_info()const;
 };
 typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
 
-///////////////////////////////////////////////////
+///////////////////////////
 
-class NotifySimulatorVersionCfg : public NotifyCfg
+class NotifySystemMonitorCfg : public NotifyCfgEx
 {
 private:
-	int session_id;
-	int cluster_id;
+	// int session_id;
+	// int cluster_id;
+	char* system_monitor_data;
+
+public:
+	NotifySystemMonitorCfg(const void* param, size_t param_size);
+	virtual ~NotifySystemMonitorCfg();
+
+	// int get_session_id()const;
+	// int get_cluster_id()const;
+	const char* get_system_monitor_data()const;
+};
+typedef NotifySystemMonitorCfg* PNOTIFY_SYSTEM_MONITOR_CFG;
+
+///////////////////////////////////////////////////
+
+class NotifySimulatorVersionCfg : public NotifyCfgEx
+{
+private:
+	// int session_id;
+	// int cluster_id;
 	char* simulator_version;
 
 public:
 	NotifySimulatorVersionCfg(const void* param, size_t param_size);
 	virtual ~NotifySimulatorVersionCfg();
 
-	int get_session_id()const;
-	int get_cluster_id()const;
+	// int get_session_id()const;
+	// int get_cluster_id()const;
 	const char* get_simulator_version()const;
 };
 typedef NotifySimulatorVersionCfg* PNOTIFY_SIMULATOR_VERSION_CFG;
@@ -826,38 +895,38 @@ typedef NotifyFakeUsreptControlCfg* PNOTIFY_FAKE_USREPT_CONTROL_CFG;
 
 ///////////////////////////////////////////////////
 
-class NotifyFakeAcsptStateCfg : public NotifyCfg
+class NotifyFakeAcsptStateCfg : public NotifyCfgEx
 {
 private:
-	int session_id;
-	int cluster_id;
+	// int session_id;
+	// int cluster_id;
 	char* fake_acspt_state;
 
 public:
 	NotifyFakeAcsptStateCfg(const void* param, size_t param_size);
 	virtual ~NotifyFakeAcsptStateCfg();
 
-	int get_session_id()const;
-	int get_cluster_id()const;
+	// int get_session_id()const;
+	// int get_cluster_id()const;
 	const char* get_fake_acspt_state()const;
 };
 typedef NotifyFakeAcsptStateCfg* PNOTIFY_FAKE_ACSPT_STATE_CFG;
 
 ///////////////////////////////////////////////////
 
-class NotifyFakeAcsptDetailCfg : public NotifyCfg
+class NotifyFakeAcsptDetailCfg : public NotifyCfgEx
 {
 private:
-	int session_id;
-	int cluster_id;
+	// int session_id;
+	// int cluster_id;
 	char* fake_acspt_detail;
 
 public:
 	NotifyFakeAcsptDetailCfg(const void* param, size_t param_size);
 	virtual ~NotifyFakeAcsptDetailCfg();
 
-	int get_session_id()const;
-	int get_cluster_id()const;
+	// int get_session_id()const;
+	// int get_cluster_id()const;
 	const char* get_fake_acspt_detail()const;
 };
 typedef NotifyFakeAcsptDetailCfg* PNOTIFY_FAKE_ACSPT_DETAIL_CFG;
@@ -879,20 +948,19 @@ typedef NotifyFileTransferAbortCfg* PNOTIFY_FILE_TRANSFER_ABORT_CFG;
 
 ///////////////////////////
 
-class NotifyFileTransferCompleteCfg : public NotifyCfg
+class NotifyFileTransferCompleteCfg : public NotifyCfgEx
 {
-
 private:
-	int session_id;
-	int cluster_id;
+	// int session_id;
+	// int cluster_id;
 	unsigned short return_code;
 
 public:
 	NotifyFileTransferCompleteCfg(const void* param, size_t param_size);
 	virtual ~NotifyFileTransferCompleteCfg();
 
-	int get_session_id()const;
-	int get_cluster_id()const;
+	// int get_session_id()const;
+	// int get_cluster_id()const;
 	unsigned short get_return_code()const;
 };
 typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
@@ -948,5 +1016,48 @@ public:
 	unsigned short add_event(const PNOTIFY_CFG notify_cfg);
 };
 typedef NotifyThread* PNOTIFY_THREAD;
+
+///////////////////////////////////////////////////
+
+class MonitorSystemTimerThread
+{
+	DECLARE_MSG_DUMPER()
+	static const char* DEFAULT_MONITOR_SYSTEM_TIMER_THREAD_TAG;
+	// static const int DEFAULT_MONITOR_SYSTEM_DURATION;  // Unit: sec
+	static const int DEFAULT_MONITOR_SYSTEM_PERIOD;  // Unit: sec
+
+private:
+	PINOTIFY observer; // To interactiveSession
+	PIPARAM manager; // To ClusterMgr
+
+	volatile int monitor_system_exit;
+	pthread_t monitor_system_tid;
+	volatile unsigned short monitor_system_timer_thread_ret;
+	char* monitor_system_timer_thread_tag;
+
+	pthread_mutex_t monitor_system_periodic_check_mtx;
+	pthread_cond_t monitor_system_periodic_check_cond;
+
+	// NotifyType monitor_system_type;
+	int monitor_system_duration;  // Total Time
+	int monitor_system_period;  // Interval for each trigger
+
+	static void* monitor_system_timer_thread_handler(void* pvoid);
+	unsigned short monitor_system_timer_thread_handler_internal();
+	static void monitor_system_timer_thread_cleanup_handler(void* pvoid);
+	void monitor_system_timer_thread_cleanup_handler_internal();
+
+public:
+	MonitorSystemTimerThread(PINOTIFY notify, PIMANAGER mgr, const char* thread_tag=NULL);
+	~MonitorSystemTimerThread();
+
+	unsigned short initialize();
+	unsigned short deinitialize();
+
+	unsigned short set_period(int period);
+
+	// unsigned short SetDuration();
+};
+typedef MonitorSystemTimerThread* PMONITOR_SYSTEM_TIMER_THREAD;
 
 #endif

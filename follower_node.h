@@ -49,6 +49,7 @@ private:
 	unsigned short recv_update_cluster_map(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short recv_transmit_text(const std::string& message_data);
 	unsigned short recv_get_system_info(const std::string& message_data);
+	unsigned short recv_get_system_monitor(const std::string& message_data);	
 	unsigned short recv_get_simulator_version(const std::string& message_data);
 	unsigned short recv_install_simulator(const std::string& message_data);
 	unsigned short recv_apply_fake_acspt_config(const std::string& message_data);
@@ -64,6 +65,7 @@ private:
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_system_info(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_get_system_monitor(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_get_simulator_version(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_install_simulator(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_apply_fake_acspt_config(void* param1=NULL, void* param2=NULL, void* param3=NULL);

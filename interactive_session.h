@@ -14,7 +14,7 @@
 
 #define SESSION_TAG_SIZE 64
 
-class InteractiveSession
+class InteractiveSession : public INotify
 {
 	DECLARE_MSG_DUMPER()
 private:
@@ -31,8 +31,8 @@ private:
 
 	static void init_command_map();
 
-	PINOTIFY observer;
-	PIPARAM manager;
+	PINOTIFY observer; // To InteractiveServer
+	PIMANAGER manager; // To ClusterMgr
 
 	volatile int session_exit;
 	pthread_t session_tid;
@@ -46,6 +46,8 @@ private:
 	char session_tag[64];
 	int session_id;
 	bool is_root;
+	bool system_monitor;
+	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
 
 	static bool is_privilege_user_command(int command_type);
 
@@ -65,6 +67,8 @@ private:
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_system_info_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
+	unsigned short handle_start_system_monitor_command(int argc, char **argv);
+	unsigned short handle_stop_system_monitor_command(int argc, char **argv);
 	unsigned short handle_get_simulator_version_command(int argc, char **argv);
 	unsigned short handle_trasnfer_simulator_package_command(int argc, char **argv);
 	unsigned short handle_install_simulator_command(int argc, char **argv);
@@ -88,6 +92,10 @@ public:
 	unsigned short initialize();
 	unsigned short deinitialize();
 	const char* get_session_tag()const;
+
+// INotify
+	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);
+	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
 };
 typedef InteractiveSession* PINTERACTIVE_SESSION;
 

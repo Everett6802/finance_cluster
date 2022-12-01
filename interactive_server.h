@@ -41,7 +41,7 @@ private:
 	int server_fd;
 	INTERACTIVE_SESSION_MAP interactive_session_map;
 	PNOTIFY_THREAD notify_thread;
-	PIMANAGER manager;
+	PIMANAGER manager; // To ClusterMgr
 
 	volatile int listen_exit;
 	pthread_t listen_tid;

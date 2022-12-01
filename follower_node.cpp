@@ -450,6 +450,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_update_cluster_map,
 		&FollowerNode::recv_transmit_text,
 		&FollowerNode::recv_get_system_info,
+		&FollowerNode::recv_get_system_monitor,
 		&FollowerNode::recv_get_simulator_version,
 		&FollowerNode::recv_install_simulator,
 		&FollowerNode::recv_apply_fake_acspt_config,
@@ -479,6 +480,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_update_cluster_map,
 		&FollowerNode::send_transmit_text,
 		&FollowerNode::send_get_system_info,
+		&FollowerNode::send_get_system_monitor,
 		&FollowerNode::send_get_simulator_version,
 		&FollowerNode::send_install_simulator,
 		&FollowerNode::send_apply_fake_acspt_config,
@@ -555,6 +557,16 @@ unsigned short FollowerNode::recv_get_system_info(const std::string& message_dat
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
 	ret = send_get_system_info((void*)&session_id, (void*)&cluster_id);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_get_system_monitor(const std::string& message_data)
+{
+// Message format:
+// EventType | session ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int session_id = atoi(message_data.c_str());
+	ret = send_get_system_monitor((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
@@ -785,7 +797,7 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 
 // Combine the payload
 	string system_info_data = string(session_id_buf) + string(cluster_id_buf);
-	string system_info;
+	// string system_info;
 	SystemInfoParam system_info_param;
 	ret = observer->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
 	// ret = get_system_info(system_info);
@@ -799,6 +811,48 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 	// memcpy(session_id_str, system_info_data.c_str(), sizeof(char) * 2);
 	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_info_data.c_str() + 2));
 	return send_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
+}
+
+unsigned short FollowerNode::send_get_system_monitor(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: The sessin id
+// param2: The cluster id
+// Message format:
+// EventType | playload: (session ID[2 digits]|system info) | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+    unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// Serialize: convert the type of cluster id from integer to string  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, *(int*)param2);
+
+// Combine the payload
+	string system_monitor_data = string(session_id_buf) + string(cluster_id_buf);
+	// string system_monitor;
+	SystemMonitorParam system_monitor_param;
+	ret = observer->get(PARAM_SYSTEM_MONITOR, (void*)&system_monitor_param);
+	// ret = get_system_monitor(system_monitor);
+	if (CHECK_FAILURE(ret))
+		WRITE_FORMAT_ERROR("Fails to get system monitor in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
+	else
+		system_monitor_data += system_monitor_param.system_monitor_data;
+	// fprintf(stderr, "Follower[%s] send_get_system_monitor message: %s\n", local_token, system_monitor_data.c_str());
+	// char session_id_str[3];
+	// memset(session_id_str, 0x0, sizeof(char) * 3);
+	// memcpy(session_id_str, system_monitor_data.c_str(), sizeof(char) * 2);
+	// fprintf(stderr, "Follower[%s] send_get_system_monitor session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_monitor_data.c_str() + 2));
+	return send_data(MSG_GET_SYSTEM_MONITOR, system_monitor_data.c_str());
 }
 
 unsigned short FollowerNode::send_get_simulator_version(void* param1, void* param2, void* param3)

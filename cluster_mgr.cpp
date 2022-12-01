@@ -255,7 +255,7 @@ ClusterMgr::ClusterMgr() :
 	for (int i = 0 ; i < MAX_INTERACTIVE_SESSION ; i++)
 	{
 		interactive_session_param[i].event_count = 0;
-		interactive_session_param[i].follower_node_count = 0;
+		interactive_session_param[i].follower_node_amount = 0;
 	}
 }
 
@@ -294,6 +294,7 @@ ClusterMgr::~ClusterMgr()
 
 void ClusterMgr::set_keepalive_timer_interval(int delay, int period)
 {
+// https://blog.xuite.net/lidj37/twblog/179517551
 	struct itimerval value, ovalue;
 
 	value.it_value.tv_sec = delay;
@@ -875,13 +876,13 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 	    		const char* filepath = (const char*)param2;
 	    		assert(filepath != NULL && "filepath should NOT be NULL");
 
-		    	int cluster_node_count;
-				ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+		    	int cluster_node_amount;
+				ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				assert(cluster_node_count != 0 && "cluster_node_count should NOT be 0");
-					// printf("Cluster Node Count: %d\n", cluster_node_count);
-				if (cluster_node_count == 1)
+				assert(cluster_node_amount != 0 && "cluster_node_amount should NOT be 0");
+					// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount == 1)
 				{
 					WRITE_ERROR("No follwer nodes in the cluster, no need to transfer the simulator package");
 					return RET_SUCCESS;
@@ -895,13 +896,13 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
 				strcpy(file_transfer_param.filepath, filepath);
 
-				WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_count - 1);
+				WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
 				ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Reset the counter 
 				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
-				interactive_session_param[cluster_file_transfer_param->session_id].follower_node_count = cluster_node_count - 1;
+				interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount = cluster_node_amount - 1;
 				interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
 				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 // Receive the response
@@ -921,7 +922,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 		    		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 					return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 				}
-					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
+					// dump_interactive_session_data_list(session_id);
 				std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
 				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 				std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
@@ -932,7 +933,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 					{
 						interactive_session_file_transfer_data.push_back(notify_cfg);
 						interactive_session_data.erase(iter);
-						if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[cluster_file_transfer_param->session_id].follower_node_count)
+						if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount)
 						{
 							found = true;
 							break;
@@ -943,7 +944,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 	    		if (!found)
 	    		{
-		    		WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_count - 1, interactive_session_file_transfer_data.size());
+		    		WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_amount - 1, interactive_session_file_transfer_data.size());
 					return RET_FAILURE_NOT_FOUND;
 				}
 				std::list<PNOTIFY_CFG>::iterator iter_file_transfer= interactive_session_file_transfer_data.begin();
@@ -964,7 +965,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 					}
 					else
 						snprintf(buf, DEF_STRING_SIZE, "Fail, due to: %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
-					cluster_file_transfer_param->clusuter_file_transfer_map[notify_file_transfer_cfg->get_cluster_id()] = string(buf);					
+					cluster_file_transfer_param->cluster_data_map[notify_file_transfer_cfg->get_cluster_id()] = string(buf);					
 					iter_file_transfer++;
 					SAFE_RELEASE(notify_file_transfer_cfg)
 				}
@@ -1063,28 +1064,29 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Cluster ID of the Leader node: 1
-				cluster_system_info_param->clusuter_system_info_map[1] = system_info_param->system_info;
+				cluster_system_info_param->cluster_data_map[1] = system_info_param->system_info;
 				if (system_info_param != NULL)
 				{
 					delete system_info_param;
 					system_info_param = NULL;
 				}
 				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				int cluster_node_count;
-			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				int cluster_node_amount;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				// printf("Cluster Node Count: %d\n", cluster_node_count);
-				if (cluster_node_count > 1)
+				// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount > 1)
 				{
+					int session_id = cluster_system_info_param->session_id;
 // Not one node cluster, send notification to the followers
 // Reset the counter 
-					pthread_mutex_lock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
-					interactive_session_param[cluster_system_info_param->session_id].follower_node_count = cluster_node_count - 1;
-					interactive_session_param[cluster_system_info_param->session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Send the request
-				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&cluster_system_info_param->session_id);
+				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&session_id);
 					if (CHECK_FAILURE(ret))
 						return ret;
 // Receive the response
@@ -1092,15 +1094,15 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				    struct timespec ts;
 				    clock_gettime(CLOCK_REALTIME, &ts);
 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_system_info_param->session_id].cond, &interactive_session_param[cluster_system_info_param->session_id].mtx, &ts);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 					{
 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 					}
-					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
-					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_system_info_param->session_id].data_list;
+					// dump_interactive_session_data_list(session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
 					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 					std::list<PNOTIFY_CFG> interactive_session_system_info_data;
 					while (iter != interactive_session_data.end())
@@ -1111,7 +1113,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 							// found = true;
 							interactive_session_system_info_data.push_back(notify_cfg);
 							interactive_session_data.erase(iter);
-							if ((int)interactive_session_system_info_data.size() == interactive_session_param[cluster_system_info_param->session_id].follower_node_count)
+							if ((int)interactive_session_system_info_data.size() == interactive_session_param[session_id].follower_node_amount)
 							{
 								found = true;
 								break;
@@ -1119,18 +1121,18 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 						}
 						iter++;
 					}
-					pthread_mutex_unlock(&interactive_session_param[cluster_system_info_param->session_id].mtx);
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 	    			if (!found)
 	    			{
-		    			WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", cluster_system_info_param->session_id, cluster_node_count - 1, interactive_session_system_info_data.size());
+		    			WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_info_data.size());
 						return RET_FAILURE_NOT_FOUND;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_system_info = interactive_session_system_info_data.begin();
 					while (iter_system_info != interactive_session_system_info_data.end())
 					{
 						PNOTIFY_SYSTEM_INFO_CFG notify_system_info_cfg = (PNOTIFY_SYSTEM_INFO_CFG)*iter_system_info;
-						assert(cluster_system_info_param->session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
-						cluster_system_info_param->clusuter_system_info_map[notify_system_info_cfg->get_cluster_id()] = string(notify_system_info_cfg->get_system_info());
+						assert(session_id == notify_system_info_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_system_info_param->cluster_data_map[notify_system_info_cfg->get_cluster_id()] = string(notify_system_info_cfg->get_system_info());
 						iter_system_info++;
 						SAFE_RELEASE(notify_system_info_cfg)
 					}
@@ -1246,6 +1248,117 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 //     		}
 //     	}
 //     	break;
+    	case PARAM_SYSTEM_MONITOR:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+   			assert(system_operator != NULL && "system_operator should NOT be NULL");
+
+			if (node_type == LEADER)
+			{
+// Leader node
+	    		PCLUSTER_SYSTEM_MONITOR_PARAM cluster_system_monitor_param = (PCLUSTER_SYSTEM_MONITOR_PARAM)param1;
+	    		assert(cluster_system_monitor_param != NULL && "cluster_system_monitor_param should NOT be NULL");
+				PSYSTEM_MONITOR_PARAM system_monitor_param = new SystemMonitorParam();
+				if (system_monitor_param  == NULL)
+					throw bad_alloc();
+				ret = system_operator->get_system_monitor_data(system_monitor_param->system_monitor_data);
+				// printf("* system_monitor: %s\n", system_monitor_param->system_monitor_data.c_str());
+				if (CHECK_FAILURE(ret))
+					return ret;
+// Cluster ID of the Leader node: 1
+				cluster_system_monitor_param->cluster_data_map[1] = system_monitor_param->system_monitor_data;
+				if (system_monitor_param != NULL)
+				{
+					delete system_monitor_param;
+					system_monitor_param = NULL;
+				}
+				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+				int cluster_node_amount;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount > 1)
+				{
+					int session_id = cluster_system_monitor_param->session_id;
+// Not one node cluster, send notification to the followers
+// Reset the counter 
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// Send the request
+				    ret = cluster_node->send(MSG_GET_SYSTEM_MONITOR, (void*)&session_id);
+					if (CHECK_FAILURE(ret))
+						return ret;
+// Receive the response
+					bool found = false;
+				    struct timespec ts;
+				    clock_gettime(CLOCK_REALTIME, &ts);
+				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+					{
+		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+					}
+					// dump_interactive_session_data_list(session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
+					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+					std::list<PNOTIFY_CFG> interactive_session_system_monitor_data;
+					while (iter != interactive_session_data.end())
+					{
+						PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
+						if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_MONITOR)
+						{
+							// found = true;
+							interactive_session_system_monitor_data.push_back(notify_cfg);
+							interactive_session_data.erase(iter);
+							if ((int)interactive_session_system_monitor_data.size() == interactive_session_param[session_id].follower_node_amount)
+							{
+								found = true;
+								break;
+							}
+						}
+						iter++;
+					}
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+	    			if (!found)
+	    			{
+		    			WRITE_FORMAT_ERROR("Lack of system monitor from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_monitor_data.size());
+						return RET_FAILURE_NOT_FOUND;
+					}
+					std::list<PNOTIFY_CFG>::iterator iter_system_monitor = interactive_session_system_monitor_data.begin();
+					while (iter_system_monitor != interactive_session_system_monitor_data.end())
+					{
+						PNOTIFY_SYSTEM_MONITOR_CFG notify_system_monitor_cfg = (PNOTIFY_SYSTEM_MONITOR_CFG)*iter_system_monitor;
+						assert(session_id == notify_system_monitor_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_system_monitor_param->cluster_data_map[notify_system_monitor_cfg->get_cluster_id()] = string(notify_system_monitor_cfg->get_system_monitor_data());
+						iter_system_monitor++;
+						SAFE_RELEASE(notify_system_monitor_cfg)
+					}
+				}
+			}
+			else if (node_type == FOLLOWER)
+			{
+	    		PSYSTEM_MONITOR_PARAM system_monitor_param = (PSYSTEM_MONITOR_PARAM)param1;
+	    		assert(system_monitor_param != NULL && "system_monitor_param should NOT be NULL");
+				ret = system_operator->get_system_monitor_data(system_monitor_param->system_monitor_data);
+				if (CHECK_FAILURE(ret))
+					return ret;
+			}
+			else
+			{
+	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
+	    		return RET_FAILURE_INCORRECT_OPERATION;		
+			}
+    	}
+    	break;
     	case PARAM_SIMULATOR_VERSION:
     	{
         	if (param1 == NULL)
@@ -1269,7 +1382,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					if (CHECK_FAILURE(ret))
 						return ret;
 // Cluster ID of the Leader node: 1
-					cluster_simulator_version_param->clusuter_simulator_version_map[1] = string(simulator_version_param->simulator_version);
+					cluster_simulator_version_param->cluster_data_map[1] = string(simulator_version_param->simulator_version);
 					if (simulator_version_param != NULL)
 					{
 						delete simulator_version_param;
@@ -1281,25 +1394,26 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					WRITE_INFO("The simulator is NOT installed");
 					// return RET_WARN_SIMULATOR_NOT_INSTALLED;
 // Cluster ID of the Leader node: 1
-					cluster_simulator_version_param->clusuter_simulator_version_map[1] = string("Not installed");
+					cluster_simulator_version_param->cluster_data_map[1] = string("Not installed");
 				}
 
 				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				int cluster_node_count;
-			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				int cluster_node_amount;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				// printf("Cluster Node Count: %d\n", cluster_node_count);
-				if (cluster_node_count > 1)
+				// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount > 1)
 				{
+					int session_id = cluster_simulator_version_param->session_id;
 // Not one node cluster, send notification to the followers
 // Reset the counter 
-					pthread_mutex_lock(&interactive_session_param[cluster_simulator_version_param->session_id].mtx);
-					interactive_session_param[cluster_simulator_version_param->session_id].follower_node_count = cluster_node_count - 1;
-					interactive_session_param[cluster_simulator_version_param->session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[cluster_simulator_version_param->session_id].mtx);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Send the request
-				    ret = cluster_node->send(MSG_GET_SIMULATOR_VERSION, (void*)&cluster_simulator_version_param->session_id);
+				    ret = cluster_node->send(MSG_GET_SIMULATOR_VERSION, (void*)&session_id);
 					if (CHECK_FAILURE(ret))
 						return ret;
 // Receive the response
@@ -1307,15 +1421,15 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				    struct timespec ts;
 				    clock_gettime(CLOCK_REALTIME, &ts);
 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[cluster_simulator_version_param->session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_simulator_version_param->session_id].cond, &interactive_session_param[cluster_simulator_version_param->session_id].mtx, &ts);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 					{
 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 					}
-					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
-					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_simulator_version_param->session_id].data_list;
+					// dump_interactive_session_data_list(session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
 					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 					std::list<PNOTIFY_CFG> interactive_session_simulator_version_data;
 					while (iter != interactive_session_data.end())
@@ -1326,7 +1440,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 							// found = true;
 							interactive_session_simulator_version_data.push_back(notify_cfg);
 							interactive_session_data.erase(iter);
-							if ((int)interactive_session_simulator_version_data.size() == interactive_session_param[cluster_simulator_version_param->session_id].follower_node_count)
+							if ((int)interactive_session_simulator_version_data.size() == interactive_session_param[session_id].follower_node_amount)
 							{
 								found = true;
 								break;
@@ -1334,18 +1448,18 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 						}
 						iter++;
 					}
-					pthread_mutex_unlock(&interactive_session_param[cluster_simulator_version_param->session_id].mtx);
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 	    			if (!found)
 	    			{
-		    			WRITE_FORMAT_ERROR("Lack of simulator version from some followers in the session[%d], expected: %d, actual: %d", cluster_simulator_version_param->session_id, cluster_node_count - 1, interactive_session_simulator_version_data.size());
+		    			WRITE_FORMAT_ERROR("Lack of simulator version from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_simulator_version_data.size());
 						return RET_FAILURE_NOT_FOUND;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_simulator_version = interactive_session_simulator_version_data.begin();
 					while (iter_simulator_version != interactive_session_simulator_version_data.end())
 					{
 						PNOTIFY_SIMULATOR_VERSION_CFG notify_simulator_version_cfg = (PNOTIFY_SIMULATOR_VERSION_CFG)*iter_simulator_version;
-						assert(cluster_simulator_version_param->session_id == notify_simulator_version_cfg->get_session_id() && "The session ID is NOT identical");
-						cluster_simulator_version_param->clusuter_simulator_version_map[notify_simulator_version_cfg->get_cluster_id()] = string(notify_simulator_version_cfg->get_simulator_version());
+						assert(session_id == notify_simulator_version_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_simulator_version_param->cluster_data_map[notify_simulator_version_cfg->get_cluster_id()] = string(notify_simulator_version_cfg->get_simulator_version());
 						iter_simulator_version++;
 						SAFE_RELEASE(notify_simulator_version_cfg)
 					}
@@ -1410,9 +1524,9 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					ret = simulator_handler->get_fake_acspt_state(fake_acspt_state_param->fake_acspt_state, fake_acspt_state_param->fake_acspt_state_buf_size);
 					if (CHECK_FAILURE(ret))
 						return ret;
-					printf("fake_acspt_state_param->fake_acspt_state: %s\n", fake_acspt_state_param->fake_acspt_state);
+					// printf("fake_acspt_state_param->fake_acspt_state: %s\n", fake_acspt_state_param->fake_acspt_state);
 // Cluster ID of the Leader node: 1
-					cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[1] = string(fake_acspt_state_param->fake_acspt_state);
+					cluster_fake_acspt_state_param->cluster_data_map[1] = string(fake_acspt_state_param->fake_acspt_state);
 					if (fake_acspt_state_param != NULL)
 					{
 						delete fake_acspt_state_param;
@@ -1424,25 +1538,26 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					WRITE_INFO("The simulator is NOT installed");
 					// return RET_WARN_SIMULATOR_NOT_INSTALLED;
 // Cluster ID of the Leader node: 1
-					cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[1] = string("Not installed");
+					cluster_fake_acspt_state_param->cluster_data_map[1] = string("Not installed");
 				}
 
 				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				int cluster_node_count;
-			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				int cluster_node_amount;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				// printf("Cluster Node Count: %d\n", cluster_node_count);
-				if (cluster_node_count > 1)
+				// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount > 1)
 				{
+					int session_id = cluster_fake_acspt_state_param->session_id;
 // Not one node cluster, send notification to the followers
 // Reset the counter 
-					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
-					interactive_session_param[cluster_fake_acspt_state_param->session_id].follower_node_count = cluster_node_count - 1;
-					interactive_session_param[cluster_fake_acspt_state_param->session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Send the request
-				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_STATE, (void*)&cluster_fake_acspt_state_param->session_id);
+				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_STATE, (void*)&session_id);
 					if (CHECK_FAILURE(ret))
 						return ret;
 // Receive the response
@@ -1450,15 +1565,15 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				    struct timespec ts;
 				    clock_gettime(CLOCK_REALTIME, &ts);
 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_fake_acspt_state_param->session_id].cond, &interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx, &ts);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 					{
 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 					}
-					// dump_interactive_session_data_list(cluster_simulator_version_param->session_id);
-					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_fake_acspt_state_param->session_id].data_list;
+					// dump_interactive_session_data_list(session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
 					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 					std::list<PNOTIFY_CFG> interactive_session_fake_acspt_state_data;
 					while (iter != interactive_session_data.end())
@@ -1469,7 +1584,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 							// found = true;
 							interactive_session_fake_acspt_state_data.push_back(notify_cfg);
 							interactive_session_data.erase(iter);
-							if ((int)interactive_session_fake_acspt_state_data.size() == interactive_session_param[cluster_fake_acspt_state_param->session_id].follower_node_count)
+							if ((int)interactive_session_fake_acspt_state_data.size() == interactive_session_param[session_id].follower_node_amount)
 							{
 								found = true;
 								break;
@@ -1477,18 +1592,18 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 						}
 						iter++;
 					}
-					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_state_param->session_id].mtx);
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 	    			if (!found)
 	    			{
-		    			WRITE_FORMAT_ERROR("Lack of fake acspt state from some followers in the session[%d], expected: %d, actual: %d", cluster_fake_acspt_state_param->session_id, cluster_node_count - 1, interactive_session_fake_acspt_state_data.size());
+		    			WRITE_FORMAT_ERROR("Lack of fake acspt state from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_state_data.size());
 						return RET_FAILURE_NOT_FOUND;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_fake_acspt_state = interactive_session_fake_acspt_state_data.begin();
 					while (iter_fake_acspt_state != interactive_session_fake_acspt_state_data.end())
 					{
 						PNOTIFY_FAKE_ACSPT_STATE_CFG notify_fake_acspt_state_cfg = (PNOTIFY_FAKE_ACSPT_STATE_CFG)*iter_fake_acspt_state;
-						assert(cluster_fake_acspt_state_param->session_id == notify_fake_acspt_state_cfg->get_session_id() && "The session ID is NOT identical");
-						cluster_fake_acspt_state_param->cluster_fake_acspt_state_map[notify_fake_acspt_state_cfg->get_cluster_id()] = string(notify_fake_acspt_state_cfg->get_fake_acspt_state());
+						assert(session_id == notify_fake_acspt_state_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_fake_acspt_state_param->cluster_data_map[notify_fake_acspt_state_cfg->get_cluster_id()] = string(notify_fake_acspt_state_cfg->get_fake_acspt_state());
 						iter_fake_acspt_state++;
 						SAFE_RELEASE(notify_fake_acspt_state_cfg)
 					}
@@ -1539,28 +1654,29 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Cluster ID of the Leader node: 1
-				cluster_fake_acspt_detail_param->clusuter_fake_acspt_detail_map[1] = fake_acspt_detail_param->fake_acspt_detail;
+				cluster_fake_acspt_detail_param->cluster_data_map[1] = fake_acspt_detail_param->fake_acspt_detail;
 				if (fake_acspt_detail_param != NULL)
 				{
 					delete fake_acspt_detail_param;
 					fake_acspt_detail_param = NULL;
 				}
 				assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-				int cluster_node_count;
-			    ret = cluster_node->get(PARAM_CLUSTER_NODE_COUNT, (void*)&cluster_node_count);
+				int cluster_node_amount;
+			    ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				// printf("Cluster Node Count: %d\n", cluster_node_count);
-				if (cluster_node_count > 1)
+				// printf("Cluster Node Count: %d\n", cluster_node_amount);
+				if (cluster_node_amount > 1)
 				{
+					int session_id = cluster_fake_acspt_detail_param->session_id;
 // Not one node cluster, send notification to the followers
 // Reset the counter 
-					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_detail_param->session_id].mtx);
-					interactive_session_param[cluster_fake_acspt_detail_param->session_id].follower_node_count = cluster_node_count - 1;
-					interactive_session_param[cluster_fake_acspt_detail_param->session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_detail_param->session_id].mtx);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_count = 0;
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Send the request
-				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_DETAIL, (void*)&cluster_fake_acspt_detail_param->session_id);
+				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_DETAIL, (void*)&session_id);
 					if (CHECK_FAILURE(ret))
 						return ret;
 // Receive the response
@@ -1568,15 +1684,15 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				    struct timespec ts;
 				    clock_gettime(CLOCK_REALTIME, &ts);
 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[cluster_fake_acspt_detail_param->session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_fake_acspt_detail_param->session_id].cond, &interactive_session_param[cluster_fake_acspt_detail_param->session_id].mtx, &ts);
+					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 					{
 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 					}
-					// dump_interactive_session_data_list(cluster_fake_acspt_detail_param->session_id);
-					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_fake_acspt_detail_param->session_id].data_list;
+					// dump_interactive_session_data_list(session_id);
+					std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
 					std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 					std::list<PNOTIFY_CFG> interactive_session_fake_acspt_detail_data;
 					while (iter != interactive_session_data.end())
@@ -1587,7 +1703,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 							// found = true;
 							interactive_session_fake_acspt_detail_data.push_back(notify_cfg);
 							interactive_session_data.erase(iter);
-							if ((int)interactive_session_fake_acspt_detail_data.size() == interactive_session_param[cluster_fake_acspt_detail_param->session_id].follower_node_count)
+							if ((int)interactive_session_fake_acspt_detail_data.size() == interactive_session_param[session_id].follower_node_amount)
 							{
 								found = true;
 								break;
@@ -1595,18 +1711,18 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 						}
 						iter++;
 					}
-					pthread_mutex_unlock(&interactive_session_param[cluster_fake_acspt_detail_param->session_id].mtx);
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 	    			if (!found)
 	    			{
-		    			WRITE_FORMAT_ERROR("Lack of fake acspt detail from some followers in the session[%d], expected: %d, actual: %d", cluster_fake_acspt_detail_param->session_id, cluster_node_count - 1, interactive_session_fake_acspt_detail_data.size());
+		    			WRITE_FORMAT_ERROR("Lack of fake acspt detail from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_detail_data.size());
 						return RET_FAILURE_NOT_FOUND;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_fake_acspt_detail = interactive_session_fake_acspt_detail_data.begin();
 					while (iter_fake_acspt_detail != interactive_session_fake_acspt_detail_data.end())
 					{
 						PNOTIFY_FAKE_ACSPT_DETAIL_CFG notify_fake_acspt_detail_cfg = (PNOTIFY_FAKE_ACSPT_DETAIL_CFG)*iter_fake_acspt_detail;
-						assert(cluster_fake_acspt_detail_param->session_id == notify_fake_acspt_detail_cfg->get_session_id() && "The session ID is NOT identical");
-						cluster_fake_acspt_detail_param->clusuter_fake_acspt_detail_map[notify_fake_acspt_detail_cfg->get_cluster_id()] = string(notify_fake_acspt_detail_cfg->get_fake_acspt_detail());
+						assert(session_id == notify_fake_acspt_detail_cfg->get_session_id() && "The session ID is NOT identical");
+						cluster_fake_acspt_detail_param->cluster_data_map[notify_fake_acspt_detail_cfg->get_cluster_id()] = string(notify_fake_acspt_detail_cfg->get_fake_acspt_detail());
 						iter_fake_acspt_detail++;
 						SAFE_RELEASE(notify_fake_acspt_detail_cfg)
 					}
@@ -1894,6 +2010,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_GET_SYSTEM_MONITOR:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the system monitor data for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
 		case NOTIFY_GET_SIMULATOR_VERSION:
 		{
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
@@ -1965,9 +2092,34 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_system_info_cfg);
+			interactive_session_param[session_id].event_count++;
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			{
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			usleep(1000); // A MUST
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
 			pthread_cond_signal(&interactive_session_param[session_id].cond);
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+    	}
+    	break;
+    	case NOTIFY_GET_SYSTEM_MONITOR:
+    	{
+    		PNOTIFY_SYSTEM_MONITOR_CFG notify_system_monitor_cfg = (PNOTIFY_SYSTEM_MONITOR_CFG)notify_cfg;
+			// assert(notify_system_monitor_cfg != NULL && "notify_system_monitor_cfg should NOT be NULL");ri
+// Caution: Required to add reference count, since another thread will access it
+			notify_system_monitor_cfg->addref(__FILE__, __LINE__);
+			int session_id = notify_system_monitor_cfg->get_session_id();
+			// const char* system_info = notify_system_info_cfg->get_system_info();
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			interactive_session_param[session_id].data_list.push_back(notify_system_monitor_cfg);
+			interactive_session_param[session_id].event_count++;
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			{
+// It's required to sleep for a while before notifying to accessing the list in another thread
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
     	}
     	break;
@@ -1983,7 +2135,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_simulator_version_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
@@ -2003,7 +2155,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_state_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
@@ -2021,9 +2173,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			// const char* fake_acspt_detail = notify_fake_acspt_detail_cfg->get_fake_acspt_detail();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_detail_cfg);
+			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			usleep(1000); // A MUST
-			pthread_cond_signal(&interactive_session_param[session_id].cond);
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			{
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
     	}
     	break;
@@ -2039,7 +2195,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_count)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);

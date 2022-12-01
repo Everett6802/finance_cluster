@@ -26,7 +26,7 @@ class ClusterMgr : public IManager
 		pthread_cond_t cond;
 		std::list<PNOTIFY_CFG> data_list;
 		int event_count;
-		int follower_node_count;
+		int follower_node_amount;
 	};
 
 private:

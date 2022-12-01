@@ -817,6 +817,16 @@ unsigned short KeepaliveTimerTask::trigger()
 
 //////////////////////////////////////////////////////////
 
+ClusterParam::ClusterParam() :
+	session_id(0)
+{
+
+}
+
+ClusterParam::~ClusterParam(){}
+
+//////////////////////////////////////////////////////////
+
 ClusterDetailParam::ClusterDetailParam(){}
 ClusterDetailParam::~ClusterDetailParam(){}
 
@@ -830,15 +840,22 @@ SystemInfoParam::SystemInfoParam()
 
 SystemInfoParam::~SystemInfoParam(){}
 
-//////////////////////////////////////////////////////////
-
-ClusterSystemInfoParam::ClusterSystemInfoParam() :
-	session_id(0)
-{
-
-}
+ClusterSystemInfoParam::ClusterSystemInfoParam(){}
 
 ClusterSystemInfoParam::~ClusterSystemInfoParam(){}
+
+//////////////////////////////////////////////////////////
+
+SystemMonitorParam::SystemMonitorParam()
+{
+	// memset(node_token_buf, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
+}
+
+SystemMonitorParam::~SystemMonitorParam(){}
+
+ClusterSystemMonitorParam::ClusterSystemMonitorParam(){}
+
+ClusterSystemMonitorParam::~ClusterSystemMonitorParam(){}
 
 //////////////////////////////////////////////////////////
 
@@ -864,11 +881,7 @@ SimulatorVersionParam::~SimulatorVersionParam()
 
 //////////////////////////////////////////////////////////
 
-ClusterSimulatorVersionParam::ClusterSimulatorVersionParam() :
-	session_id(0)
-{
-
-}
+ClusterSimulatorVersionParam::ClusterSimulatorVersionParam(){}
 
 ClusterSimulatorVersionParam::~ClusterSimulatorVersionParam(){}
 
@@ -896,11 +909,7 @@ FakeAcsptStateParam::~FakeAcsptStateParam()
 
 //////////////////////////////////////////////////////////
 
-ClusterFakeAcsptStateParam::ClusterFakeAcsptStateParam() :
-	session_id(0)
-{
-
-}
+ClusterFakeAcsptStateParam::ClusterFakeAcsptStateParam(){}
 
 ClusterFakeAcsptStateParam::~ClusterFakeAcsptStateParam(){}
 
@@ -915,11 +924,7 @@ FakeAcsptDetailParam::~FakeAcsptDetailParam(){}
 
 //////////////////////////////////////////////////////////
 
-ClusterFakeAcsptDetailParam::ClusterFakeAcsptDetailParam() :
-	session_id(0)
-{
-
-}
+ClusterFakeAcsptDetailParam::ClusterFakeAcsptDetailParam(){}
 
 ClusterFakeAcsptDetailParam::~ClusterFakeAcsptDetailParam(){}
 
@@ -943,11 +948,7 @@ FileTransferParam::~FileTransferParam()
 
 //////////////////////////////////////////////////////////
 
-ClusterFileTransferParam::ClusterFileTransferParam() :
-	session_id(0)
-{
-
-}
+ClusterFileTransferParam::ClusterFileTransferParam(){}
 
 ClusterFileTransferParam::~ClusterFileTransferParam(){}
 
@@ -1028,6 +1029,27 @@ const void* NotifyCfg::get_notify_param()const{return notify_param;}
 
 ///////////////////////////
 
+NotifyCfgEx::NotifyCfgEx(NotifyType type, const void* param, size_t param_size) :
+	NotifyCfg(type, param, param_size)
+{
+}
+
+NotifyCfgEx::~NotifyCfgEx()
+{
+}
+
+int NotifyCfgEx::get_session_id()const
+{
+	return session_id;
+}
+
+int NotifyCfgEx::get_cluster_id()const
+{
+	return cluster_id;
+}
+
+///////////////////////////
+
 NotifyNodeDieCfg::NotifyNodeDieCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_NODE_DIE, param, param_size)
 {
@@ -1083,7 +1105,7 @@ int NotifySessionExitCfg::get_session_id()const
 ///////////////////////////
 
 NotifySystemInfoCfg::NotifySystemInfoCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_GET_SYSTEM_INFO, param, param_size)
+	NotifyCfgEx(NOTIFY_GET_SYSTEM_INFO, param, param_size)
 {
 // // session ID[2 digits]|system info
 // 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
@@ -1135,15 +1157,15 @@ NotifySystemInfoCfg::~NotifySystemInfoCfg()
 	// }
 }
 
-int NotifySystemInfoCfg::get_session_id()const
-{
-	return session_id;
-}
+// int NotifySystemInfoCfg::get_session_id()const
+// {
+// 	return session_id;
+// }
 
-int NotifySystemInfoCfg::get_cluster_id()const
-{
-	return cluster_id;
-}
+// int NotifySystemInfoCfg::get_cluster_id()const
+// {
+// 	return cluster_id;
+// }
 
 const char* NotifySystemInfoCfg::get_system_info()const
 {
@@ -1152,8 +1174,53 @@ const char* NotifySystemInfoCfg::get_system_info()const
 
 ///////////////////////////
 
+NotifySystemMonitorCfg::NotifySystemMonitorCfg(const void* param, size_t param_size) :
+	NotifyCfgEx(NOTIFY_GET_SYSTEM_INFO, param, param_size)
+{
+// session ID[2 digits]|cluster ID[2 digits]|system monitor data
+	// fprintf(stderr, "NotifySystemMonitorCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+// De-Serialize: convert the type of cluster id from string to integer  
+	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+	memset(cluster_id_buf, 0x0, sizeof(char) * CLUSTER_ID_BUF_SIZE);
+	memcpy(cluster_id_buf, param_char + PAYLOAD_SESSION_ID_DIGITS, sizeof(char) * PAYLOAD_CLUSTER_ID_DIGITS);
+	cluster_id = atoi(cluster_id_buf);
+
+	system_monitor_data = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS);
+	if (strlen(system_monitor_data) == 0)
+		system_monitor_data = NULL;
+	// fprintf(stderr, "NotifySystemMonitorCfg, session id: %d, system_monitor_data: %s\n", session_id, system_monitor_data);
+}
+
+NotifySystemMonitorCfg::~NotifySystemMonitorCfg()
+{
+// No need, since the base destructor is virtual
+	// if(notify_param != NULL)
+	// {
+	// 	char* notify_system_info_param = (char*)notify_param;
+	// 	free(notify_system_info_param);
+	// 	notify_param = NULL;
+	// }
+}
+
+const char* NotifySystemMonitorCfg::get_system_monitor_data()const
+{
+	return system_monitor_data;
+}
+
+///////////////////////////
+
 NotifySimulatorVersionCfg::NotifySimulatorVersionCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_GET_SIMULATOR_VERSION, param, param_size)
+	NotifyCfgEx(NOTIFY_GET_SIMULATOR_VERSION, param, param_size)
 {
 // session ID[2 digits]|cluster ID[2 digits]|system info
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
@@ -1190,15 +1257,15 @@ NotifySimulatorVersionCfg::~NotifySimulatorVersionCfg()
 	// }
 }
 
-int NotifySimulatorVersionCfg::get_session_id()const
-{
-	return session_id;
-}
+// int NotifySimulatorVersionCfg::get_session_id()const
+// {
+// 	return session_id;
+// }
 
-int NotifySimulatorVersionCfg::get_cluster_id()const
-{
-	return cluster_id;
-}
+// int NotifySimulatorVersionCfg::get_cluster_id()const
+// {
+// 	return cluster_id;
+// }
 
 const char* NotifySimulatorVersionCfg::get_simulator_version()const
 {
@@ -1326,7 +1393,7 @@ FakeUsreptControlType NotifyFakeUsreptControlCfg::get_fake_usrept_control_type()
 ///////////////////////////
 
 NotifyFakeAcsptStateCfg::NotifyFakeAcsptStateCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_GET_FAKE_ACSPT_STATE, param, param_size)
+	NotifyCfgEx(NOTIFY_GET_FAKE_ACSPT_STATE, param, param_size)
 {
 // session ID[2 digits]|cluster ID[2 digits]|fake acspt state
 	// fprintf(stderr, "NotifyFakeAcsptStateCfg: param:%s, param_size: %d\n", (char*)param, param_size);
@@ -1363,15 +1430,15 @@ NotifyFakeAcsptStateCfg::~NotifyFakeAcsptStateCfg()
 	// }
 }
 
-int NotifyFakeAcsptStateCfg::get_session_id()const
-{
-	return session_id;
-}
+// int NotifyFakeAcsptStateCfg::get_session_id()const
+// {
+// 	return session_id;
+// }
 
-int NotifyFakeAcsptStateCfg::get_cluster_id()const
-{
-	return cluster_id;
-}
+// int NotifyFakeAcsptStateCfg::get_cluster_id()const
+// {
+// 	return cluster_id;
+// }
 
 const char* NotifyFakeAcsptStateCfg::get_fake_acspt_state()const
 {
@@ -1382,7 +1449,7 @@ const char* NotifyFakeAcsptStateCfg::get_fake_acspt_state()const
 ///////////////////////////
 
 NotifyFakeAcsptDetailCfg::NotifyFakeAcsptDetailCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_GET_FAKE_ACSPT_STATE, param, param_size)
+	NotifyCfgEx(NOTIFY_GET_FAKE_ACSPT_STATE, param, param_size)
 {
 	assert(param != NULL && "param should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
@@ -1417,15 +1484,15 @@ NotifyFakeAcsptDetailCfg::~NotifyFakeAcsptDetailCfg()
 	// }
 }
 
-int NotifyFakeAcsptDetailCfg::get_session_id()const
-{
-	return session_id;
-}
+// int NotifyFakeAcsptDetailCfg::get_session_id()const
+// {
+// 	return session_id;
+// }
 
-int NotifyFakeAcsptDetailCfg::get_cluster_id()const
-{
-	return cluster_id;
-}
+// int NotifyFakeAcsptDetailCfg::get_cluster_id()const
+// {
+// 	return cluster_id;
+// }
 
 const char* NotifyFakeAcsptDetailCfg::get_fake_acspt_detail()const
 {
@@ -1456,7 +1523,7 @@ const char* NotifyFileTransferAbortCfg::get_remote_token()const
 ///////////////////////////
 
 NotifyFileTransferCompleteCfg::NotifyFileTransferCompleteCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_COMPLETE_FILE_TRANSFER, param, param_size)
+	NotifyCfgEx(NOTIFY_COMPLETE_FILE_TRANSFER, param, param_size)
 {
 	assert(param != NULL && "param should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
@@ -1485,15 +1552,15 @@ NotifyFileTransferCompleteCfg::NotifyFileTransferCompleteCfg(const void* param, 
 
 NotifyFileTransferCompleteCfg::~NotifyFileTransferCompleteCfg(){}
 
-int NotifyFileTransferCompleteCfg::get_session_id()const
-{
-	return session_id;
-}
+// int NotifyFileTransferCompleteCfg::get_session_id()const
+// {
+// 	return session_id;
+// }
 
-int NotifyFileTransferCompleteCfg::get_cluster_id()const
-{
-	return cluster_id;
-}
+// int NotifyFileTransferCompleteCfg::get_cluster_id()const
+// {
+// 	return cluster_id;
+// }
 
 unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
 {
@@ -1558,7 +1625,7 @@ void* NotifyThread::notify_thread_handler(void* pvoid)
 	}
 	else
 	{
-		STATIC_WRITE_FORMAT_ERROR("The event thread is NOT running properly, due to: %s", GetErrorDescription(pthis->notify_thread_ret));
+		STATIC_WRITE_FORMAT_ERROR("The notify thread is NOT running properly, due to: %s", GetErrorDescription(pthis->notify_thread_ret));
 	}
 // No need to send data to pthread_join
 	// pthread_exit((CHECK_SUCCESS(pthis->notify_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->notify_thread_ret)));
@@ -1690,14 +1757,14 @@ unsigned short NotifyThread::initialize()
 {
 	notify_mtx = PTHREAD_MUTEX_INITIALIZER;
 	notify_cond = PTHREAD_COND_INITIALIZER;
-	// fprintf(stderr, "[%s]Nofity Thread is initialized\n", notify_thread_tag);
+	// fprintf(stderr, "[%s]Nofity Thread is initialized\n", monitor_system_timer_thread_tag);
 	if (pthread_create(&notify_tid, NULL, notify_thread_handler, this) != 0)
 	{
-		// fprintf(stderr, "[%s]Nofity Thread is initialized1\n", notify_thread_tag);
+		// fprintf(stderr, "[%s]Nofity Thread is initialized1\n", monitor_system_timer_thread_tag);
 		WRITE_FORMAT_ERROR("Fail to create a worker thread of notifying event, due to: %s",strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
-	// fprintf(stderr, "[%s]Nofity Thread[%d] is initialized2\n", notify_thread_tag, notify_tid);
+	// fprintf(stderr, "[%s]Nofity Thread[%d] is initialized2\n", monitor_system_timer_thread_tag, notify_tid);
 	return RET_SUCCESS;
 }
 
@@ -1710,7 +1777,7 @@ unsigned short NotifyThread::deinitialize()
 	// sleep(1);
 	usleep(100000);
 // Check notify thread alive
-	// bool notify_thread_alive = false;
+	// bool monitor_system_timer_thread_alive = false;
 	if (notify_tid != 0)
 	{
 		int kill_ret = pthread_kill(notify_tid, 0);
@@ -1729,10 +1796,10 @@ unsigned short NotifyThread::deinitialize()
 		else
 		{
 			WRITE_DEBUG("The signal to the worker thread of notifying is STILL alive");
-			// notify_thread_alive = true;
+			// monitor_system_timer_thread_alive = true;
 // Kill the thread
 		    if (pthread_cancel(notify_tid) != 0)
-		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
+		        WRITE_FORMAT_ERROR("Error occur while deleting the worker thread of notifying event, due to: %s", strerror(errno));
 			// sleep(1);
 			usleep(100000);
 		}
@@ -1768,3 +1835,280 @@ unsigned short NotifyThread::add_event(const PNOTIFY_CFG notify_cfg)
 	pthread_mutex_unlock(&notify_mtx);
 	return RET_SUCCESS;
 }
+
+
+//////////////////////////////////////////////////////////
+
+const char* MonitorSystemTimerThread::DEFAULT_MONITOR_SYSTEM_TIMER_THREAD_TAG = "Monitor System Timer Thread";
+// const int MonitorSystemTimerThread::DEFAULT_MONITOR_SYSTEM_DURATION = 10;  // Unit: sec
+const int MonitorSystemTimerThread::DEFAULT_MONITOR_SYSTEM_PERIOD = 30;  // Unit: sec
+
+void* MonitorSystemTimerThread::monitor_system_timer_thread_handler(void* pvoid)
+{
+	// fprintf(stderr, "monitor_system_timer_thread_handler is invokded !!!\n");
+	MonitorSystemTimerThread* pthis = (MonitorSystemTimerThread*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+
+// https://www.shrubbery.net/solaris9ab/SUNWdev/MTP/p10.html
+	int setcancelstate_ret;
+    if ((setcancelstate_ret=pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL)) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcancelstate() fails, due to: %s", strerror(errno));
+    	pthis->monitor_system_timer_thread_ret = RET_FAILURE_SYSTEM_API;
+    }
+
+// PTHREAD_CANCEL_DEFERRED means that it will wait the pthread_join, 
+    // pthread_cond_wait, pthread_cond_timewait.. to be call when the 
+    // thread receive cancel message.
+    int setcanceltype_ret;
+    if ((setcanceltype_ret=pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL)) != 0) 
+    {
+    	STATIC_WRITE_FORMAT_ERROR("pthread_setcanceltype() fails, due to: %s", strerror(errno));
+    	pthis->monitor_system_timer_thread_ret = RET_FAILURE_SYSTEM_API;
+	}
+// Call the thread handler function to run the thread
+	if (CHECK_SUCCESS(pthis->monitor_system_timer_thread_ret))
+	{
+		pthread_cleanup_push(monitor_system_timer_thread_cleanup_handler, pthis);
+		pthis->monitor_system_timer_thread_ret = pthis->monitor_system_timer_thread_handler_internal();
+		pthread_cleanup_pop(1);
+	}
+	else
+	{
+		STATIC_WRITE_FORMAT_ERROR("The timer thread of system monitor is NOT running properly, due to: %s", GetErrorDescription(pthis->monitor_system_timer_thread_ret));
+	}
+// No need to send data to pthread_join
+	// pthread_exit((CHECK_SUCCESS(pthis->monitor_system_timer_thread_ret) ? NULL : (void*)GetErrorDescription(pthis->monitor_system_timer_thread_ret)));
+	pthread_exit(NULL);
+}
+
+unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_internal()
+{
+	assert(observer != NULL && "notify_observer should NOT be NULL");
+	assert(manager != NULL && "manager should NOT be NULL");
+	WRITE_FORMAT_INFO("[%s] The worker timer thread of system monitor is running", monitor_system_timer_thread_tag);
+	unsigned short ret = RET_SUCCESS;
+	struct timespec ts;
+	struct timespec ts_end;
+	NodeType node_type = NONE;
+	ret = manager->get(PARAM_NODE_TYPE, (void*)&node_type);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	bool should_exit;
+	while (monitor_system_exit == 0)
+	{
+// If the thread calls sleep(), it is not able to be awake immediately if the thread is falling asleep.
+// Exploit pthread_cond_timedwait() instead
+		// sleep(monitor_system_period);
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts_end = ts;
+		ts_end.tv_sec += monitor_system_period;
+		should_exit = false;
+// https://www.cnblogs.com/qingxia/archive/2012/08/30/2663791.html
+		pthread_mutex_lock(&monitor_system_periodic_check_mtx);
+		int timedwait_ret = pthread_cond_timedwait(&monitor_system_periodic_check_cond, &monitor_system_periodic_check_mtx, &ts_end);
+		if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+		{
+			if (timedwait_ret != ETIMEDOUT)
+			{
+			    WRITE_FORMAT_ERROR("[%s] pthread_cond_timedwait() fails, due to: %s", monitor_system_timer_thread_tag, pthread_cond_timedwait_err(timedwait_ret));
+				ret = RET_FAILURE_SYSTEM_API;
+				should_exit = true;
+			}
+		}
+		else
+		{
+			WRITE_FORMAT_DEBUG("[%s] Notifies to exit......", monitor_system_timer_thread_tag);			
+			should_exit = true;
+		}
+		pthread_mutex_unlock(&monitor_system_periodic_check_mtx);
+		if (should_exit) goto OUT;
+
+		WRITE_FORMAT_DEBUG("[%s] Get the data of system monitor", monitor_system_timer_thread_tag);
+// Get the data
+		string system_monitor_string;
+		switch (node_type)
+		{
+			case LEADER:
+			{
+				ClusterSystemMonitorParam cluster_system_monitor_param;
+			    ret = manager->get(PARAM_SYSTEM_MONITOR, (void*)&cluster_system_monitor_param);
+			 	if (CHECK_FAILURE(ret))
+					return ret;
+			    // SAFE_RELEASE(notify_cfg)
+				ClusterDetailParam cluster_detail_param;
+			    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+
+				map<int, string>& cluster_data_map = cluster_system_monitor_param.cluster_data_map;
+// Print data in cosole
+				system_monitor_string = string("*** System Monitor ***\n");
+				map<int, string>::iterator iter = cluster_data_map.begin();
+				while (iter != cluster_data_map.end())
+				{
+					int node_id = (int)iter->first;
+					string node_token;
+					ret = cluster_map.get_node_token(node_id, node_token);
+					if (CHECK_FAILURE(ret))
+						return ret;
+					char buf[DEF_STRING_SIZE];
+					snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
+					system_monitor_string += string(buf);
+					system_monitor_string += ((string)iter->second);
+					system_monitor_string += string("\n**********\n");
+					++iter;
+				}
+				system_monitor_string += string("\n");
+			}
+			break;
+			case FOLLOWER:
+			{
+				SystemMonitorParam system_monitor_param;
+			    ret = manager->get(PARAM_SYSTEM_MONITOR, (void*)&system_monitor_param);
+			 	if (CHECK_FAILURE(ret))
+					return ret;
+				system_monitor_string = string("*** System Monitor (Local) ***\n");
+				system_monitor_string += system_monitor_param.system_monitor_data;
+				system_monitor_string += string("\n**********\n");
+			}
+			break;
+			default:
+			{
+				WRITE_FORMAT_ERROR("Unknow node type: %d", node_type);
+				ret = RET_FAILURE_INCORRECT_VALUE;
+				goto OUT;
+			}
+			break;
+		}
+		WRITE_FORMAT_DEBUG("[%s] Get the data of system monitor... Done: %s", monitor_system_timer_thread_tag, system_monitor_string.c_str());
+		observer->notify(NOTIFY_GET_SYSTEM_MONITOR, (void*)&system_monitor_string);
+	}
+OUT:
+	WRITE_FORMAT_INFO("[%s] The worker timer thread of system monitor is dead", monitor_system_timer_thread_tag);
+	return ret;
+}
+
+void MonitorSystemTimerThread::monitor_system_timer_thread_cleanup_handler(void* pvoid)
+{
+	MonitorSystemTimerThread* pthis = (MonitorSystemTimerThread*)pvoid;
+	if (pthis == NULL)
+		throw std::invalid_argument("pvoid should NOT be NULL");
+	pthis->monitor_system_timer_thread_cleanup_handler_internal();
+}
+
+void MonitorSystemTimerThread::monitor_system_timer_thread_cleanup_handler_internal()
+{
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the timer thread of system monitor......", monitor_system_timer_thread_tag);
+}
+
+MonitorSystemTimerThread::MonitorSystemTimerThread(PINOTIFY notify, PIMANAGER mgr, const char* thread_tag) :
+	observer(notify),
+	manager(mgr),
+	monitor_system_exit(0),
+	monitor_system_tid(0),
+	monitor_system_timer_thread_ret(RET_SUCCESS),
+	monitor_system_period(DEFAULT_MONITOR_SYSTEM_PERIOD)
+{
+	IMPLEMENT_MSG_DUMPER()
+	if (thread_tag == NULL)
+		monitor_system_timer_thread_tag = strdup(DEFAULT_MONITOR_SYSTEM_TIMER_THREAD_TAG);
+	else
+		monitor_system_timer_thread_tag = strdup(thread_tag);
+}
+
+MonitorSystemTimerThread::~MonitorSystemTimerThread()
+{
+	if (monitor_system_timer_thread_tag != NULL)
+	{
+		free(monitor_system_timer_thread_tag);
+		monitor_system_timer_thread_tag = NULL;
+	}
+	if (manager != NULL)
+		manager = NULL;
+	if (observer != NULL)
+		observer = NULL;
+
+	RELEASE_MSG_DUMPER()
+}
+
+unsigned short MonitorSystemTimerThread::initialize()
+{
+	monitor_system_periodic_check_mtx = PTHREAD_MUTEX_INITIALIZER;
+	monitor_system_periodic_check_cond = PTHREAD_COND_INITIALIZER;
+	// fprintf(stderr, "[%s]Nofity One Timer Thread is initialized\n", monitor_system_timer_thread_tag);
+	if (pthread_create(&monitor_system_tid, NULL, monitor_system_timer_thread_handler, this) != 0)
+	{
+		// fprintf(stderr, "[%s]Nofity Thread is initialized1\n", monitor_system_timer_thread_tag);
+		WRITE_FORMAT_ERROR("Fail to create a worker timer thread of system monitor, due to: %s",strerror(errno));
+		return RET_FAILURE_HANDLE_THREAD;
+	}
+	// fprintf(stderr, "[%s]Nofity Thread[%d] is initialized2\n", monitor_system_timer_thread_tag, notify_tid);
+	return RET_SUCCESS;
+}
+
+unsigned short MonitorSystemTimerThread::deinitialize()
+{
+	unsigned short ret = RET_SUCCESS;
+	// void* status;
+// Notify the worker thread it's time to exit
+	__sync_fetch_and_add(&monitor_system_exit, 1);
+	// sleep(1);
+	usleep(100000);
+// Check notify thread alive
+	// bool monitor_system_timer_thread_alive = false;
+	if (monitor_system_tid != 0)
+	{
+		int kill_ret = pthread_kill(monitor_system_tid, 0);
+		if(kill_ret == ESRCH)
+		{
+			WRITE_WARN("The worker timer thread of system monitor did NOT exist......");
+			ret = RET_SUCCESS;
+			// goto OUT;
+		}
+		else if(kill_ret == EINVAL)
+		{
+			WRITE_ERROR("The signal to the worker timer thread of system monitor is invalid");
+			ret = RET_FAILURE_HANDLE_THREAD;
+			// goto OUT;
+		}
+		else
+		{
+			WRITE_DEBUG("The signal to the worker timer thread of system monitor is STILL alive");
+// Notify the worker thread to wake up
+			pthread_mutex_lock(&monitor_system_periodic_check_mtx);
+			pthread_cond_signal(&monitor_system_periodic_check_cond);
+			pthread_mutex_unlock(&monitor_system_periodic_check_mtx);
+			usleep(50000);
+
+			// monitor_system_timer_thread_alive = true;
+// Kill the thread
+		    if (pthread_cancel(monitor_system_tid) != 0)
+		        WRITE_FORMAT_ERROR("Error occur while deleting the worker timer thread of system monitor, due to: %s", strerror(errno));
+			// sleep(1);
+			usleep(50000);
+		}
+	}
+
+// Wait for notify thread's death
+	WRITE_DEBUG("Wait for the worker timer thread of system monitor's death...");
+	pthread_join(monitor_system_tid, NULL);
+	if (CHECK_SUCCESS(monitor_system_timer_thread_ret))
+		WRITE_DEBUG("Wait for the worker timer thread of system monitor's death Successfully !!!");
+	else
+	{
+		WRITE_FORMAT_ERROR("Error occur while waiting for the worker timer thread of system monitor's death, due to: %s", GetErrorDescription(monitor_system_timer_thread_ret));
+		ret = monitor_system_timer_thread_ret;
+	}
+
+	return ret;
+}
+
+unsigned short MonitorSystemTimerThread::set_period(int period)
+{
+	monitor_system_period = period;
+	return RET_SUCCESS;
+}
+

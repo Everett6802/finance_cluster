@@ -27,6 +27,7 @@ public:
 	unsigned short deinitialize();
 
 	unsigned short get_system_info(std::string& system_info);
+	unsigned short get_system_monitor_data(std::string& system_monitor_data);
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

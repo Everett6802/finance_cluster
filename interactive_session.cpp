@@ -19,6 +19,8 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
+	InteractiveSessionCommand_StartSystemMonitor,
+	InteractiveSessionCommand_StopSystemMonitor,
 	InteractiveSessionCommand_GetSimulatorVersion,
 	InteractiveSessionCommand_TransferSimulatorPackage,
 	InteractiveSessionCommand_InstallSimulator,
@@ -42,6 +44,8 @@ static const char *interactive_session_command[InteractiveSessionCommandSize] =
 	"get_cluster_detail",
 	"get_system_info",
 	// "get_node_system_info",
+	"start_system_monitor",
+	"stop_system_monitor",
 	"get_simulator_version",
 	"transfer_simulator_package",
 	"install_simulator",
@@ -116,7 +120,9 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	multi_clis_filepath(NULL),
 	sock_fd(client_fd),
 	session_id(interactive_session_id),
-	is_root(false)
+	is_root(false),
+	system_monitor(false),
+	monitor_system_timer_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 	init_command_map();
@@ -158,6 +164,13 @@ unsigned short InteractiveSession::initialize()
 unsigned short InteractiveSession::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
+	if (monitor_system_timer_thread != NULL)
+	{
+		ret = monitor_system_timer_thread->deinitialize();
+		delete monitor_system_timer_thread;
+		monitor_system_timer_thread = NULL;		
+	}
+
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&session_exit, 1);
 	// sleep(1);
@@ -228,6 +241,7 @@ unsigned short InteractiveSession::deinitialize()
 		close(sock_fd);
 		sock_fd = -1;
 	}
+
 	return ret;
 }
 
@@ -373,6 +387,14 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 					}
 					else
 					{
+// Stop system monitor before executing other commands if the system monitor is enabled
+						if (system_monitor && (strcmp(argv_inner[0], "stop_system_monitor") != 0))
+					    {
+							WRITE_WARN("Warning!! System Monitor Enabled");
+							static string system_monitor_string("System Montior Enabled\n");
+							print_to_console(system_monitor_string);
+							goto OUT;
+					    }
 // Some commmands require privilege user
 						if (is_privilege_user_command((int)iter->second))
 						{
@@ -423,6 +445,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 				command_line_outer = NULL;
 			cur_argc_outer++;
 		}
+OUT:
 		if (session_exit == 0)
 		{
 // Print the prompt again
@@ -628,6 +651,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
+		&InteractiveSession::handle_start_system_monitor_command,
+		&InteractiveSession::handle_stop_system_monitor_command,
 		&InteractiveSession::handle_get_simulator_version_command,
 		&InteractiveSession::handle_trasnfer_simulator_package_command,
 		&InteractiveSession::handle_install_simulator_command,
@@ -665,6 +690,8 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
 	usage_string += string("* get_system_info\n Description: Get the system info in the cluster\n");
 	// usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
+	usage_string += string("* start_system_monitor\n Description: Start system monitor in the cluster\n");
+	usage_string += string("* stop_system_monitor\n Description: Stop system monitor in the cluster\n");
 	usage_string += string("  Param: Node ID/IP\n");
 	usage_string += string("    Format 1: Node ID: (ex. 1)\n");
 	usage_string += string("    Format 2: Node IP: (ex. 10.206.24.219)\n");
@@ -796,11 +823,11 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 				return ret;
 			ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
-			map<int, string>& clusuter_system_info_map = cluster_system_info_param.clusuter_system_info_map;
+			map<int, string>& cluster_data_map = cluster_system_info_param.cluster_data_map;
 	// Print data in cosole
 			string system_info_string("*** System Info ***\n");
-			map<int, string>::iterator iter = clusuter_system_info_map.begin();
-			while (iter != clusuter_system_info_map.end())
+			map<int, string>::iterator iter = cluster_data_map.begin();
+			while (iter != cluster_data_map.end())
 			{
 				// simulator_version_string += string(simulator_version_param->simulator_version);
 				// simulator_version_string += string("\n");
@@ -829,6 +856,7 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 			string system_info_string("*** System Info (Local) ***\n");
 			system_info_string += system_info_param.system_info;
 			system_info_string += string("\n**********\n");
+			ret = print_to_console(system_info_string);
 		}
 		break;
 		default:
@@ -873,6 +901,51 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 // 	return RET_SUCCESS;
 // }
 
+unsigned short InteractiveSession::handle_start_system_monitor_command(int argc, char **argv)
+{
+	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n**********************\n\n");
+	if (system_monitor)
+	{
+		WRITE_ERROR("System monitor is enabled");
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	assert(monitor_system_timer_thread == NULL && "monitor_system_timer_thread should be NULL");
+	unsigned short ret = RET_SUCCESS;
+	monitor_system_timer_thread = new MonitorSystemTimerThread(this, manager);
+	if (monitor_system_timer_thread == NULL)
+		throw bad_alloc();
+	ret = monitor_system_timer_thread->initialize();
+	if (CHECK_FAILURE(ret))
+	{
+		delete monitor_system_timer_thread;
+		monitor_system_timer_thread = NULL;
+		return ret;
+	}
+	system_monitor = true;
+	ret = print_to_console(system_monitor_string);
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, char **argv)
+{
+	static string system_monitor_string("*** System Monitor ***\n STOP\n**********************\n\n");
+	if (!system_monitor)
+	{
+		WRITE_ERROR("System monitor is disabled");
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	assert(monitor_system_timer_thread != NULL && "monitor_system_timer_thread should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	ret = monitor_system_timer_thread->deinitialize();
+	delete monitor_system_timer_thread;
+	monitor_system_timer_thread = NULL;
+	if (CHECK_FAILURE(ret))
+		return ret;
+	system_monitor = false;
+	ret = print_to_console(system_monitor_string);
+	return RET_SUCCESS;	
+}
+
 unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int argc, char **argv)
 {
 	assert(observer != NULL && "observer should NOT be NULL");
@@ -905,11 +978,11 @@ unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int
 	ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 	char buf[DEF_STRING_SIZE];
-	map<int, string>& clusuter_file_transfer_map = cluster_file_transfer_param.clusuter_file_transfer_map;
+	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
 // Print data in cosole
 	string file_transfer_string("file transfer\n");
-	map<int, string>::iterator iter = clusuter_file_transfer_map.begin();
-	while (iter != clusuter_file_transfer_map.end())
+	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
+	while (iter != cluster_file_transfer_map.end())
 	{
 		int node_id = (int)iter->first;
 		string node_token;
@@ -953,11 +1026,11 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_STRING_SIZE];
-		map<int, string>& clusuter_simulator_version_map = cluster_simulator_version_param.clusuter_simulator_version_map;
+		map<int, string>& cluster_simulator_version_map = cluster_simulator_version_param.cluster_data_map;
 // Print data in cosole
 		string simulator_version_string("simulator version\n");
-		map<int, string>::iterator iter = clusuter_simulator_version_map.begin();
-		while (iter != clusuter_simulator_version_map.end())
+		map<int, string>::iterator iter = cluster_simulator_version_map.begin();
+		while (iter != cluster_simulator_version_map.end())
 		{
 			// simulator_version_string += string(simulator_version_param->simulator_version);
 			// simulator_version_string += string("\n");
@@ -1259,7 +1332,7 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
 		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_VERY_LONG_STRING_SIZE];
-		map<int, string>& cluster_fake_acspt_state_map = cluster_fake_acspt_state_param.cluster_fake_acspt_state_map;
+		map<int, string>& cluster_fake_acspt_state_map = cluster_fake_acspt_state_param.cluster_data_map;
 // Print data in cosole
 		string fake_acspt_state_string("*** Fake Acspt State ***\n");
 		map<int, string>::iterator iter = cluster_fake_acspt_state_map.begin();
@@ -1308,12 +1381,12 @@ unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc
 		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_VERY_SHORT_STRING_SIZE];
-		map<int, string>& clusuter_fake_acspt_detail_map = cluster_fake_acspt_detail_param.clusuter_fake_acspt_detail_map;
+		map<int, string>& cluster_fake_acspt_detail_map = cluster_fake_acspt_detail_param.cluster_data_map;
 // Print data in cosole
 		string fake_acspt_detail_string("*** Fake Acspt Detail ***\n");
-		map<int, string>::iterator iter = clusuter_fake_acspt_detail_map.begin();
+		map<int, string>::iterator iter = cluster_fake_acspt_detail_map.begin();
 		string newline_str("\n");
-		while (iter != clusuter_fake_acspt_detail_map.end())
+		while (iter != cluster_fake_acspt_detail_map.end())
 		{
 			int node_id = (int)iter->first;
 			string node_token;
@@ -1394,4 +1467,50 @@ unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char 
 	}
 
 	return ret;
+}
+
+unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_param)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(notify_type)
+    {
+// Synchronous event:
+    	case NOTIFY_GET_SYSTEM_MONITOR:
+    	{
+    		string& system_monitor_string = *(string*)notify_param;
+    		ret = print_to_console(system_monitor_string);
+    	}
+    	break;
+// Asynchronous event:
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short InteractiveSession::async_handle(NotifyCfg* notify_cfg)
+{
+	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+    unsigned short ret = RET_SUCCESS;
+    NotifyType notify_type = notify_cfg->get_notify_type();
+    switch(notify_type)
+    {
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		// fprintf(stderr, "%s in InteractiveSession::async_handle()", buf);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
 }
