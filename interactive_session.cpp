@@ -122,7 +122,8 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	session_id(interactive_session_id),
 	is_root(false),
 	system_monitor(false),
-	monitor_system_timer_thread(NULL)
+	monitor_system_timer_thread(NULL),
+	system_monitor_period(0)
 {
 	IMPLEMENT_MSG_DUMPER()
 	init_command_map();
@@ -151,8 +152,9 @@ InteractiveSession::~InteractiveSession()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short InteractiveSession::initialize()
+unsigned short InteractiveSession::initialize(int system_monitor_period_value)
 {
+	system_monitor_period = system_monitor_period_value;
 	if (pthread_create(&session_tid, NULL, session_thread_handler, this) != 0)
 	{
 		WRITE_FORMAT_ERROR("Fail to create a handler thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
@@ -914,6 +916,8 @@ unsigned short InteractiveSession::handle_start_system_monitor_command(int argc,
 	monitor_system_timer_thread = new MonitorSystemTimerThread(this, manager);
 	if (monitor_system_timer_thread == NULL)
 		throw bad_alloc();
+	if (system_monitor_period != 0)
+		monitor_system_timer_thread->set_period(system_monitor_period);
 	ret = monitor_system_timer_thread->initialize();
 	if (CHECK_FAILURE(ret))
 	{

@@ -155,6 +155,7 @@ const char* CONFIG_FOLDER_NAME = "conf";
 const char* CONF_FIELD_CLUSTER_NETWORK = "cluster_network";
 const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
 const char* CONF_FIELD_LOCAL_CLUSTER = "local_cluster";
+const char* CONF_FIELD_SYSTEM_MONITOR_PERIOD = "system_monitor_period";
 
 const int PAYLOAD_SESSION_ID_DIGITS = 2;
 const char* PAYLOAD_SESSION_ID_STRING_FORMAT = "%02d";

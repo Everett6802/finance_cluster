@@ -48,6 +48,7 @@ private:
 	bool is_root;
 	bool system_monitor;
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
+	int system_monitor_period;
 
 	static bool is_privilege_user_command(int command_type);
 
@@ -89,7 +90,7 @@ public:
 	InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int client_fd, const sockaddr_in& sock_addraddress, int interactive_session_id);
 	~InteractiveSession();
 
-	unsigned short initialize();
+	unsigned short initialize(int system_monitor_period_value);
 	unsigned short deinitialize();
 	const char* get_session_tag()const;
 

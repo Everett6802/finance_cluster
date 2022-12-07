@@ -101,6 +101,11 @@ unsigned short ClusterMgr::parse_config()
 			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
 			// fprintf(stderr, "CONF Name: %s, Value: %s\n", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
 		}
+		else if (strcmp(conf_name, CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
+		{
+			system_monitor_period = atoi(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_SYSTEM_MONITOR_PERIOD, system_monitor_period);
+		}
 		else
 		{
 			static const int ERRMSG_SIZE = 64;
@@ -509,7 +514,7 @@ unsigned short ClusterMgr::initialize_components(bool local_follower)
 		interactive_server = new InteractiveServer(this);
 		if (interactive_server == NULL)
 			throw bad_alloc();
-		ret = interactive_server->initialize();
+		ret = interactive_server->initialize(system_monitor_period);
 		if (CHECK_FAILURE(ret))
 			return ret;
 // Initialize the simulator handler

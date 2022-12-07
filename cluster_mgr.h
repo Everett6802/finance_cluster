@@ -33,6 +33,7 @@ private:
 // config
 	std::string cluster_network;
 	int cluster_netmask_digits;
+	int system_monitor_period;
 
 	PNOTIFY_THREAD notify_thread;
 	bool local_cluster;
