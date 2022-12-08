@@ -806,6 +806,7 @@ unsigned short LeaderNode::recv_get_system_monitor(const std::string& message_da
 	PNOTIFY_CFG notify_cfg = new NotifySystemMonitorCfg((void*)message_data.c_str(), notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
+	fprintf(stderr, "SM: LeaderNode::recv_get_system_monitor(): %s\n", message_data.c_str());
 // Asynchronous event
 	observer->notify(NOTIFY_GET_SYSTEM_MONITOR, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
@@ -1026,6 +1027,7 @@ unsigned short LeaderNode::send_get_system_monitor(void* param1, void* param2, v
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
+	fprintf(stderr, "SM: LeaderNode::send_get_system_monitor()\n");
 	return send_data(MSG_GET_SYSTEM_MONITOR, buf);
 }
 

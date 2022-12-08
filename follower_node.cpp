@@ -566,6 +566,7 @@ unsigned short FollowerNode::recv_get_system_monitor(const std::string& message_
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
 	int session_id = atoi(message_data.c_str());
+	fprintf(stderr, "SM: FollowerNode::recv_get_system_monitor(): %d\n", cluster_id);
 	ret = send_get_system_monitor((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
@@ -852,6 +853,7 @@ unsigned short FollowerNode::send_get_system_monitor(void* param1, void* param2,
 	// memset(session_id_str, 0x0, sizeof(char) * 3);
 	// memcpy(session_id_str, system_monitor_data.c_str(), sizeof(char) * 2);
 	// fprintf(stderr, "Follower[%s] send_get_system_monitor session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_monitor_data.c_str() + 2));
+	fprintf(stderr, "SM: FollwerNode::send_get_system_monitor(): %s\n", system_monitor_data.c_str());
 	return send_data(MSG_GET_SYSTEM_MONITOR, system_monitor_data.c_str());
 }
 
