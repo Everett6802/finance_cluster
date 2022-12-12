@@ -1175,7 +1175,7 @@ const char* NotifySystemInfoCfg::get_system_info()const
 ///////////////////////////
 
 NotifySystemMonitorCfg::NotifySystemMonitorCfg(const void* param, size_t param_size) :
-	NotifyCfgEx(NOTIFY_GET_SYSTEM_INFO, param, param_size)
+	NotifyCfgEx(NOTIFY_GET_SYSTEM_MONITOR, param, param_size)
 {
 // session ID[2 digits]|cluster ID[2 digits]|system monitor data
 	// fprintf(stderr, "NotifySystemMonitorCfg: param:%s, param_size: %d\n", (char*)param, param_size);
