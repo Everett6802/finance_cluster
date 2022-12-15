@@ -2072,7 +2072,6 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 	return ret;
 }
 
-
 unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 {
 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
