@@ -406,7 +406,7 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 		jiffies_count[i][1] = atoi(token2);
 	}
 	cpu_usage_value = (float)(jiffies_count[1][1] - jiffies_count[0][1]) * 100.0 / (jiffies_count[1][0] - jiffies_count[0][0]);
-	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, "cpu uage: %.2f%", cpu_usage_value);
+	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, "cpu uage: %.2f % ", cpu_usage_value);
 	cpu_usage = cpu_usage_value_str;
 OUT:
 	for (int i = 0 ; i < CMD_COUNT; i++)

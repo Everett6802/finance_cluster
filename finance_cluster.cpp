@@ -169,6 +169,11 @@ void detach_from_terminal()
 
 int main(int argc, char** argv)
 {
+	// char buf[32] = {'\0'};
+	// float value = 32.47;
+	// snprintf(buf, 32 , "Test: %.2f %\n", value);
+	// printf(buf);
+	// exit(0);
 	// const char* process_name = "finance_cluster";
 	// int process_count;
 	// get_process_count(process_name, process_count);
