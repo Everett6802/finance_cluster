@@ -23,6 +23,8 @@ private:
 	unsigned short get_os_info(std::string& os_info);
 // For system monitor
 	unsigned short get_cpu_usage(std::string& cpu_usage, unsigned int sleep_time_in_millisec);
+	unsigned short get_memory_usage(std::string& memory_usage);
+
 public:
 	SystemOperator(PINOTIFY notify);
 	virtual ~SystemOperator();

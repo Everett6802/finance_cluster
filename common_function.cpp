@@ -299,12 +299,21 @@ bool is_root_user()
 	return ((strcmp(get_username(), "root") == 0) ? true : false);
 }
 
-void print_curtime(const char* title)
+void get_curtime_str(string& curtime)
 {
-  time_t t = time(NULL);
-  struct tm tm = *localtime(&t);
-  printf("%s: %d-%02d-%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  	time_t t = time(NULL);
+  	struct tm tm = *localtime(&t);
+  	char curtime_str[DEF_SHORT_STRING_SIZE];
+  	snprintf(curtime_str, DEF_SHORT_STRING_SIZE, "%d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  	curtime = curtime_str;
 }
+
+// void print_curtime(const char* title)
+// {
+//   	time_t t = time(NULL);
+//   	struct tm tm = *localtime(&t);
+//   	printf("%s: %d-%02d-%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+// }
 
 const char* pthread_cond_timedwait_err(int ret)
 {

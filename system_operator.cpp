@@ -373,26 +373,24 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp[CMD_COUNT];
-	char* line[CMD_COUNT];
+	char* line[CMD_COUNT] = {NULL};
 	int jiffies_count[CMD_COUNT][2] = {0};
-	float cpu_usage_value;
 	char cpu_usage_value_str[DEF_SHORT_STRING_SIZE];
-
+	float cpu_usage_value;
 
 	fp[0] = popen(CMD, "r");
 	usleep(sleep_time_in_millisec * 1000);
 	fp[1] = popen(CMD, "r");
 	for (int i = 0 ; i < CMD_COUNT; i++)
 	{
-		char *line = NULL;
 		size_t line_len = 0;
-		if (getline(&line, &line_len, fp[i]) == -1)
+		if (getline(&line[i], &line_len, fp[i]) == -1)
 		{
 			WRITE_FORMAT_ERROR("getline(%d) fails, due to: %s", i, strerror(errno));
 			ret = RET_FAILURE_SYSTEM_API;
 			goto OUT;
 		}
-		char* line_tmp = line;
+		char* line_tmp = line[i];
 	    char* rest = NULL;
 		char* token1 = strtok_r(line_tmp, " ", &rest);
 		char* token2 = strtok_r(NULL, " ", &rest);
@@ -406,11 +404,16 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 		jiffies_count[i][1] = atoi(token2);
 	}
 	cpu_usage_value = (float)(jiffies_count[1][1] - jiffies_count[0][1]) * 100.0 / (jiffies_count[1][0] - jiffies_count[0][0]);
-	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, "cpu uage: %.2f % ", cpu_usage_value);
+	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, " cpu usage: %.2f % \n", cpu_usage_value);
 	cpu_usage = cpu_usage_value_str;
 OUT:
 	for (int i = 0 ; i < CMD_COUNT; i++)
 	{
+		if (line[i] != NULL)
+		{
+			free(line[i]);
+			line[i] = NULL;
+		}
 		if (fp[i] != NULL)
 		{
 			pclose(fp[i]);
@@ -420,6 +423,40 @@ OUT:
 	return ret;
 }
 
+
+unsigned short SystemOperator::get_memory_usage(string& memory_usage)
+{
+	static char *CMD = "free -m | grep 'Mem' | awk '{print $3/$2}'";
+	unsigned short ret = RET_SUCCESS;
+	FILE* fp = popen(CMD, "r");
+	char *line = NULL;
+	size_t line_len = 0;
+	char memory_usage_value_str[DEF_SHORT_STRING_SIZE];
+	float memory_usage_value;
+
+	if (getline(&line, &line_len, fp) == -1)
+	{
+		WRITE_FORMAT_ERROR("getline() fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	memory_usage_value = atof(line) * 100.0;
+	snprintf(memory_usage_value_str, DEF_SHORT_STRING_SIZE, " memory usage: %.2f % \n", memory_usage_value);
+	memory_usage = memory_usage_value_str;
+OUT:
+	if (line != NULL)
+	{
+		free(line);
+		line = NULL;
+	}
+	if (fp != NULL)
+	{
+		pclose(fp);
+		fp = NULL;
+	}
+
+	return ret;
+}
 unsigned short SystemOperator::get_system_monitor_data(std::string& system_monitor_data)
 {
 	unsigned short ret = RET_SUCCESS;
@@ -429,6 +466,12 @@ unsigned short SystemOperator::get_system_monitor_data(std::string& system_monit
 	if (CHECK_FAILURE(ret))
 		return ret;
 	system_monitor_data += cpu_usage;
+// Get memory usage
+	string memory_usage;
+	ret = get_memory_usage(memory_usage);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	system_monitor_data += memory_usage;
 	// system_monitor_data = string("This is only a test\n");
 	return ret;
 }

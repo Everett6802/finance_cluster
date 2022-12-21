@@ -1946,6 +1946,10 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 				map<int, string>& cluster_data_map = cluster_system_monitor_param.cluster_data_map;
 // Print data in cosole
 				system_monitor_string = string("*** System Monitor ***\n");
+				string curtime_str;
+				get_curtime_str(curtime_str);
+				system_monitor_string += string(" @ ") + curtime_str + string("\n**********************\n");
+
 				map<int, string>::iterator iter = cluster_data_map.begin();
 				while (iter != cluster_data_map.end())
 				{

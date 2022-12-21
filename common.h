@@ -7,7 +7,7 @@
 #include <syslog.h>
 #include <assert.h>
 #include <errno.h>
-#include <unistd.h>
+#include <unistd.h> 
 #include <list>
 #include <deque>
 #include <string>
@@ -309,7 +309,8 @@ unsigned short get_process_count(const char* process_name, int& process_count);
 bool check_string_is_number(const char* input);
 const char *get_username();
 bool is_root_user();
-void print_curtime(const char* title=NULL);
+void get_curtime_str(std::string& curtime);
+// void print_curtime(const char* title=NULL);
 const char* pthread_cond_timedwait_err(int ret);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
