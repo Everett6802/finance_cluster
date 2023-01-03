@@ -457,6 +457,7 @@ OUT:
 
 	return ret;
 }
+
 unsigned short SystemOperator::get_system_monitor_data(std::string& system_monitor_data)
 {
 	unsigned short ret = RET_SUCCESS;

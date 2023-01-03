@@ -37,29 +37,72 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommandSize
 };
 
-static const char *interactive_session_command[InteractiveSessionCommandSize] = 
+
+struct CommandAttribute
 {
-	"help",
-	"exit",
-	"get_cluster_detail",
-	"get_system_info",
-	// "get_node_system_info",
-	"start_system_monitor",
-	"stop_system_monitor",
-	"get_simulator_version",
-	"transfer_simulator_package",
-	"install_simulator",
-	"apply_fake_acspt_config",
-	"get_fake_acspt_config_value",
-	"apply_fake_usrept_config",
-	"start_fake_acspt",
-	"stop_fake_acspt",
-	"start_fake_usrept",
-	"stop_fake_usrept",
-	"get_fake_acspt_state",
-	"get_fake_acspt_detail",
-	"run_multi_clis"
+	string command;
+	unsigned char authority;
+	string description;
 };
+typedef CommandAttribute* PCOMMAND_ATTRIBUTE;
+
+
+static const unsigned char AUTHORITY_LEADER = 0x1; 
+static const unsigned char AUTHORITY_ROOT = 0x1 << 1; 
+
+#define CHECK_LDADER(x) ((x & AUTHORITY_LEADER) ? true : false)
+#define CHECK_ROOT(x) ((x & AUTHORITY_ROOT) ? true : false)
+#define GET_COMMAND(x) interactive_session_command_attr[x].command
+#define GET_AUTHORITY(x) interactive_session_command_attr[x].authority
+#define GET_DESCRIPTION(x) interactive_session_command_attr[x].description
+#define CHECK_AUTHORITY(x, y) (y >= GET_AUTHORITY(x) ? true : false)
+
+static const CommandAttribute interactive_session_command_attr[InteractiveSessionCommandSize] = 
+{
+	{.command="help", .authority=0X0, .description="The usage"},
+	{.command="exit", .authority=0X0, .description="Exit the session"},
+	{.command="get_cluster_detail", .authority=0X0, .description="Get the cluster detail info"},
+	{.command="get_system_info", .authority=0X0, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info"},
+	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
+	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
+	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
+	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
+	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
+	{.command="apply_fake_acspt_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake acepts\n  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)"},
+	{.command="get_fake_acspt_config_value", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the config value from fake acspts config file\n  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)"},
+	{.command="apply_fake_usrept_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake usrepts\n  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)"},
+	{.command="start_fake_acspt", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Start fake acepts"},
+	{.command="stop_fake_acspt", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Stop fake acepts"},
+	{.command="start_fake_usrept", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Start fake usrepts"},
+	{.command="stop_fake_usrept", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Stop fake usrepts"},
+	{.command="get_fake_acspt_state", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the states of all fake acepts"},
+	{.command="get_fake_acspt_detail", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the details of all fake acepts"},
+	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"}
+};
+
+// static const char *interactive_session_command[InteractiveSessionCommandSize] = 
+// {
+// 	"help",
+// 	"exit",
+// 	"get_cluster_detail",
+// 	"get_system_info",
+// 	// "get_node_system_info",
+// 	"start_system_monitor",
+// 	"stop_system_monitor",
+// 	"get_simulator_version",
+// 	"transfer_simulator_package",
+// 	"install_simulator",
+// 	"apply_fake_acspt_config",
+// 	"get_fake_acspt_config_value",
+// 	"apply_fake_usrept_config",
+// 	"start_fake_acspt",
+// 	"stop_fake_acspt",
+// 	"start_fake_usrept",
+// 	"stop_fake_usrept",
+// 	"get_fake_acspt_state",
+// 	"get_fake_acspt_detail",
+// 	"run_multi_clis"
+// };
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
 typedef COMMAND_MAP::iterator COMMAND_MAP_ITER;
@@ -95,7 +138,8 @@ void InteractiveSession::init_command_map()
 		{
 			for (int i = 0 ; i < InteractiveSessionCommandSize ; i++)
 			{
-				command_map.insert(make_pair(string(interactive_session_command[i]), (InteractiveSessionCommandType)i));
+				// command_map.insert(make_pair(string(interactive_session_command[i]), (InteractiveSessionCommandType)i));
+				command_map.insert(make_pair(interactive_session_command_attr[i].command, (InteractiveSessionCommandType)i));
 			}
 			// for(COMMAND_MAP_ITER iter = command_map.begin() ; iter != command_map.end() ; iter++)
 			// {
@@ -121,6 +165,8 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	sock_fd(client_fd),
 	session_id(interactive_session_id),
 	is_root(false),
+	is_leader(false),
+	authority_mask(0x0),
 	system_monitor(false),
 	monitor_system_timer_thread(NULL),
 	system_monitor_period(0)
@@ -130,7 +176,6 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
 	memset(session_tag, 0x0, sizeof(char) * 64);
 	snprintf(session_tag, 64, "%d (%s:%d)", session_id, inet_ntoa(sock_addr.sin_addr), htons(sock_addr.sin_port));
-	is_root = is_root_user();
 	// printf("is_root: %s\n", (is_root ? "True" : "False"));
 }
 	
@@ -154,7 +199,23 @@ InteractiveSession::~InteractiveSession()
 
 unsigned short InteractiveSession::initialize(int system_monitor_period_value)
 {
+	assert(manager != NULL && "manager should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
 	system_monitor_period = system_monitor_period_value;
+	NodeType node_type = NONE;
+    ret = manager->get(PARAM_NODE_TYPE, (void*)&node_type);
+ 	if (CHECK_FAILURE(ret))
+		return ret;	
+	is_leader = (node_type == LEADER ? true : false);
+	is_root = is_root_user();
+
+	authority_mask = 0x0;
+	if (is_leader)
+		authority_mask |= AUTHORITY_LEADER;
+	if (is_root)
+		authority_mask |= AUTHORITY_ROOT;
+	WRITE_FORMAT_DEBUG("is_root: %s, is_leader: %s, authority_mask: %d", (is_root ? "true" : "false"), (is_leader ? "true" : "false"), authority_mask);
+
 	if (pthread_create(&session_tid, NULL, session_thread_handler, this) != 0)
 	{
 		WRITE_FORMAT_ERROR("Fail to create a handler thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
@@ -252,31 +313,32 @@ const char* InteractiveSession::get_session_tag()const
 	return session_tag;
 }
 
-bool InteractiveSession::is_privilege_user_command(int command_type)
+bool InteractiveSession::check_command_authority(int command_type)
 {
-	static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
-	{
-		InteractiveSessionCommand_GetSimulatorVersion,
-		InteractiveSessionCommand_TransferSimulatorPackage,
-		InteractiveSessionCommand_InstallSimulator,
-		InteractiveSessionCommand_ApplyFakeAcsptConfig,
-		InteractiveSessionCommand_GetFakeAcsptConfigValue,
-		InteractiveSessionCommand_ApplyFakeUsreptConfig,
-		InteractiveSessionCommand_StartFakeAcspt,
-		InteractiveSessionCommand_StopFakeAcspt,
-		InteractiveSessionCommand_StartFakeUsrept,
-		InteractiveSessionCommand_StopFakeUsrept,
-		InteractiveSessionCommand_GetFakeAcsptState,
-		InteractiveSessionCommand_GetFakeAcsptDetail,
-		InteractiveSessionCommand_RunMultiClis
-	};
-	static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
-	for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
-	{
-		if (command_type == PRIVILEGE_USER_COMMAND_LIST[i])
-			return true;
-	}
-	return false;
+	// static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
+	// {
+	// 	InteractiveSessionCommand_GetSimulatorVersion,
+	// 	InteractiveSessionCommand_TransferSimulatorPackage,
+	// 	InteractiveSessionCommand_InstallSimulator,
+	// 	InteractiveSessionCommand_ApplyFakeAcsptConfig,
+	// 	InteractiveSessionCommand_GetFakeAcsptConfigValue,
+	// 	InteractiveSessionCommand_ApplyFakeUsreptConfig,
+	// 	InteractiveSessionCommand_StartFakeAcspt,
+	// 	InteractiveSessionCommand_StopFakeAcspt,
+	// 	InteractiveSessionCommand_StartFakeUsrept,
+	// 	InteractiveSessionCommand_StopFakeUsrept,
+	// 	InteractiveSessionCommand_GetFakeAcsptState,
+	// 	InteractiveSessionCommand_GetFakeAcsptDetail,
+	// 	InteractiveSessionCommand_RunMultiClis
+	// };
+	// static int PRIVILEGE_USER_COMMAND_LIST_LEN = sizeof(PRIVILEGE_USER_COMMAND_LIST) / sizeof(PRIVILEGE_USER_COMMAND_LIST[0]);
+	// for (int i = 0 ; i < PRIVILEGE_USER_COMMAND_LIST_LEN ; i++)
+	// {
+	// 	if (command_type == PRIVILEGE_USER_COMMAND_LIST[i])
+	// 		return true;
+	// }
+	// return false;
+	return CHECK_AUTHORITY(command_type, authority_mask);
 }
 
 void* InteractiveSession::session_thread_handler(void* pvoid)
@@ -398,15 +460,19 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 							goto OUT;
 					    }
 // Some commmands require privilege user
-						if (is_privilege_user_command((int)iter->second))
+					    int command_type = (int)iter->second;
+						if (!check_command_authority(command_type))
 						{
-							if (!is_root)
-							{
-								can_execute = false;
-								WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
-							}
-						}
-						
+							// if (!is_root)
+							// {
+							// 	can_execute = false;
+							// 	WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
+							// }
+							WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s command", authority_mask, GET_AUTHORITY(command_type), argv_inner[0]);
+							static string no_authority_string("No Authority to Execute\n");
+							print_to_console(no_authority_string);
+							can_execute = false;
+						}						
 					}
 					command_line_inner = NULL;
 				}
@@ -687,38 +753,46 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	unsigned short ret = RET_SUCCESS;
 	string usage_string;
 	usage_string += string("====================== Usage ======================\n");
-	usage_string += string("* help\n Description: The usage\n");
-	usage_string += string("* exit\n Description: Exit the session\n");
-	usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
-	usage_string += string("* get_system_info\n Description: Get the system info in the cluster\n");
-	// usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
-	usage_string += string("* start_system_monitor\n Description: Start system monitor in the cluster\n");
-	usage_string += string("* stop_system_monitor\n Description: Stop system monitor in the cluster\n");
-	usage_string += string("  Param: Node ID/IP\n");
-	usage_string += string("    Format 1: Node ID: (ex. 1)\n");
-	usage_string += string("    Format 2: Node IP: (ex. 10.206.24.219)\n");
-	if (is_root)
+	for (int i = 0; i < InteractiveSessionCommandSize; i++)
 	{
-		usage_string += string("* get_simulator_version\n Description: Get simulator version in the cluster\n");
-		usage_string += string("* transfer_simulator_package\n Description: Leader transfers the simulator package to each follower\n");
-		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
-		usage_string += string("* install_simulator\n Description: Install simulator in the cluster\n");
-		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
-		usage_string += string("* apply_fake_acspt_config\n Description: Apply new config to all fake acepts in the cluster\n");
-		usage_string += string("  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)\n");
-		usage_string += string("* get_fake_acspt_config_value\n Description: Get the config value from fake acspts config file\n");
-		usage_string += string("  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)\n");
-		usage_string += string("* apply_fake_usrept_config\n Description: Apply new config to all fake usrepts in the cluster\n");
-		usage_string += string("  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)\n");
-		usage_string += string("* start_fake_acspt\n Description: Start fake acepts in the cluster\n");
-		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts in the cluster\n");
-		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts in the cluster\n");
-		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts in the cluster\n");
-		usage_string += string("* get_fake_acspt_state\n Description: Get the states of all fake acepts in the cluster\n");
-		usage_string += string("* get_fake_acspt_detail\n Description: Get the details of all fake acepts in the cluster\n");
-		usage_string += string("* run_multi_clis\n Description: Run multiple CLI commands at a time\n");
-		usage_string += string("  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)\n");
+		if (CHECK_AUTHORITY(i, authority_mask))
+			usage_string += string("* ") + GET_COMMAND(i) + string("\n Description: ") + GET_DESCRIPTION(i) + string("\n");	
 	}
+	// usage_string += string("* help\n Description: The usage\n");
+	// usage_string += string("* exit\n Description: Exit the session\n");
+	// usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
+	// usage_string += string("* get_system_info\n Description: Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info\n");
+	// if (is_leader)
+	// {
+	// 	// usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
+	// 	usage_string += string("  Param: Node ID/IP\n");
+	// 	usage_string += string("    Format 1: Node ID: (ex. 1)\n");
+	// 	usage_string += string("    Format 2: Node IP: (ex. 10.206.24.219)\n");
+	// 	usage_string += string("* start_system_monitor\n Description: Start system monitor\n");
+	// 	usage_string += string("* stop_system_monitor\n Description: Stop system monitor\n");
+	// 	if (is_root)
+	// 	{
+	// 		usage_string += string("* get_simulator_version\n Description: Get simulator version\n");
+	// 		usage_string += string("* transfer_simulator_package\n Description: Leader transfers the simulator package to each follower\n");
+	// 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
+	// 		usage_string += string("* install_simulator\n Description: Install simulator\n");
+	// 		usage_string += string("  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)\n");
+	// 		usage_string += string("* apply_fake_acspt_config\n Description: Apply new config to all fake acepts\n");
+	// 		usage_string += string("  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)\n");
+	// 		usage_string += string("* get_fake_acspt_config_value\n Description: Get the config value from fake acspts config file\n");
+	// 		usage_string += string("  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)\n");
+	// 		usage_string += string("* apply_fake_usrept_config\n Description: Apply new config to all fake usrepts\n");
+	// 		usage_string += string("  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)\n");
+	// 		usage_string += string("* start_fake_acspt\n Description: Start fake acepts\n");
+	// 		usage_string += string("* stop_fake_acspt\n Description: Stop fake acepts\n");
+	// 		usage_string += string("* start_fake_usrept\n Description: Start fake usrepts\n");
+	// 		usage_string += string("* stop_fake_usrept\n Description: Stop fake usrepts\n");
+	// 		usage_string += string("* get_fake_acspt_state\n Description: Get the states of all fake acepts\n");
+	// 		usage_string += string("* get_fake_acspt_detail\n Description: Get the details of all fake acepts\n");
+	// 		usage_string += string("* run_multi_clis\n Description: Run multiple CLI commands at a time\n");
+	// 		usage_string += string("  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)\n");
+	// 	}
+	// }
 	usage_string += string("===================================================\n");
 
 	ret = print_to_console(usage_string);
@@ -906,6 +980,13 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 unsigned short InteractiveSession::handle_start_system_monitor_command(int argc, char **argv)
 {
 	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n**********************\n\n");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
 	if (system_monitor)
 	{
 		WRITE_ERROR("System monitor is enabled");
@@ -933,6 +1014,13 @@ unsigned short InteractiveSession::handle_start_system_monitor_command(int argc,
 unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, char **argv)
 {
 	static string system_monitor_string("*** System Monitor ***\n STOP\n**********************\n\n");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
 	if (!system_monitor)
 	{
 		WRITE_ERROR("System monitor is disabled");
@@ -1064,7 +1152,7 @@ unsigned short InteractiveSession::handle_install_simulator_command(int argc, ch
 	}
 
 // Send message to the user
-	// print_to_console(string("Install Simulator in the cluster..."));
+	// print_to_console(string("Install Simulator..."));
 // Notify the parent
 	size_t notify_param_size = strlen(argv[1]) + 1;
 	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)argv[1], notify_param_size);
@@ -1087,7 +1175,7 @@ unsigned short InteractiveSession::handle_apply_fake_acspt_config_command(int ar
 	}
 
 // Send message to the user
-	// print_to_console(string("Install Simulator in the cluster..."));
+	// print_to_console(string("Install Simulator..."));
 	const char* new_fake_acspt_config_filepath = (const char*)argv[1];
 	unsigned short ret = RET_SUCCESS;
 // Read the new config
@@ -1132,7 +1220,7 @@ unsigned short InteractiveSession::handle_get_fake_acspt_config_value_command(in
 	}
 
 // Send message to the user
-	// print_to_console(string("Install Simulator in the cluster..."));
+	// print_to_console(string("Install Simulator..."));
 	unsigned short ret = RET_SUCCESS;
 
 	FakeAcsptConfigValueParam fake_acspt_config_value_param;
@@ -1182,7 +1270,7 @@ unsigned short InteractiveSession::handle_apply_fake_usrept_config_command(int a
 	}
 
 // Send message to the user
-	// print_to_console(string("Install Simulator in the cluster..."));
+	// print_to_console(string("Install Simulator..."));
 	const char* new_fake_usrept_config_filepath = (const char*)argv[1];
 	unsigned short ret = RET_SUCCESS;
 // Read the new config
@@ -1249,7 +1337,7 @@ unsigned short InteractiveSession::handle_stop_fake_acspt_command(int argc, char
 	}
 
 // Send message to the user
-	// print_to_console(string("Stop FakeAcspts in the cluster..."));
+	// print_to_console(string("Stop FakeAcspts..."));
 // Notify the parent
 	FakeAcsptControlType fake_acspt_control_type = FAKE_ACSPT_STOP;
 	size_t notify_param_size = sizeof(FakeAcsptControlType);
@@ -1273,7 +1361,7 @@ unsigned short InteractiveSession::handle_start_fake_usrept_command(int argc, ch
 	}
 
 // Send message to the user
-	// print_to_console(string("Start FakeAcspts in the cluster..."));
+	// print_to_console(string("Start FakeAcspts..."));
 // Notify the parent
 	FakeUsreptControlType fake_usrept_control_type = FAKE_USREPT_START;
 	size_t notify_param_size = sizeof(FakeUsreptControlType);
@@ -1297,7 +1385,7 @@ unsigned short InteractiveSession::handle_stop_fake_usrept_command(int argc, cha
 	}
 
 // Send message to the user
-	// print_to_console(string("Stop FakeAcspts in the cluster..."));
+	// print_to_console(string("Stop FakeAcspts..."));
 // Notify the parent
 	FakeUsreptControlType fake_usrept_control_type = FAKE_USREPT_STOP;
 	size_t notify_param_size = sizeof(FakeUsreptControlType);

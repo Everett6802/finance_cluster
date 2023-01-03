@@ -11,8 +11,8 @@
 #include <string>
 #include "common.h"
 
-
 #define SESSION_TAG_SIZE 64
+
 
 class InteractiveSession : public INotify
 {
@@ -46,11 +46,13 @@ private:
 	char session_tag[64];
 	int session_id;
 	bool is_root;
+	bool is_leader;
+	unsigned char authority_mask;
 	bool system_monitor;
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
 	int system_monitor_period;
 
-	static bool is_privilege_user_command(int command_type);
+	bool check_command_authority(int command_type);
 
 	static void* session_thread_handler(void* void_tr);
 	unsigned short session_thread_handler_internal();
