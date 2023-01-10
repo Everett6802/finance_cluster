@@ -313,6 +313,12 @@ const char* InteractiveSession::get_session_tag()const
 	return session_tag;
 }
 
+unsigned short InteractiveSession::print_console(const std::string& console_string)const
+{
+	print_to_console(console_string);
+	return RET_SUCCESS;
+}
+
 bool InteractiveSession::check_command_authority(int command_type)
 {
 	// static InteractiveSessionCommandType PRIVILEGE_USER_COMMAND_LIST[] = 
@@ -679,7 +685,7 @@ void InteractiveSession::multi_clis_thread_cleanup_handler_internal()
 	}
 }
 
-unsigned short InteractiveSession::print_to_console(string response)const
+unsigned short InteractiveSession::print_to_console(const string& response)const
 {
 	const char* response_ptr = response.c_str();
 	int response_size = response.size();

@@ -206,7 +206,7 @@ unsigned short InteractiveServer::init_server()
 // 	return RET_SUCCESS;
 // }
 
-unsigned short InteractiveServer::remove_session(int session_id)
+unsigned short InteractiveServer::close_session(int session_id)
 {
 	unsigned short ret = RET_SUCCESS;
 // Remove the session from the container
@@ -229,6 +229,62 @@ unsigned short InteractiveServer::remove_session(int session_id)
 	delete interactive_session;
 	interactive_session = NULL;	
 	return ret;
+}
+
+unsigned short InteractiveServer::close_all_session()
+{
+	INTERACTIVE_SESSION_ITER iter = interactive_session_map.begin();
+	unsigned short ret = RET_SUCCESS;
+	while(iter != interactive_session_map.end())
+	{
+		PINTERACTIVE_SESSION interactive_session = (PINTERACTIVE_SESSION)(iter->second);
+		iter++;
+		if (interactive_session != NULL)
+		{
+			ret = interactive_session->deinitialize();
+			if (CHECK_FAILURE(ret))
+				WRITE_FORMAT_ERROR("[%s] Fails to cleanup the session[%s], due to %s", interactive_session->get_session_tag(), GetErrorDescription(ret));
+			delete interactive_session;
+			interactive_session = NULL;
+		}
+	}
+	interactive_session_map.clear();
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveServer::print_session(int session_id, const std::string& console_message)const
+{
+	unsigned short ret = RET_SUCCESS;
+// Remove the session from the container
+	pthread_mutex_lock(&session_mtx);
+	INTERACTIVE_SESSION_CONST_ITER const_iter = interactive_session_map.find(session_id);
+	if (const_iter == interactive_session_map.end())
+	{
+		WRITE_FORMAT_ERROR("The Session[%d] does NOT exist", session_id);
+		pthread_mutex_unlock(&session_mtx);
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	pthread_mutex_unlock(&session_mtx);
+
+	InteractiveSession* interactive_session = (InteractiveSession*)const_iter->second;
+	assert(interactive_session != NULL && "interactive_session should NOT be NULL");
+	interactive_session->print_console(console_message);	
+	return ret;
+}
+
+unsigned short InteractiveServer::print_all_session(const std::string& console_message)const
+{
+	pthread_mutex_lock(&session_mtx);
+	INTERACTIVE_SESSION_CONST_ITER const_iter = interactive_session_map.begin();
+	while(const_iter != interactive_session_map.end())
+	{
+		PINTERACTIVE_SESSION interactive_session = (PINTERACTIVE_SESSION)(const_iter->second);
+		assert(interactive_session != NULL && "interactive_session should NOT be NULL");
+		interactive_session->print_console(console_message);
+		const_iter++;
+	}
+	pthread_mutex_unlock(&session_mtx);
+	return RET_SUCCESS;
 }
 
 unsigned short InteractiveServer::initialize(int system_monitor_period_value)
@@ -344,6 +400,13 @@ unsigned short InteractiveServer::deinitialize()
 	return ret;
 }
 
+unsigned short InteractiveServer::print_console(const std::string& console_message)const
+{
+	unsigned short ret = print_all_session(console_message);
+	return ret;
+}
+
+
 InteractiveServer::const_iterator InteractiveServer::begin() 
 {
 	return const_iterator(interactive_session_map.begin());
@@ -421,7 +484,7 @@ unsigned short InteractiveServer::async_handle(NotifyCfg* notify_cfg)
     		// int session_id = *((int*)notify_cfg->get_notify_param());
 			int session_id = ((PNOTIFY_SESSION_EXIT_CFG)notify_cfg)->get_session_id();
 			WRITE_FORMAT_DEBUG("Session[%d] notify the parent to exit", session_id);
-			ret = remove_session(session_id);
+			ret = close_session(session_id);
     	}
     	break;
     	default:
@@ -576,20 +639,21 @@ void InteractiveServer::listen_thread_cleanup_handler(void* pvoid)
 void InteractiveServer::listen_thread_cleanup_handler_internal()
 {
 	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the listen thread......", listen_thread_tag);
-	INTERACTIVE_SESSION_ITER iter = interactive_session_map.begin();
-	unsigned short ret = RET_SUCCESS;
-	while(iter != interactive_session_map.end())
-	{
-		PINTERACTIVE_SESSION interactive_session = (PINTERACTIVE_SESSION)(iter->second);
-		iter++;
-		if (interactive_session != NULL)
-		{
-			ret = interactive_session->deinitialize();
-			if (CHECK_FAILURE(ret))
-				WRITE_FORMAT_ERROR("[%s] Fails to cleanup the session[%s], due to %s", interactive_session->get_session_tag(), GetErrorDescription(ret));
-			delete interactive_session;
-			interactive_session = NULL;
-		}
-	}
-	interactive_session_map.clear();
+	// INTERACTIVE_SESSION_ITER iter = interactive_session_map.begin();
+	// unsigned short ret = RET_SUCCESS;
+	// while(iter != interactive_session_map.end())
+	// {
+	// 	PINTERACTIVE_SESSION interactive_session = (PINTERACTIVE_SESSION)(iter->second);
+	// 	iter++;
+	// 	if (interactive_session != NULL)
+	// 	{
+	// 		ret = interactive_session->deinitialize();
+	// 		if (CHECK_FAILURE(ret))
+	// 			WRITE_FORMAT_ERROR("[%s] Fails to cleanup the session[%s], due to %s", interactive_session->get_session_tag(), GetErrorDescription(ret));
+	// 		delete interactive_session;
+	// 		interactive_session = NULL;
+	// 	}
+	// }
+	// interactive_session_map.clear();
+	close_all_session();
 }

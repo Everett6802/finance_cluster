@@ -474,7 +474,26 @@ unsigned short ClusterMgr::rebuild_cluster()
         		free(cluster_token);
         		cluster_token = NULL;
         	}
+// Switch node's rule. The console should be closed. Notify the user to reconnect... 
+        	static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
+			assert(interactive_server != NULL && "interactive_server should NOT be NULL");
+	        WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s] for switching rule", local_token);
+	        interactive_server->print_console(close_console_message);
+	        usleep(300000);
+			interactive_server->deinitialize();
+			delete interactive_server;
+			interactive_server = NULL;
         	ret = become_leader();
+        	if (CHECK_SUCCESS(ret))
+        	{
+				WRITE_DEBUG("Re-Initialize the session server......");
+				interactive_server = new InteractiveServer(this);
+				if (interactive_server == NULL)
+					throw bad_alloc();
+				ret = interactive_server->initialize(system_monitor_period);
+				if (CHECK_FAILURE(ret))
+					return ret;
+        	}
         }
         else
         {

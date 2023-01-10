@@ -11,6 +11,7 @@ class InteractiveSession;
 typedef std::map<int, InteractiveSession*> INTERACTIVE_SESSION_MAP;
 typedef INTERACTIVE_SESSION_MAP* PINTERACTIVE_SESSION_MAP;
 typedef std::map<int, InteractiveSession*>::iterator INTERACTIVE_SESSION_ITER;
+typedef std::map<int, InteractiveSession*>::const_iterator INTERACTIVE_SESSION_CONST_ITER;
 
 class InteractiveServer : public INotify
 {
@@ -48,10 +49,13 @@ private:
 	pthread_t listen_tid;
 	volatile unsigned short listen_thread_ret;
 
-	pthread_mutex_t session_mtx;
+	mutable pthread_mutex_t session_mtx;
 
 	unsigned short init_server();
-	unsigned short remove_session(int session_id);
+	unsigned short close_session(int session_id);
+	unsigned short close_all_session();
+	unsigned short print_session(int session_id, const std::string& console_message)const;
+	unsigned short print_all_session(const std::string& console_message)const;
 
 	static void* listen_thread_handler(void* pvoid);
 	unsigned short listen_thread_handler_internal();
@@ -81,6 +85,7 @@ public:
 
 	unsigned short initialize(int system_monitor_period_value);
 	unsigned short deinitialize();
+	unsigned short print_console(const std::string& console_message)const;
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);
