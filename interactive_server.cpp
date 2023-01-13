@@ -406,7 +406,6 @@ unsigned short InteractiveServer::print_console(const std::string& console_messa
 	return ret;
 }
 
-
 InteractiveServer::const_iterator InteractiveServer::begin() 
 {
 	return const_iterator(interactive_session_map.begin());

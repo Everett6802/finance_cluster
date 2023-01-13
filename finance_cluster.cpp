@@ -65,7 +65,7 @@ void show_usage_and_exit()
 	PRINT("====================== Usage ======================\n");
 	PRINT("-h|--help\n Description: The usage\n Caution: Other flags are ignored\n");
 	PRINT("-j|--join\n Description: Join a cluster\n Caution: Only for TCP connection");
-	PRINT("-d|--detach\n Description: Detach from the terminal\n");
+	// PRINT("-d|--detach\n Description: Detach from the terminal\n");
 	PRINT("===================================================\n");
 	exit(EXIT_SUCCESS);
 }
@@ -101,11 +101,11 @@ unsigned short parse_param(int argc, char** argv)
 			param_join = argv[index + 1];
 			offset = 2;
 		}
-		else if ((strcmp(argv[index], "--detach") == 0) || (strcmp(argv[index], "-d") == 0))
-		{
-			param_detach = true;
-			offset = 1;
-		}
+		// else if ((strcmp(argv[index], "--detach") == 0) || (strcmp(argv[index], "-d") == 0))
+		// {
+		// 	param_detach = true;
+		// 	offset = 1;
+		// }
 		else
 		{
 			FPRINT(stderr, "Unknown parameter: %s\n", argv[index]);

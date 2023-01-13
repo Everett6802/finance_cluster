@@ -16,6 +16,7 @@ enum InteractiveSessionCommandType
 {
 	InteractiveSessionCommand_Help,
 	InteractiveSessionCommand_Exit,
+	InteractiveSessionCommand_GetRole,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
@@ -61,6 +62,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 {
 	{.command="help", .authority=0X0, .description="The usage"},
 	{.command="exit", .authority=0X0, .description="Exit the session"},
+	{.command="get_role", .authority=0X0, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=0X0, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=0X0, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
@@ -475,8 +477,8 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 							// 	WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
 							// }
 							WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s command", authority_mask, GET_AUTHORITY(command_type), argv_inner[0]);
-							static string no_authority_string("No Authority to Execute\n");
-							print_to_console(no_authority_string);
+							static string no_role_string("No Authority to Execute\n");
+							print_to_console(no_role_string);
 							can_execute = false;
 						}						
 					}
@@ -722,6 +724,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 	{
 		&InteractiveSession::handle_help_command,
 		&InteractiveSession::handle_exit_command,
+		&InteractiveSession::handle_get_role_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
@@ -799,7 +802,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	// 		usage_string += string("  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)\n");
 	// 	}
 	// }
-	usage_string += string("===================================================\n");
+	usage_string += string("===================================================\n\n");
 
 	ret = print_to_console(usage_string);
 	return ret;
@@ -827,6 +830,29 @@ unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 // Asynchronous event
 	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_get_role_command(int argc, char **argv)
+{
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	string role_string;
+	if (is_leader)
+	{
+		role_string = "Leader";
+		if (is_root)
+			role_string += string("(Root)");
+	}
+	else
+		role_string = "Follower";
+
+	role_string += string("\n\n");
+	print_to_console(role_string);
 	return RET_SUCCESS;
 }
 
