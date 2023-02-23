@@ -61,10 +61,11 @@ private:
 	unsigned short become_follower(bool need_rebuild_cluster=false);
 	// unsigned short start_connection();
 	unsigned short stop_connection();
-	unsigned short rebuild_cluster();
+	unsigned short rebuild_cluster(int new_leader_node_id=-1);
 	unsigned short initialize_components(bool local_follower=false);
 	void check_keepalive();
 	void dump_interactive_session_data_list(int session_id)const;
+	unsigned short close_console();
 
 public:
 	ClusterMgr();

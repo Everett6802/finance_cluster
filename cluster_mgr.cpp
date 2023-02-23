@@ -417,7 +417,20 @@ unsigned short ClusterMgr::stop_connection()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::rebuild_cluster()
+unsigned short ClusterMgr::close_console()
+{
+	static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
+	assert(interactive_server != NULL && "interactive_server should NOT be NULL");
+	WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", local_token);
+	interactive_server->print_console(close_console_message);
+	usleep(300000);
+	interactive_server->deinitialize();
+	delete interactive_server;
+	interactive_server = NULL;
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 {
 	if (node_type == LEADER)
 	{
@@ -436,14 +449,6 @@ unsigned short ClusterMgr::rebuild_cluster()
 		WRITE_FORMAT_ERROR("The cluster map in Follower[%s] is empty", local_token);
 		return RET_FAILURE_RUNTIME;
 	}
-// Pops up the first node: Leader
-	int first_node_id;
-	std::string first_node_token;
-	ret = cluster_map.get_first_node(first_node_id, first_node_token);
-	if (CHECK_FAILURE(ret))
-		return ret;
-	string cluster_token_string(cluster_token);
-	assert(strcmp(first_node_token.c_str(), cluster_token) == 0 && "The first node in cluster should be Leader");
 // Get the node ID from the follower
 	int node_id;
     ret = cluster_node->get(PARAM_NODE_ID, (void*)&node_id);
@@ -453,61 +458,80 @@ unsigned short ClusterMgr::rebuild_cluster()
 	ret = stop_connection();
 	if (CHECK_FAILURE(ret))
 		return ret;
-// Try to re-establish the cluster from the cluster map
-    while (!cluster_map.is_empty())
-    {
-    	int leader_candidate_node_id;
-        string leader_candidate_node_token;
-        ret = cluster_map.get_first_node(leader_candidate_node_id, leader_candidate_node_token);
+
+// Pops up the first node: Leader
+	int first_node_id;
+	std::string first_node_token;
+	ret = cluster_map.get_first_node(first_node_id, first_node_token);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	string cluster_token_string(cluster_token);
+	assert(strcmp(first_node_token.c_str(), cluster_token) == 0 && "The first node in cluster should be Leader");
+	assert(!cluster_map.is_empty() && "Cluster map should NOT be empty");
+
+	if (new_leader_node_id != -1)
+	{
+// User assign a specific FOLLOWER as the new LEADER. 
+// Modify the cluster map, so that the sepecific FOLLOWER becoms the leader candidate
+        ret = cluster_map.set_first_node(new_leader_node_id);
         if (CHECK_FAILURE(ret))
         {
-        	WRITE_ERROR("Fails to get the candidate of the Leader");
+        	WRITE_FORMAT_ERROR("Fails to set the new Leader: %d in the cluster map, due to: %s", new_leader_node_id, GetErrorDescription(ret));
         	return ret;
         }
-        // fprintf(stderr, "ID: %d candidate: id: %d, ip: %s\n", node_id, leader_candidate_node_id, leader_candidate_node_ip.c_str());
-        if (leader_candidate_node_id == node_id)
-        {
-// Leader
-	        WRITE_FORMAT_DEBUG("Node[%s] try to becomme the Leader in the Cluster......", local_token);
-        	if (cluster_token != NULL)
-        	{
-        		free(cluster_token);
-        		cluster_token = NULL;
-        	}
-// Switch node's rule. The console should be closed. Notify the user to reconnect... 
-        	static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
-			assert(interactive_server != NULL && "interactive_server should NOT be NULL");
-	        WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s] for switching rule", local_token);
-	        interactive_server->print_console(close_console_message);
-	        usleep(300000);
-			interactive_server->deinitialize();
-			delete interactive_server;
-			interactive_server = NULL;
-        	ret = become_leader();
-        	if (CHECK_SUCCESS(ret))
-        	{
-				WRITE_DEBUG("Re-Initialize the session server......");
-				interactive_server = new InteractiveServer(this);
-				if (interactive_server == NULL)
-					throw bad_alloc();
-				ret = interactive_server->initialize(system_monitor_period);
-				if (CHECK_FAILURE(ret))
-					return ret;
-        	}
-        }
-        else
-        {
-// Follower
-	        WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", local_token, cluster_token);
-			if (cluster_token != NULL)
-				free(cluster_token);
-			cluster_token = strdup(leader_candidate_node_token.c_str());
-        	ret = become_follower(true);
-	        if (IS_TRY_CONNECTION_TIMEOUT(ret))
-	        	continue;
-        }
-        break;
+	}
+// In algorithm, select the fisrt FOLLOWER as the next new LEADER
+    int leader_candidate_node_id;
+    string leader_candidate_node_token;
+    ret = cluster_map.get_first_node(leader_candidate_node_id, leader_candidate_node_token);
+    if (CHECK_FAILURE(ret))
+    {
+       	WRITE_ERROR("Fails to get the candidate of the Leader in the cluster map");
+        return ret;
     }
+
+// Try to re-establish the cluster from the cluster map
+        // fprintf(stderr, "ID: %d candidate: id: %d, ip: %s\n", node_id, leader_candidate_node_id, leader_candidate_node_ip.c_str());
+    if (leader_candidate_node_id == node_id)
+    {
+// Leader
+		WRITE_FORMAT_DEBUG("Node[%s] try to becomme the Leader in the Cluster......", local_token);
+		if (cluster_token != NULL)
+		{
+        	free(cluster_token);
+        	cluster_token = NULL;
+		}
+// Switch node's rule. The console should be closed. Notify the user to reconnect the console...
+		close_console();
+// Switch to leader and re-initialize the required components
+		ret = become_leader();
+		if (CHECK_SUCCESS(ret))
+		{
+        	assert(interactive_server == NULL && "interactive_server should be NULL");
+        	WRITE_DEBUG("Re-Initialize the session server......");
+        	interactive_server = new InteractiveServer(this);
+        	if (interactive_server == NULL)
+				throw bad_alloc();
+        	ret = interactive_server->initialize(system_monitor_period);
+        	if (CHECK_FAILURE(ret))
+				return ret;
+		}
+    }
+    else
+    {
+// Follower
+	    WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", local_token, cluster_token);
+		srand((unsigned)time(NULL));
+		int rand_num = rand() % 13 + 1;
+		usleep(rand_num * 100000);
+		if (cluster_token != NULL)
+			free(cluster_token);
+		cluster_token = strdup(leader_candidate_node_token.c_str());
+		ret = become_follower(true);
+        if (CHECK_FAILURE(ret))
+			return ret;
+    }
+
 	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
 	if (local_cluster && node_type == LEADER)
 	{
@@ -1037,6 +1061,19 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		*((NodeType*)param1) = node_type;
+    	}
+    	break;
+    	case PARAM_CLUSTER_MAP:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		PCLUSTER_MAP cluster_map = (ClusterMap*)param1;
+ 		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)cluster_map);
+			if (CHECK_FAILURE(ret))
+				return ret;
     	}
     	break;
     	case PARAM_CLUSTER_DETAIL:
@@ -2078,6 +2115,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_SWITCH_LEADER:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the notification of switching leader for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2209,7 +2257,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	case NOTIFY_COMPLETE_FILE_TRANSFER:
     	{
     		PNOTIFY_FILE_TRANSFER_COMPLETE_CFG notify_file_transfer_complete_cfg = (PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg;
-			// assert(notify_system_info_cfg != NULL && "notify_system_info_cfg should NOT be NULL");ri
+			// assert(notify_system_info_cfg != NULL && "notify_system_info_cfg should NOT be NULL");
 // Caution: Required to add reference count, since another thread will access it
 			notify_file_transfer_complete_cfg->addref(__FILE__, __LINE__);
 			int session_id = notify_file_transfer_complete_cfg->get_session_id();
@@ -2224,6 +2272,52 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
 			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+    	}
+    	break;
+    	case NOTIFY_SWITCH_LEADER:
+    	{
+    		PNOTIFY_SWITCH_LEADER_CFG notify_switch_leader_cfg = (PNOTIFY_SWITCH_LEADER_CFG)notify_cfg;
+    		int leader_candidate_node_id = notify_switch_leader_cfg->get_node_id();
+    		if (node_type == LEADER)
+    		{
+				ClusterMap cluster_map;
+			    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				string leader_candidate_node_token;
+			    ret = cluster_map.get_node_token(leader_candidate_node_id, leader_candidate_node_token);
+				if (CHECK_FAILURE(ret))
+					return ret;
+// Notify the Followers to rebuild the cluster
+				ret = cluster_node->send(MSG_SWITCH_LEADER, (void*)&leader_candidate_node_id);
+				if (CHECK_FAILURE(ret))
+					return ret;
+// Leader stop connection
+				ret = stop_connection();
+				if (CHECK_FAILURE(ret))
+					return ret;
+// Leader switch role to Follower and join the new cluster
+				if (cluster_token != NULL)
+					free(cluster_token);
+				cluster_token = strdup(leader_candidate_node_token.c_str());
+				ret = become_follower(true);
+		        if (CHECK_FAILURE(ret))
+					return ret;
+    		}
+    		else if (node_type == FOLLOWER)
+    		{
+    			ret = rebuild_cluster(leader_candidate_node_id);
+				if (CHECK_FAILURE(ret))
+				{
+					WRITE_FORMAT_ERROR("Rebuild cluster fails while switching rule, due to: %s", GetErrorDescription(ret));
+					return ret;
+				}
+    		}
+    		else
+    		{
+				WRITE_FORMAT_ERROR("Unknown node type: %d while switching rule", node_type);
+				return RET_FAILURE_INCORRECT_OPERATION;    			
+    		}
     	}
     	break;
     	default:

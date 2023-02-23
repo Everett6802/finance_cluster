@@ -60,6 +60,7 @@ private:
 	unsigned short recv_get_fake_acspt_detail(const std::string& message_data);
 	unsigned short recv_request_file_transfer(const std::string& message_data);
 	unsigned short recv_complete_file_transfer(const std::string& message_data);
+	unsigned short recv_switch_leader(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
@@ -76,6 +77,7 @@ private:
 	unsigned short send_get_fake_acspt_detail(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_switch_leader(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 
 public:
 	FollowerNode(PIMANAGER parent, const char* server_token=NULL, const char* token=NULL);  // server_token/token is NULL for local cluster

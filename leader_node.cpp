@@ -709,7 +709,8 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		&LeaderNode::recv_get_fake_acspt_state,
 		&LeaderNode::recv_get_fake_acspt_detail,
 		&LeaderNode::recv_request_file_transfer,
-		&LeaderNode::recv_complete_file_transfer
+		&LeaderNode::recv_complete_file_transfer,
+		&LeaderNode::recv_switch_leader
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -740,7 +741,8 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_fake_acspt_state,
 		&LeaderNode::send_get_fake_acspt_detail,
 		&LeaderNode::send_request_file_transfer,
-		&LeaderNode::send_complete_file_transfer
+		&LeaderNode::send_complete_file_transfer,
+		&LeaderNode::send_switch_leader
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -883,6 +885,8 @@ unsigned short LeaderNode::recv_complete_file_transfer(const std::string& messag
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
+
+unsigned short LeaderNode::recv_switch_leader(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -1181,6 +1185,26 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	return send_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
 }
 
+unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: leader candidate node id
+// Message format:
+// EventType | text | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	static const int BUF_SIZE = sizeof(int) + 1;
+	int leader_candidate_node_id = *(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
+
+	return send_data(MSG_SWITCH_LEADER, buf);
+}
+
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -1269,9 +1293,9 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
-            pthread_mutex_lock(&node_channel_mtx);
-            ret = cluster_map_param.copy(cluster_map);
-            pthread_mutex_unlock(&node_channel_mtx);
+         pthread_mutex_lock(&node_channel_mtx);
+         ret = cluster_map_param.copy(cluster_map);
+         pthread_mutex_unlock(&node_channel_mtx);
     	}
     	break;
     	case PARAM_CLUSTER_NODE_AMOUNT:
@@ -1315,7 +1339,7 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
          pthread_mutex_unlock(&node_channel_mtx);
     	}
     	break;
-      	case PARAM_NODE_ID:
+      case PARAM_NODE_ID:
     	{
     		if (param1 == NULL)
     		{

@@ -250,8 +250,6 @@ NodeMessageParser::~NodeMessageParser()
 	}
 }
 
-
-
 unsigned short NodeMessageParser::add(const char* new_message)
 {
 	if (full_message_found)
@@ -528,7 +526,7 @@ unsigned short ClusterMap::add_node(const char* node_id_token_str)
 
 unsigned short ClusterMap::delete_node(int node_id)
 {
-	ClusterNode delete_node(node_id, string(""));
+	// ClusterNode delete_node(node_id, string(""));
 // Does NOT work !!!
 	// list<ClusterNode*>::iterator iter_find = find(cluster_map.begin(), cluster_map.end(), &delete_nodeClusterNode(node_id, string("")));
 	// if (iter_find == cluster_map.end())
@@ -591,6 +589,66 @@ unsigned short ClusterMap::cleanup_node()
 		delete cluster_node;
 	}
 	cluster_map.clear();
+	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::set_first_node(const int first_node_id)
+{
+// Find the node
+	bool found = false;
+	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+// The designated node is already the first node, it's no need to move the nodes in the list
+	if (((ClusterNode*)*iter_find)->node_id == first_node_id)
+		return RET_SUCCESS;
+	iter_find++;
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_id == first_node_id)
+		{
+// Delete the node
+			cluster_map.erase(iter_find);
+// Insert the node in the head of the list
+			cluster_map.push_front(cluster_node);
+			found = true;
+			break;
+		}
+		iter_find++;
+	}
+	if (!found)
+		return RET_FAILURE_NOT_FOUND;
+
+	reset_cluster_map_str();
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMap::set_first_node_token(const std::string& first_node_token)
+{
+// Find the node
+	bool found = false;
+	list<ClusterNode*>::iterator iter_find = cluster_map.begin();
+// The designated node is already the first node, it's no need to move the nodes in the list
+	if (((ClusterNode*)*iter_find)->node_token == first_node_token)
+		return RET_SUCCESS;
+	iter_find++;
+	while(iter_find != cluster_map.end())
+	{
+		ClusterNode* cluster_node = (ClusterNode*)*iter_find;
+		if (cluster_node->node_token == first_node_token)
+		{
+// Delete the node
+			cluster_map.erase(iter_find);
+// Insert the node in the head of the list
+			cluster_map.push_front(cluster_node);
+			found = true;
+			break;
+		}
+		iter_find++;
+	}
+	if (!found)
+		return RET_FAILURE_NOT_FOUND;
+
 	reset_cluster_map_str();
 	return RET_SUCCESS;
 }
@@ -1586,6 +1644,23 @@ NotifySendFileDoneCfg::~NotifySendFileDoneCfg()
 const char* NotifySendFileDoneCfg::get_remote_token()const
 {
 	return remote_token;
+}
+
+//////////////////////////////////////////////////////////
+
+NotifySwitchLeaderCfg::NotifySwitchLeaderCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_SWITCH_LEADER, param, param_size)
+{
+	// printf("NotifyFileTransferAbortCfg()\n");
+	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	node_id = *(int*)notify_param;
+}
+
+NotifySwitchLeaderCfg::~NotifySwitchLeaderCfg(){}
+
+int NotifySwitchLeaderCfg::get_node_id()const
+{
+	return node_id;
 }
 
 //////////////////////////////////////////////////////////

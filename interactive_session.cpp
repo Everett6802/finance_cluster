@@ -35,6 +35,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetFakeAcsptState,
 	InteractiveSessionCommand_GetFakeAcsptDetail,
 	InteractiveSessionCommand_RunMultiClis,
+	InteractiveSessionCommand_SwitchLeader,
 	InteractiveSessionCommandSize
 };
 
@@ -79,7 +80,8 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="stop_fake_usrept", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Stop fake usrepts"},
 	{.command="get_fake_acspt_state", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the states of all fake acepts"},
 	{.command="get_fake_acspt_detail", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the details of all fake acepts"},
-	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"}
+	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
+	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"}
 };
 
 // static const char *interactive_session_command[InteractiveSessionCommandSize] = 
@@ -742,7 +744,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_stop_fake_usrept_command,
 		&InteractiveSession::handle_get_fake_acspt_state_command,
 		&InteractiveSession::handle_get_fake_acspt_detail_command,
-		&InteractiveSession::handle_run_multi_clis_command
+		&InteractiveSession::handle_run_multi_clis_command,
+		&InteractiveSession::handle_switch_leader_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -876,6 +879,10 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
     ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
 	if (CHECK_FAILURE(ret))
 		return ret;
+	// ClusterMap cluster_map;
+	// ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	// if (CHECK_FAILURE(ret))
+	// 	return ret;
 // Print data in cosole
 	string cluster_detail_string(CLUSTER_DETAIL_TITLE);
 	ClusterMap::const_iterator iter = cluster_detail_param.cluster_map.begin();
@@ -925,11 +932,15 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 		 	if (CHECK_FAILURE(ret))
 				return ret;
 		    // SAFE_RELEASE(notify_cfg)
-			ClusterDetailParam cluster_detail_param;
-		    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+			// ClusterDetailParam cluster_detail_param;
+		 //    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+			// if (CHECK_FAILURE(ret))
+			// 	return ret;
+			// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+			ClusterMap cluster_map;
+		    ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 			map<int, string>& cluster_data_map = cluster_system_info_param.cluster_data_map;
 	// Print data in cosole
@@ -1095,11 +1106,15 @@ unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int
 		return ret;
     // SAFE_RELEASE(notify_cfg)
 // Wait for transferring done...
-	ClusterDetailParam cluster_detail_param;
-	ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+	// ClusterDetailParam cluster_detail_param;
+	// ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+	// if (CHECK_FAILURE(ret))
+	// 	return ret;
+	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+	ClusterMap cluster_map;
+	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 	if (CHECK_FAILURE(ret))
 		return ret;
-	ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 	char buf[DEF_STRING_SIZE];
 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
@@ -1143,11 +1158,15 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
     // SAFE_RELEASE(notify_cfg)
 	if (CHECK_SUCCESS(ret))
 	{
-		ClusterDetailParam cluster_detail_param;
-	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// ClusterDetailParam cluster_detail_param;
+	 //    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// if (CHECK_FAILURE(ret))
+		// 	return ret;
+		// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+		ClusterMap cluster_map;
+	    ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_STRING_SIZE];
 		map<int, string>& cluster_simulator_version_map = cluster_simulator_version_param.cluster_data_map;
@@ -1449,11 +1468,15 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
     // SAFE_RELEASE(notify_cfg)
 	if (CHECK_SUCCESS(ret))
 	{
-		ClusterDetailParam cluster_detail_param;
-	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// ClusterDetailParam cluster_detail_param;
+	 //    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// if (CHECK_FAILURE(ret))
+		// 	return ret;
+		// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+		ClusterMap cluster_map;
+	    ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_VERY_LONG_STRING_SIZE];
 		map<int, string>& cluster_fake_acspt_state_map = cluster_fake_acspt_state_param.cluster_data_map;
@@ -1498,11 +1521,15 @@ unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc
     // SAFE_RELEASE(notify_cfg)
 	if (CHECK_SUCCESS(ret))
 	{
-		ClusterDetailParam cluster_detail_param;
-	    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// ClusterDetailParam cluster_detail_param;
+	 //    ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+		// if (CHECK_FAILURE(ret))
+		// 	return ret;
+		// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+		ClusterMap cluster_map;
+	    ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		ClusterMap& cluster_map = cluster_detail_param.cluster_map;
 
 		char buf[DEF_VERY_SHORT_STRING_SIZE];
 		map<int, string>& cluster_fake_acspt_detail_map = cluster_fake_acspt_detail_param.cluster_data_map;
@@ -1589,6 +1616,52 @@ unsigned short InteractiveSession::handle_run_multi_clis_command(int argc, char 
 		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of running multiple CLIs's death, due to: %s", GetErrorDescription(multi_clis_thread_ret));
 		ret = multi_clis_thread_ret;
 	}
+
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_switch_leader_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+// Notify the parent
+	int node_id = atoi(argv[1]);
+// Before switching leader, check if the node exists
+	ClusterMap cluster_map;
+	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (cluster_map.size() == 1)
+	{
+		print_to_console(string("Only single node in the cluster. Switching leader does NOT take effect\n"));
+		return RET_WARN_INTERACTIVE_COMMAND;		
+	}
+	bool found = false;
+	ret = cluster_map.check_exist_by_node_id(node_id, found);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (!found)
+	{
+		char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Fails to switch unknown node[%d] to leader\n", node_id);
+		WRITE_ERROR(buf);
+		print_to_console(string(buf));
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	size_t notify_param_size = sizeof(int);
+	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&node_id , notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	ret = observer->notify(NOTIFY_SWITCH_LEADER, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
 
 	return ret;
 }

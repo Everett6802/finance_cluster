@@ -207,16 +207,17 @@ enum MessageType{
 	MSG_GET_FAKE_ACSPT_DETAIL, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Leader -> Follower
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
 };
 
 enum ParamType{
-	PARAM_CLUSTER_MAP,
 	PARAM_CLUSTER_NODE_AMOUNT,
 	PARAM_CLUSTER_TOKEN2ID,
 	PARAM_CLUSTER_ID2TOKEN,
 	PARAM_NODE_TYPE,
 	PARAM_NODE_ID,
+	PARAM_CLUSTER_MAP,
 	PARAM_CONNECTION_RETRY,
 	PARAM_LOCAL_CLUSTER,
 	PARAM_CLUSTER_DETAIL,
@@ -253,6 +254,7 @@ enum NotifyType{
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SEND_FILE_DONE,
+	NOTIFY_SWITCH_LEADER,
 	NOTIFY_SIZE
 };
 
@@ -485,6 +487,8 @@ public:
 	unsigned short delete_node_by_token(std::string node_token);
 	unsigned short pop_node(ClusterNode** first_node);
 	unsigned short cleanup_node();
+	unsigned short set_first_node(const int first_node_id);
+	unsigned short set_first_node_token(const std::string& first_node_token);
 	unsigned short get_first_node(int& first_node_id, std::string& first_node_token, bool peek_only=false);
 	unsigned short get_first_node_token(std::string& first_node_token, bool peek_only=false);
 	unsigned short get_node_id(const std::string& node_token, int& node_id)const;
@@ -497,6 +501,7 @@ public:
 	unsigned short from_string(const char* cluster_map_str);
 	// unsigned short from_object(const ClusterMap& cluster_map_obj);
 };
+typedef ClusterMap* PCLUSTER_MAP;
 
 ///////////////////////////////////////////////////
 
@@ -981,6 +986,21 @@ public:
 	const char* get_remote_token()const;
 };
 typedef NotifySendFileDoneCfg* PNOTIFY_SEND_FILE_DONE_CFG;
+
+///////////////////////////
+
+class NotifySwitchLeaderCfg : public NotifyCfg
+{
+private:
+	int node_id;
+
+public:
+	NotifySwitchLeaderCfg(const void* param, size_t param_size);
+	virtual ~NotifySwitchLeaderCfg();
+
+	int get_node_id()const;
+};
+typedef NotifySwitchLeaderCfg* PNOTIFY_SWITCH_LEADER_CFG;
 
 ///////////////////////////////////////////////////
 
