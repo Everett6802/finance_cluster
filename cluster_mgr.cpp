@@ -108,10 +108,11 @@ unsigned short ClusterMgr::parse_config()
 		}
 		else
 		{
-			static const int ERRMSG_SIZE = 64;
-			char errmsg[ERRMSG_SIZE];
-			snprintf(errmsg, ERRMSG_SIZE, "Unknown config field: %s", conf_name);
-			throw invalid_argument(errmsg);
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown config field: %s", conf_name);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+			throw invalid_argument(buf);
 		}
 
 		if (line_tmp != NULL)
@@ -1040,7 +1041,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1809,7 +1810,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1936,7 +1937,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			    		static const int BUF_SIZE = 256;
 			    		char buf[BUF_SIZE];
 			    		snprintf(buf, BUF_SIZE, "Unknown usrept config type: %d", usrept_config_type);
-			    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+			    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
 			    		throw std::invalid_argument(buf);
 					}
 					break;
@@ -1990,7 +1991,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		    		static const int BUF_SIZE = 256;
 		    		char buf[BUF_SIZE];
 		    		snprintf(buf, BUF_SIZE, "Unknown simulator acspt control type: %d", fake_acspt_control_type);
-		    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+		    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
 		    		throw std::invalid_argument(buf);
 				}
 				break;
@@ -2034,6 +2035,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		    		static const int BUF_SIZE = 256;
 		    		char buf[BUF_SIZE];
 		    		snprintf(buf, BUF_SIZE, "Unknown simulator ue control type: %d", fake_usrept_control_type);
+		    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
 		    		throw std::invalid_argument(buf);
 				}
 				break;
@@ -2131,7 +2133,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -2325,7 +2327,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

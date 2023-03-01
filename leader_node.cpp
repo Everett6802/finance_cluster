@@ -1272,7 +1272,7 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1359,7 +1359,7 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1397,7 +1397,7 @@ unsigned short LeaderNode::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1437,7 +1437,7 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

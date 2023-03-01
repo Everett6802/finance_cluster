@@ -529,6 +529,11 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 		WRITE_FORMAT_ERROR("Fails to update the cluster map in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
 		goto OUT;
 	}
+	if (cluster_id == 0)
+	{
+		cluster_map.get_last_node_id(cluster_id);
+		WRITE_FORMAT_DEBUG("Update Follower cluster ID: %d", cluster_id);
+	}
 OUT:
 	pthread_mutex_unlock(&cluster_map_mtx);
 	return ret;
@@ -1072,7 +1077,7 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1123,7 +1128,7 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1161,7 +1166,7 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1192,7 +1197,7 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

@@ -1684,7 +1684,7 @@ unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_p
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1705,6 +1705,7 @@ unsigned short InteractiveSession::async_handle(NotifyCfg* notify_cfg)
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
     		// fprintf(stderr, "%s in InteractiveSession::async_handle()", buf);
+		    fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

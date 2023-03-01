@@ -427,6 +427,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     	case NOTIFY_APPLY_FAKE_USREPT_CONFIG:
       	case NOTIFY_CONTROL_FAKE_ACSPT:
       	case NOTIFY_CONTROL_FAKE_USREPT:
+      	case NOTIFY_SWITCH_LEADER:
     	{
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
@@ -454,7 +455,6 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     		// 	WRITE_FORMAT_ERROR("The config of the notify_type[%d] should NOT be NULL", notify_type);
     		// 	return RET_FAILURE_INVALID_ARGUMENT;
     		// }
-// Asynchronous event for Leader; Synchronous event for Follower
     		ret = notify_thread->add_event(notify_cfg);
     	}
     	break;
@@ -463,7 +463,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -492,6 +492,7 @@ unsigned short InteractiveServer::async_handle(NotifyCfg* notify_cfg)
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
     		// fprintf(stderr, "%s in InteractiveServer::async_handle()", buf);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
