@@ -580,6 +580,12 @@ unsigned short LeaderNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
 	// void* status;
+	ret = stop_file_transfer();
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_ERROR("Fails to stop file transfer, due to: %s", GetErrorDescription(ret));
+	}
+
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&listen_exit, 1);
 	// sleep(1);

@@ -2122,7 +2122,6 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 
-     		assert(node_type == LEADER && "node type should be LEADER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		WRITE_DEBUG("Receive the notification of switching leader for session......");
     		ret = notify_thread->add_event(notify_cfg);
@@ -2301,6 +2300,8 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 // Leader switch role to Follower and join the new cluster
 				if (cluster_token != NULL)
 					free(cluster_token);
+				close_console();
+				WRITE_FORMAT_DEBUG("Leader -> Follower, re-connect to new Leader[%d: %s]", leader_candidate_node_id, leader_candidate_node_token.c_str());
 				cluster_token = strdup(leader_candidate_node_token.c_str());
 				ret = become_follower(true);
 		        if (CHECK_FAILURE(ret))

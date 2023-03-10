@@ -1659,7 +1659,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&node_id , notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
-// Asynchronous event
+// Asynchronous event: Synchronous in InteractiveServer and Asynchronous in ClusterManager
 	ret = observer->notify(NOTIFY_SWITCH_LEADER, notify_cfg);
     SAFE_RELEASE(notify_cfg)
 
