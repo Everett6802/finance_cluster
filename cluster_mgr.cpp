@@ -2306,6 +2306,14 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 				ret = become_follower(true);
 		        if (CHECK_FAILURE(ret))
 					return ret;
+	        	assert(interactive_server == NULL && "interactive_server should be NULL");
+	        	WRITE_DEBUG("Re-Initialize the session server due to role switch...");
+	        	interactive_server = new InteractiveServer(this);
+	        	if (interactive_server == NULL)
+					throw bad_alloc();
+	        	ret = interactive_server->initialize(system_monitor_period);
+	        	if (CHECK_FAILURE(ret))
+					return ret;
     		}
     		else if (node_type == FOLLOWER)
     		{

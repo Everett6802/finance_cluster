@@ -2003,6 +2003,8 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 		WRITE_FORMAT_DEBUG("[%s] Get the data of system monitor", monitor_system_timer_thread_tag);
 // Get the data
 		string system_monitor_string;
+		string curtime_str;
+		get_curtime_str(curtime_str);
 		switch (node_type)
 		{
 			case LEADER:
@@ -2021,8 +2023,6 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 				map<int, string>& cluster_data_map = cluster_system_monitor_param.cluster_data_map;
 // Print data in cosole
 				system_monitor_string = string("*** System Monitor ***\n");
-				string curtime_str;
-				get_curtime_str(curtime_str);
 				system_monitor_string += string(" @ ") + curtime_str + string("\n**********************\n\n");
 
 				map<int, string>::iterator iter = cluster_data_map.begin();
@@ -2050,6 +2050,7 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 			 	if (CHECK_FAILURE(ret))
 					return ret;
 				system_monitor_string = string("*** System Monitor (Local) ***\n");
+				system_monitor_string += string(" @ ") + curtime_str + string("\n**********************\n\n");
 				system_monitor_string += system_monitor_param.system_monitor_data;
 				system_monitor_string += string("\n**********\n");
 			}
