@@ -71,6 +71,7 @@ private:
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_system_info_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
+	unsigned short handle_get_configuration_setup_command(int argc, char **argv);
 	unsigned short handle_start_system_monitor_command(int argc, char **argv);
 	unsigned short handle_stop_system_monitor_command(int argc, char **argv);
 	unsigned short handle_get_simulator_version_command(int argc, char **argv);

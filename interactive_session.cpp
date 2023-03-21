@@ -20,6 +20,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
+	InteractiveSessionCommand_GetConfigurationSetupInfo,
 	InteractiveSessionCommand_StartSystemMonitor,
 	InteractiveSessionCommand_StopSystemMonitor,
 	InteractiveSessionCommand_GetSimulatorVersion,
@@ -65,6 +66,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_role", .authority=0X0, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=0X0, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=0X0, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info"},
+	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
@@ -728,6 +730,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
+		&InteractiveSession::handle_get_configuration_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
 		&InteractiveSession::handle_stop_system_monitor_command,
 		&InteractiveSession::handle_get_simulator_version_command,
@@ -1009,6 +1012,17 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 // 	return RET_SUCCESS;
 // }
 
+unsigned short InteractiveSession::handle_get_configuration_setup_command(int argc, char **argv)
+{
+	unsigned short ret = RET_SUCCESS;
+	string configuration_setup_string;
+	ret = manager->get(PARAM_CONFIGURATION_SETUP, (void*)&configuration_setup_string);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	print_to_console(configuration_setup_string);
+	return RET_SUCCESS;
+}
+
 unsigned short InteractiveSession::handle_start_system_monitor_command(int argc, char **argv)
 {
 	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n**********************\n\n");
@@ -1039,7 +1053,7 @@ unsigned short InteractiveSession::handle_start_system_monitor_command(int argc,
 		return ret;
 	}
 	system_monitor = true;
-	ret = print_to_console(system_monitor_string);
+	print_to_console(system_monitor_string);
 	return RET_SUCCESS;
 }
 

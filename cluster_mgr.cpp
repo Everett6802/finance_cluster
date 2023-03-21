@@ -1272,6 +1272,46 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 //     		}
 //     	}
 //     	break;
+    	case PARAM_CONFIGURATION_SETUP:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		string& configuration_setup_string = *(string*)param1;
+			list<string> conf_line_list;
+			ret = read_config_file_lines(conf_line_list, FINANCE_CLUSTER_CONF_FILENAME);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			list<string>::iterator iter = conf_line_list.begin();
+			while (iter != conf_line_list.end())
+			{
+				string line = (string)*iter;
+				char* line_tmp = strdup(line.c_str());
+				char* conf_name = strtok(line_tmp, "=");
+				if (conf_name == NULL)
+				{
+					WRITE_FORMAT_ERROR("Incorrect configuration name: %s", line_tmp);
+					return RET_FAILURE_INCORRECT_CONFIG;
+				}
+				char* conf_value = strtok(NULL, "=");
+				if (conf_value == NULL)
+				{
+					WRITE_FORMAT_ERROR("Incorrect configuration value: %s", line_tmp);
+					return RET_FAILURE_INCORRECT_CONFIG;
+				}
+				configuration_setup_string += (string(conf_name) + string(": ") + string(conf_value) + string("\n"));
+				if (line_tmp != NULL)
+				{
+					free(line_tmp);
+					line_tmp = NULL;
+				}
+				iter++;
+			}
+			configuration_setup_string += string("\n");
+    	}
+    	break;
     	case PARAM_SYSTEM_MONITOR:
     	{
         	if (param1 == NULL)
