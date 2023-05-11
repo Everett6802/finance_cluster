@@ -188,8 +188,8 @@ unsigned short FollowerNode::become_follower()
 			return ret;
 	}
 
-	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_token);
-	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
+	WRITE_FORMAT_INFO("Node[%s] is Follower", local_token);
+	printf("Node[%s] is Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
 
 	return ret;
 }

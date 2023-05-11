@@ -456,6 +456,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 						}
 					}
 // Send the message to the observer
+					// fprintf(stderr, "Check !!!\n");
 					// fprintf(stderr, "===> recv: message: (%d, %s)\n", node_message_parser.get_message_type(), node_message_parser.get_message());
 					ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
 					if (CHECK_FAILURE(ret))

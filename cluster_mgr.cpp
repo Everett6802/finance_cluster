@@ -15,6 +15,12 @@
 
 using namespace std;
 
+static unsigned char COMPONENT_MASK_INTERACTIVE_SESSION = 0x1 << 0;
+static unsigned char COMPONENT_MASK_SIMULATOR_HANDLER = 0x1 << 1;
+static unsigned char COMPONENT_MASK_SYSTEM_OPERATOR = 0x1 << 2;
+static unsigned char COMPONENT_MASK_ALL = 0xFF;
+static unsigned char COMPONENT_MASK_NOT_LOCAL_FOLLOWER = COMPONENT_MASK_INTERACTIVE_SESSION | COMPONENT_MASK_SIMULATOR_HANDLER;
+
 static KeepaliveTimerTask keepalive_timer_task;
 static void timer_sigroutine(int signo)
 {
@@ -368,7 +374,7 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 	if (CHECK_FAILURE(ret))
 		return ret;
 	node_type = FOLLOWER;
-	WRITE_FORMAT_DEBUG("This Node[%s] is a Follower !!!", local_token);
+	WRITE_FORMAT_DEBUG("This Node[%s] is Follower !!!", local_token);
 	return ret;
 }
 
@@ -420,14 +426,21 @@ unsigned short ClusterMgr::stop_connection()
 
 unsigned short ClusterMgr::close_console()
 {
-	static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
-	assert(interactive_server != NULL && "interactive_server should NOT be NULL");
-	WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", local_token);
-	interactive_server->print_console(close_console_message);
-	usleep(300000);
-	interactive_server->deinitialize();
-	delete interactive_server;
-	interactive_server = NULL;
+	bool local_follower = false;
+	if (local_cluster)
+		is_local_follower(local_follower);
+	if (!local_follower)
+	{
+		static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
+		assert(interactive_server != NULL && "interactive_server should NOT be NULL");
+		WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", local_token);
+		interactive_server->print_console(close_console_message);
+		usleep(300000);
+		// interactive_server->deinitialize();
+		// delete interactive_server;
+		// interactive_server = NULL;
+		deinitialize_components(COMPONENT_MASK_INTERACTIVE_SESSION);
+	}
 	return RET_SUCCESS;
 }
 
@@ -506,17 +519,20 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		close_console();
 // Switch to leader and re-initialize the required components
 		ret = become_leader();
-		if (CHECK_SUCCESS(ret))
-		{
-        	assert(interactive_server == NULL && "interactive_server should be NULL");
-        	WRITE_DEBUG("Re-Initialize the session server......");
-        	interactive_server = new InteractiveServer(this);
-        	if (interactive_server == NULL)
-				throw bad_alloc();
-        	ret = interactive_server->initialize(system_monitor_period);
-        	if (CHECK_FAILURE(ret))
-				return ret;
-		}
+        if (CHECK_FAILURE(ret))
+			return ret;
+		// if (CHECK_SUCCESS(ret))
+		// {
+  //       	assert(interactive_server == NULL && "interactive_server should be NULL");
+  //       	WRITE_FORMAT_DEBUG("[%s] Re-Initialize the session server......", local_token);
+  //       	interactive_server = new InteractiveServer(this);
+  //       	if (interactive_server == NULL)
+		// 		throw bad_alloc();
+  //       	ret = interactive_server->initialize(system_monitor_period);
+  //       	if (CHECK_FAILURE(ret))
+		// 		return ret;
+		// }
+		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
     }
     else
     {
@@ -531,39 +547,49 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		ret = become_follower(true);
         if (CHECK_FAILURE(ret))
 			return ret;
+		if (local_cluster)
+			deinitialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
+		else
+    		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
+
     }
 
-	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
-	if (local_cluster && node_type == LEADER)
-	{
-		ret = initialize_components();
-		if (CHECK_FAILURE(ret))
-			return ret;
-	}
+	// // fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
+	// if (local_cluster && node_type == LEADER)
+	// {
+	// 	ret = initialize_components();
+	// 	if (CHECK_FAILURE(ret))
+	// 		return ret;
+	// }
     if (CHECK_FAILURE(ret))
-    {
     	WRITE_FORMAT_ERROR("Node[%s] fails to rebuild the cluster, due to: %s", local_token, GetErrorDescription(ret));
-    }
 	return ret;
 }
 
-unsigned short ClusterMgr::initialize_components(bool local_follower)
+unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 {
 	unsigned short ret= RET_SUCCESS;
-	if (!local_follower)
+	if (component_mask & COMPONENT_MASK_INTERACTIVE_SESSION)
 	{
 // Initialize the session server
-		WRITE_DEBUG("Initialize the session server......");
-		assert(interactive_server == NULL && "interactive_server should be NULL");
+		WRITE_FORMAT_DEBUG("[%s] Initialize the session server......", local_token);
+		// assert(interactive_server == NULL && "interactive_server should be NULL");
+		if (interactive_server != NULL)
+			deinitialize_components(COMPONENT_MASK_INTERACTIVE_SESSION);
 		interactive_server = new InteractiveServer(this);
 		if (interactive_server == NULL)
 			throw bad_alloc();
 		ret = interactive_server->initialize(system_monitor_period);
 		if (CHECK_FAILURE(ret))
 			return ret;
+	}
+	if (component_mask & COMPONENT_MASK_SIMULATOR_HANDLER)
+	{
 // Initialize the simulator handler
-		WRITE_DEBUG("Initialize the simulator handler......");
-		assert(simulator_handler == NULL && "simulator_handler should be NULL");
+		WRITE_FORMAT_DEBUG("[%s] Initialize the simulator handler......", local_token);
+		// assert(simulator_handler == NULL && "simulator_handler should be NULL");
+		if (simulator_handler != NULL)
+			deinitialize_components(COMPONENT_MASK_SIMULATOR_HANDLER);
 		simulator_handler = new SimulatorHandler(this);
 		if (simulator_handler == NULL)
 			throw bad_alloc();
@@ -574,16 +600,57 @@ unsigned short ClusterMgr::initialize_components(bool local_follower)
 		WRITE_INFO((simulator_installed ? "The simulator is installed" : "The simulator is NOT installed"));
 	}
 // Initialize the system operater
-	if (system_operator == NULL)
+	if (component_mask & COMPONENT_MASK_SYSTEM_OPERATOR)
 	{
-		WRITE_DEBUG("Initialize the system operater......");
+		WRITE_FORMAT_DEBUG("[%s] Initialize the system operater......", local_token);
 		// assert(system_operator == NULL && "system_operator should be NULL");
+		if (system_operator != NULL)
+			deinitialize_components(COMPONENT_MASK_SYSTEM_OPERATOR);
 		system_operator = new SystemOperator(this);
 		if (system_operator == NULL)
 			throw bad_alloc();
 		ret = system_operator->initialize(cluster_network.c_str(), cluster_netmask_digits);
 		if (CHECK_FAILURE(ret))
 			return ret;
+	}
+	return ret;
+}
+
+unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask)
+{
+	unsigned short ret= RET_SUCCESS;
+	if (component_mask & COMPONENT_MASK_INTERACTIVE_SESSION)
+	{
+// Deinitialize the session server
+		WRITE_FORMAT_DEBUG("[%s] De-Initialize the session server......", local_token);
+		if (interactive_server != NULL)
+		{
+			interactive_server->deinitialize();
+			delete interactive_server;
+			interactive_server = NULL;	
+		}
+	}
+	if (component_mask & COMPONENT_MASK_SIMULATOR_HANDLER)
+	{
+// Deinitialize the simulator handler
+		WRITE_FORMAT_DEBUG("[%s] De-Initialize the simulator handler......", local_token);
+		if (simulator_handler != NULL)
+		{
+			simulator_handler->deinitialize();
+			delete simulator_handler;
+			simulator_handler = NULL;	
+		}	
+	}
+	if (system_operator == NULL)
+	{
+// DeInitialize the system operater
+		WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
+		if (system_operator != NULL)
+		{
+			system_operator->deinitialize();
+			delete system_operator;
+			system_operator = NULL;	
+		}
 	}
 	return ret;
 }
@@ -715,6 +782,7 @@ unsigned short ClusterMgr::initialize()
 			return ret;
 		if (local_follower)
 		{
+			// printf("shm_open: %s, read only !!!\n", LOCAL_CLUSTER_SHM_FILENAME);
 			int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_RDONLY, 0666);
 		  	if (shm_fd < 0) 
 		  	{
@@ -756,7 +824,9 @@ unsigned short ClusterMgr::initialize()
 	ret = start_keepalive_timer();
 	if (CHECK_FAILURE(ret))
 		return ret;
-	ret = initialize_components(local_follower);
+	unsigned short component_mask = local_follower ? COMPONENT_MASK_SYSTEM_OPERATOR : COMPONENT_MASK_ALL;
+	// printf("local_follower: %s, component_mask: %d", (local_follower ? "True" : "False"), component_mask);
+	ret = initialize_components(component_mask);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	return ret;
@@ -764,31 +834,33 @@ unsigned short ClusterMgr::initialize()
 
 unsigned short ClusterMgr::deinitialize()
 {
-// Deinitialize the system operator
-	if (system_operator != NULL)
-	{
-		system_operator->deinitialize();
-		delete system_operator;
-		system_operator = NULL;	
-	}
-// Deinitialize the simulator handler
-	if (simulator_handler != NULL)
-	{
-		simulator_handler->deinitialize();
-		delete simulator_handler;
-		simulator_handler = NULL;	
-	}
-// Deinitialize the session server
-	if (interactive_server != NULL)
-	{
-		interactive_server->deinitialize();
-		delete interactive_server;
-		interactive_server = NULL;	
-	}
+	unsigned short ret = RET_SUCCESS;
+	ret = deinitialize_components(COMPONENT_MASK_ALL);
+// // Deinitialize the system operator
+// 	if (system_operator != NULL)
+// 	{
+// 		system_operator->deinitialize();
+// 		delete system_operator;
+// 		system_operator = NULL;	
+// 	}
+// // Deinitialize the simulator handler
+// 	if (simulator_handler != NULL)
+// 	{
+// 		simulator_handler->deinitialize();
+// 		delete simulator_handler;
+// 		simulator_handler = NULL;	
+// 	}
+// // Deinitialize the session server
+// 	if (interactive_server != NULL)
+// 	{
+// 		interactive_server->deinitialize();
+// 		delete interactive_server;
+// 		interactive_server = NULL;	
+// 	}
 // Stop a keep-alive timer
 	stop_keepalive_timer();
 // Close the connection
-	unsigned short ret = stop_connection();
+	ret = stop_connection();
 // Stop the event thread
 	if (notify_thread != NULL)
 	{
@@ -2307,7 +2379,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 		        if (CHECK_FAILURE(ret))
 					return ret;
 	        	assert(interactive_server == NULL && "interactive_server should be NULL");
-	        	WRITE_DEBUG("Re-Initialize the session server due to role switch...");
+	        	WRITE_FORMAT_DEBUG("[%s] Re-Initialize the session server due to role switch...", local_token);
 	        	interactive_server = new InteractiveServer(this);
 	        	if (interactive_server == NULL)
 					throw bad_alloc();

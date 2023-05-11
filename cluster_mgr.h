@@ -62,7 +62,8 @@ private:
 	// unsigned short start_connection();
 	unsigned short stop_connection();
 	unsigned short rebuild_cluster(int new_leader_node_id=-1);
-	unsigned short initialize_components(bool local_follower=false);
+	unsigned short initialize_components(unsigned short component_mask);
+	unsigned short deinitialize_components(unsigned short component_mask);
 	void check_keepalive();
 	void dump_interactive_session_data_list(int session_id)const;
 	unsigned short close_console();
