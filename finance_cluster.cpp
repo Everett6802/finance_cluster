@@ -167,6 +167,16 @@ void detach_from_terminal()
     openlog ("firstdaemon", LOG_PID, LOG_SYSLOG);
 }
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+
 int main(int argc, char** argv)
 {
 	// char buf[32] = {'\0'};
@@ -243,6 +253,29 @@ int main(int argc, char** argv)
 	// token = strtok_r(NULL, ":", &rest);
 	// printf("token: %s, rest: %s\n", token, rest);
 	// exit(0);
+
+// 	const char* LOCAL_CLUSTER_SHM_FILENAME = "cluster_shm_file";
+
+// 	printf("shm_unlink: %s\n", LOCAL_CLUSTER_SHM_FILENAME);
+// 	shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
+// 	printf("shm_open: %s, create !!!\n", LOCAL_CLUSTER_SHM_FILENAME);
+//   	int shm_fd1 = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+//    	if (shm_fd1 < 0) 
+//   	{
+//   		fprintf(stderr, "shm_open() fails, due to : %s\n", strerror(errno));
+//   		exit(1);
+//   	}
+// 	printf("shm_unlink: %s\n", LOCAL_CLUSTER_SHM_FILENAME);
+// 	shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
+// // // The /dev/shm/finance_cluster_cluster_token file is created
+// // 	printf("shm_open: %s, create !!!\n", LOCAL_CLUSTER_SHM_FILENAME);
+// //   	int shm_fd2 = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+// //    	if (shm_fd2 < 0) 
+// //   	{
+// //   		fprintf(stderr, "shm_open() fails, due to : %s\n", strerror(errno));
+// //   		exit(1);
+// //   	}
+// 	exit(0);
 
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;

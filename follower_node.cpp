@@ -188,8 +188,8 @@ unsigned short FollowerNode::become_follower()
 			return ret;
 	}
 
-	WRITE_FORMAT_INFO("Node[%s] is a Follower", local_token);
-	printf("Node[%s] is a Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
+	WRITE_FORMAT_INFO("Node[%s] is Follower", local_token);
+	printf("Node[%s] is Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
 
 	return ret;
 }
@@ -460,7 +460,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		&FollowerNode::recv_get_fake_acspt_state,
 		&FollowerNode::recv_get_fake_acspt_detail,
 		&FollowerNode::recv_request_file_transfer,
-		&FollowerNode::recv_complete_file_transfer
+		&FollowerNode::recv_complete_file_transfer,
+		&FollowerNode::recv_switch_leader
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -490,7 +491,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_get_fake_acspt_state,
 		&FollowerNode::send_get_fake_acspt_detail,
 		&FollowerNode::send_request_file_transfer,
-		&FollowerNode::send_complete_file_transfer
+		&FollowerNode::send_complete_file_transfer,
+		&FollowerNode::send_switch_leader
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -529,14 +531,9 @@ unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_
 	}
 	if (cluster_id == 0)
 	{
-// New Follower get the Node ID from Leader
-	    ret = cluster_map.get_last_node_id(cluster_id);
-		if (CHECK_FAILURE(ret))
-		{
-			WRITE_FORMAT_ERROR("Fails to get node ID in Follower[%s], due to: %s", local_token, GetErrorDescription(ret));
-			goto OUT;
-		}
-    }
+		cluster_map.get_last_node_id(cluster_id);
+		WRITE_FORMAT_DEBUG("Update Follower cluster ID: %d", cluster_id);
+	}
 OUT:
 	pthread_mutex_unlock(&cluster_map_mtx);
 	return ret;
@@ -732,6 +729,23 @@ unsigned short FollowerNode::recv_complete_file_transfer(const std::string& mess
 
 	int session_id = atoi(message_data.c_str());
 	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_switch_leader(const std::string& message_data)
+{
+// Message format:
+// EventType | leader candidate node ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int leader_candidate_node_id = atoi(message_data.c_str());
+
+	size_t notify_param_size = sizeof(int);
+	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+	ret = observer->notify(NOTIFY_SWITCH_LEADER, notify_cfg);
 	return ret;
 }
 
@@ -1041,6 +1055,8 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	return send_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
 }
 
+unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}
+
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -1061,7 +1077,7 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1112,7 +1128,7 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown param type: %d", param_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1150,7 +1166,7 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -1181,7 +1197,7 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
-    		fprintf(stderr, "%s in %s:%d", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
