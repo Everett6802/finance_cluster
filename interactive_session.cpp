@@ -23,6 +23,8 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetConfigurationSetupInfo,
 	InteractiveSessionCommand_StartSystemMonitor,
 	InteractiveSessionCommand_StopSystemMonitor,
+	InteractiveSessionCommand_SyncFolder,
+	InteractiveSessionCommand_SyncFile,
 	InteractiveSessionCommand_GetSimulatorVersion,
 	InteractiveSessionCommand_TransferSimulatorPackage,
 	InteractiveSessionCommand_InstallSimulator,
@@ -70,6 +72,8 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
+	{.command="sync_folder", .authority=AUTHORITY_LEADER, .description="Synchronize all the files in the folder to the follower  Param: filepath (ex. /home/super) or No param: exploit the sync folder in the config file"},
+	{.command="sync_file", .authority=AUTHORITY_LEADER, .description="Synchronize a specific file of the folder to the follower\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
 	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
 	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
@@ -664,7 +668,6 @@ unsigned short InteractiveSession::multi_clis_thread_handler_internal()
 				print_to_console(string(rsp_buf));
 			}
 		}
-
 		multi_clis_line_index++;
 
 		free(cli_line);
@@ -735,6 +738,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_configuration_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
 		&InteractiveSession::handle_stop_system_monitor_command,
+		&InteractiveSession::handle_sync_folder_command,
+		&InteractiveSession::handle_sync_file_command,
 		&InteractiveSession::handle_get_simulator_version_command,
 		&InteractiveSession::handle_trasnfer_simulator_package_command,
 		&InteractiveSession::handle_install_simulator_command,
@@ -1095,7 +1100,12 @@ unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, 
 	return RET_SUCCESS;	
 }
 
-unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int argc, char **argv)
+unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **argv)
+{
+	return RET_SUCCESS;	
+}
+
+unsigned short InteractiveSession::handle_sync_file_command(int argc, char **argv)
 {
 	assert(observer != NULL && "observer should NOT be NULL");
 	if (argc != 2)
@@ -1104,16 +1114,41 @@ unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int
 		print_to_console(incorrect_command_phrases);
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
-	const char* filepath = (const char*)argv[1];
+
+	unsigned short ret = RET_SUCCESS;
+// Before switching leader, check if the node exists
+	ClusterMap cluster_map;
+	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (cluster_map.size() == 1)
+	{
+		print_to_console(string("Only single node in the cluster. Synchronizing files does NOT take effect\n"));
+		return RET_WARN_INTERACTIVE_COMMAND;		
+	}
+
+	char filepath[DEF_LONG_STRING_SIZE]; 
+	const char* argv1_tmp = (const char*)argv[1];
+	if (strchr(argv1_tmp, '/') != NULL)
+	{
+		string sync_folderpath;
+		ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)&sync_folderpath);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
+	}
+	else
+		strcpy(filepath, argv1_tmp);
+	
+	WRITE_FORMAT_DEBUG("Try to synchorinize the file: %s", filepath);
 	if (!check_file_exist(filepath))
 	{
-		WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
-		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+		WRITE_FORMAT_WARN("The file[%s] being synchronized does NOT exist", filepath);
+		return RET_FAILURE_NOT_FOUND;
 	}
 
 	ClusterFileTransferParam cluster_file_transfer_param;
-// Start to transfer simulator package
-	unsigned short ret = RET_SUCCESS;
+// Start to transfer the file
 	cluster_file_transfer_param.session_id = session_id;
     ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
  	if (CHECK_FAILURE(ret))
@@ -1125,10 +1160,10 @@ unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int
 	// if (CHECK_FAILURE(ret))
 	// 	return ret;
 	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
-	ClusterMap cluster_map;
-	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
-	if (CHECK_FAILURE(ret))
-		return ret;
+	// ClusterMap cluster_map;
+	// ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	// if (CHECK_FAILURE(ret))
+	// 	return ret;
 
 	char buf[DEF_STRING_SIZE];
 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
@@ -1203,6 +1238,62 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 		simulator_version_string += string("\n");
 		ret = print_to_console(simulator_version_string);
 	}
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	const char* filepath = (const char*)argv[1];
+	if (!check_file_exist(filepath))
+	{
+		WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
+		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+	}
+
+	ClusterFileTransferParam cluster_file_transfer_param;
+// Start to transfer simulator package
+	unsigned short ret = RET_SUCCESS;
+	cluster_file_transfer_param.session_id = session_id;
+    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+ 	if (CHECK_FAILURE(ret))
+		return ret;
+    // SAFE_RELEASE(notify_cfg)
+// Wait for transferring done...
+	// ClusterDetailParam cluster_detail_param;
+	// ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+	// if (CHECK_FAILURE(ret))
+	// 	return ret;
+	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+	ClusterMap cluster_map;
+	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	char buf[DEF_STRING_SIZE];
+	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
+// Print data in cosole
+	string file_transfer_string("file transfer\n");
+	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
+	while (iter != cluster_file_transfer_map.end())
+	{
+		int node_id = (int)iter->first;
+		string node_token;
+		ret = cluster_map.get_node_token(node_id, node_token);
+		if (CHECK_FAILURE(ret))
+			return ret;
+		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+		file_transfer_string += string(buf);
+		++iter;
+	}
+	file_transfer_string += string("\n");
+	ret = print_to_console(file_transfer_string);
 	return RET_SUCCESS;
 }
 

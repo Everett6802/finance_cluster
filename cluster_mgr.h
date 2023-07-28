@@ -33,10 +33,11 @@ private:
 // config
 	std::string cluster_network;
 	int cluster_netmask_digits;
+	bool local_cluster;
 	int system_monitor_period;
+	std::string sync_folderpath;
 
 	PNOTIFY_THREAD notify_thread;
-	bool local_cluster;
 	char* local_token;
 	char* cluster_token; // Only for the follower
 	NodeType node_type;

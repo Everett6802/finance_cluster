@@ -177,8 +177,25 @@ void detach_from_terminal()
 #include <errno.h>
 #include <unistd.h>
 
+// #ifndef MACSTR
+// #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
+// #endif
+// #ifndef STR2MAC
+// #define STR2MAC(a) (unsigned int*)&(a)[0], (unsigned int*)&(a)[1], \
+//     (unsigned int*)&(a)[2], (unsigned int*)&(a)[3], \
+//     (unsigned int*)&(a)[4], (unsigned int*)&(a)[5]
+// #endif
+
 int main(int argc, char** argv)
 {
+	// char* my_mac = "04:2A:4D:AE:53:D7";
+	// unsigned int my_mac_int[6];
+	// sscanf(my_mac, MACSTR, STR2MAC(my_mac_int));
+	// for (int i = 0; i < 6 ; i++)
+	// {
+	// 	printf("%d %02x\n", i, my_mac_int[i]);
+	// }
+	// exit(0);
 	// char buf[32] = {'\0'};
 	// float value = 32.47;
 	// snprintf(buf, 32 , "Test: %.2f %\n", value);

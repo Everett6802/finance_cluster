@@ -112,6 +112,11 @@ unsigned short ClusterMgr::parse_config()
 			system_monitor_period = atoi(conf_value);
 			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_SYSTEM_MONITOR_PERIOD, system_monitor_period);
 		}
+		else if (strcmp(conf_name, CONF_FIELD_SYNC_FOLDERPATH) == 0)
+		{
+			sync_folderpath = string(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_SYNC_FOLDERPATH, sync_folderpath.c_str());
+		}
 		else
 		{
     		static const int BUF_SIZE = 256;
@@ -1005,7 +1010,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 					// printf("Cluster Node Count: %d\n", cluster_node_amount);
 				if (cluster_node_amount == 1)
 				{
-					WRITE_ERROR("No follwer nodes in the cluster, no need to transfer the simulator package");
+					WRITE_FORMAT_ERROR("No follwer nodes in the cluster, no need to transfer the file: %s", filepath);
 					return RET_SUCCESS;
 				}
 // Start the file transfer sender
@@ -1421,6 +1426,49 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
 			configuration_setup_string += string("\n");
     	}
+    	break;
+    	case PARAM_CONFIGURATION_VALUE:
+    	{
+        	if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_ERROR("The param1/param2 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		const char* conf_name = (const char*)param1;
+			if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
+			{
+				string& conf_value = *(string*)param2;
+				conf_value = cluster_network;
+			}
+			else if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
+			{
+				int& conf_value = *(int*)param2;
+				conf_value = cluster_netmask_digits;
+			}
+			else if (strcmp(conf_name, CONF_FIELD_LOCAL_CLUSTER) == 0)
+			{
+				bool& conf_value = *(bool*)param2;
+				conf_value = local_cluster;
+			}
+			else if (strcmp(conf_name, CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
+			{
+				int& conf_value = *(int*)param2;
+				conf_value = system_monitor_period;
+			}
+			else if (strcmp(conf_name, CONF_FIELD_SYNC_FOLDERPATH) == 0)
+			{
+				string& conf_value = *(string*)param2;
+				conf_value = sync_folderpath;
+			}
+			else
+			{
+	    		static const int BUF_SIZE = 256;
+	    		char buf[BUF_SIZE];
+	    		snprintf(buf, BUF_SIZE, "Unknown config field: %s", conf_name);
+	    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+				throw invalid_argument(buf);
+			}
+		}
     	break;
     	case PARAM_SYSTEM_MONITOR:
     	{
