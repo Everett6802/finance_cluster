@@ -188,6 +188,12 @@ void detach_from_terminal()
 
 int main(int argc, char** argv)
 {
+    // char *filename = "/home/super/simulator.tar.xz";
+    // char *extension = strchr(filename, '.');  // Find the last dot in the filename
+    // int res = strcmp(extension, ".tar.xz1");
+    // printf("extension: %s, res: %d\n", extension, res);    
+    // exit(0);
+
 	// char* my_mac = "04:2A:4D:AE:53:D7";
 	// unsigned int my_mac_int[6];
 	// sscanf(my_mac, MACSTR, STR2MAC(my_mac_int));

@@ -317,6 +317,7 @@ bool is_root_user();
 void get_curtime_str(std::string& curtime);
 // void print_curtime(const char* title=NULL);
 const char* pthread_cond_timedwait_err(int ret);
+unsigned short create_folder_recursive(const char* full_folderpath);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface

@@ -331,3 +331,38 @@ const char* pthread_cond_timedwait_err(int ret)
     }
     return NULL;
 }
+
+unsigned short create_folder_recursive(const char* full_folderpath)
+{
+	assert(full_folderpath != NULL && "input should NOT be NULL");
+	char* full_folderpath_tmp = strdup(full_folderpath);
+	char* full_folderpath_tmp_ptr = full_folderpath_tmp;
+	char* rest_full_folderpath_tmp_ptr = NULL;
+	char* foldername;
+	string upper_folderpath;
+	unsigned short ret = RET_SUCCESS;
+	while ((foldername = strtok_r(full_folderpath_tmp_ptr, "/", &rest_full_folderpath_tmp_ptr)) != NULL)
+	{
+		upper_folderpath += (string("/") + string(foldername));
+		// printf("Folderpath: %s\n", upper_folderpath.c_str());
+		if (access(upper_folderpath.c_str(), F_OK) != 0)
+		{
+			STATIC_WRITE_FORMAT_DEBUG("Create the folder: %s", upper_folderpath.c_str());
+			if(mkdir(upper_folderpath.c_str(), S_IRWXU) != 0)
+			{
+				STATIC_WRITE_FORMAT_ERROR("mkdir() fails, due to: %s", strerror(errno));
+				ret = RET_FAILURE_SYSTEM_API;
+				goto OUT;
+			}
+		}
+		if (full_folderpath_tmp_ptr != NULL)
+			full_folderpath_tmp_ptr = NULL;
+	}
+OUT:
+	if (full_folderpath_tmp != NULL)
+	{
+		free(full_folderpath_tmp);
+		full_folderpath_tmp = NULL;
+	}
+	return ret;
+}

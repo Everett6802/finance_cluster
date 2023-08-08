@@ -92,6 +92,21 @@ unsigned short FileChannel::initialize(const char* filepath, const char* channel
 				return RET_FAILURE_SYSTEM_API;
 	    	}
 	    }
+	    else
+	    {
+		    char folderpath[256];  // Adjust the size as needed
+		    strcpy(folderpath, filepath);
+		    char *last_slash = strrchr(folderpath, '/');
+		    if (last_slash == NULL) 
+		    {
+			    WRITE_FORMAT_ERROR("Incorrect filepath: %s", filepath);
+			    return RET_FAILURE_INCORRECT_PATH;
+		    }
+		    *last_slash = '\0';
+		    unsigned short ret = create_folder_recursive(folderpath);
+		    if (CHECK_FAILURE(ret))
+		    	return ret;
+	    }
 		if (pthread_create(&recv_tid, NULL, recv_thread_handler, this) != 0)
 		{
 		    WRITE_FORMAT_ERROR("Fail to create a worker thread of receiving message, due to: %s",strerror(errno));

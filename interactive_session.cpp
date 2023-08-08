@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <dirent.h>
 #include <map>
 // #include <string>
 #include "interactive_session.h"
@@ -1102,7 +1103,76 @@ unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, 
 
 unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **argv)
 {
-	return RET_SUCCESS;	
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	char folderpath[DEF_LONG_STRING_SIZE]; 
+	string sync_folderpath;
+	ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (strchr(sync_folderpath.c_str(), '~') != NULL)
+	{
+		const char* sync_folderpath_start_ptr = &(sync_folderpath.c_str()[2]);
+		if (strcmp(get_username(), "root") == 0)
+			snprintf(folderpath, DEF_LONG_STRING_SIZE, "/root/%s", sync_folderpath_start_ptr);
+		else
+			snprintf(folderpath, DEF_LONG_STRING_SIZE, "/home/%s/%s", get_username(), sync_folderpath_start_ptr);
+	}
+	else
+		strcpy(folderpath, sync_folderpath.c_str());
+
+	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", folderpath);
+    struct dirent *entry = nullptr;
+    DIR *dp = opendir(folderpath);
+    if (dp == nullptr)
+    {
+		if (errno == ENOENT) 
+		{
+			WRITE_FORMAT_WARN("The folder[%s] being synchronized does NOT exist", folderpath);
+			return RET_FAILURE_NOT_FOUND;
+		} 
+		else  /* opendir() failed for some other reason. */
+		{
+			WRITE_FORMAT_WARN("opendir() fails, due to: %s", strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+    } 
+
+    int argc_tmp = 2;
+    char** argv_tmp = new char*[argc_tmp];
+    for (int i = 0; i < argc_tmp; i++)
+    	argv_tmp[i] = new char[DEF_LONG_STRING_SIZE];
+    strcpy(argv_tmp[0], argv[0]);
+    while ((entry = readdir(dp)))
+    {
+// You can't (usefully) compare strings using != or ==, you need to use strcmp
+// The reason for this is because != and == will only compare the base addresses of those strings. 
+// Not the contents of the strings themselves.
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        	continue;
+        // printf ("%s\n", entry->d_name);
+    	argv_tmp[1] = new char[DEF_LONG_STRING_SIZE];
+        strcpy(argv_tmp[1], entry->d_name);
+        ret = handle_sync_file_command(argc_tmp, argv_tmp);
+        if (CHECK_FAILURE(ret))
+			break;     	
+    }
+    if (argv_tmp != NULL)
+    {
+    	for (int i = 0; i < argc_tmp; i++)
+    		delete[] argv_tmp[i];
+    	delete[] argv_tmp;
+    	argv_tmp = NULL;
+    }
+
+	return ret;	
 }
 
 unsigned short InteractiveSession::handle_sync_file_command(int argc, char **argv)
@@ -1129,13 +1199,22 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 
 	char filepath[DEF_LONG_STRING_SIZE]; 
 	const char* argv1_tmp = (const char*)argv[1];
-	if (strchr(argv1_tmp, '/') != NULL)
+	if (strchr(argv1_tmp, '/') == NULL)
 	{
 		string sync_folderpath;
-		ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)&sync_folderpath);
+		ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
 		if (CHECK_FAILURE(ret))
 			return ret;
-		snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
+		if (strchr(sync_folderpath.c_str(), '~') != NULL)
+		{
+			const char* sync_folderpath_start_ptr = &(sync_folderpath.c_str()[2]);
+			if (strcmp(get_username(), "root") == 0)
+				snprintf(filepath, DEF_LONG_STRING_SIZE, "/root/%s/%s", sync_folderpath_start_ptr, argv1_tmp);
+			else
+				snprintf(filepath, DEF_LONG_STRING_SIZE, "/home/%s/%s/%s", get_username(), sync_folderpath_start_ptr, argv1_tmp);
+		}
+		else
+			snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
 	}
 	else
 		strcpy(filepath, argv1_tmp);
@@ -1165,10 +1244,11 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	// if (CHECK_FAILURE(ret))
 	// 	return ret;
 
-	char buf[DEF_STRING_SIZE];
+	char buf[DEF_LONG_STRING_SIZE];
 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
 // Print data in cosole
-	string file_transfer_string("file transfer\n");
+	// snprintf(buf, DEF_LONG_STRING_SIZE, "file transfer: %s\n", filepath);
+	string file_transfer_string = string("file transfer: ") + string(filepath) + string("\n");
 	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
 	while (iter != cluster_file_transfer_map.end())
 	{
@@ -1243,58 +1323,66 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 
 unsigned short InteractiveSession::handle_trasnfer_simulator_package_command(int argc, char **argv)
 {
-	assert(observer != NULL && "observer should NOT be NULL");
+	// assert(observer != NULL && "observer should NOT be NULL");
 	if (argc != 2)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
 		print_to_console(incorrect_command_phrases);
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
-	const char* filepath = (const char*)argv[1];
-	if (!check_file_exist(filepath))
-	{
-		WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
-		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
-	}
+	char* filepath = (char*)argv[1];
+    char *extension = strchr(filepath, '.');  // Find the last dot in the filename
+    if (strcmp(extension, ".tar.xz") != 0)
+    {
+		WRITE_FORMAT_WARN("WANRING!! Incorrect extension filename: %s", filepath);
+		print_to_console(string("The extension should be .tar.xz"));
+		return RET_WARN_INTERACTIVE_COMMAND;
+    }
+// 	if (!check_file_exist(filepath))
+// 	{
+// 		WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
+// 		return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
+// 	}
 
-	ClusterFileTransferParam cluster_file_transfer_param;
-// Start to transfer simulator package
-	unsigned short ret = RET_SUCCESS;
-	cluster_file_transfer_param.session_id = session_id;
-    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
- 	if (CHECK_FAILURE(ret))
-		return ret;
-    // SAFE_RELEASE(notify_cfg)
-// Wait for transferring done...
-	// ClusterDetailParam cluster_detail_param;
-	// ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
-	// if (CHECK_FAILURE(ret))
-	// 	return ret;
-	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
-	ClusterMap cluster_map;
-	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
-	if (CHECK_FAILURE(ret))
-		return ret;
+// 	ClusterFileTransferParam cluster_file_transfer_param;
+// // Start to transfer simulator package
+// 	unsigned short ret = RET_SUCCESS;
+// 	cluster_file_transfer_param.session_id = session_id;
+//     ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+//  	if (CHECK_FAILURE(ret))
+// 		return ret;
+//     // SAFE_RELEASE(notify_cfg)
+// // Wait for transferring done...
+// 	// ClusterDetailParam cluster_detail_param;
+// 	// ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
+// 	// if (CHECK_FAILURE(ret))
+// 	// 	return ret;
+// 	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
+// 	ClusterMap cluster_map;
+// 	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
 
-	char buf[DEF_STRING_SIZE];
-	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
-// Print data in cosole
-	string file_transfer_string("file transfer\n");
-	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
-	while (iter != cluster_file_transfer_map.end())
-	{
-		int node_id = (int)iter->first;
-		string node_token;
-		ret = cluster_map.get_node_token(node_id, node_token);
-		if (CHECK_FAILURE(ret))
-			return ret;
-		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
-		file_transfer_string += string(buf);
-		++iter;
-	}
-	file_transfer_string += string("\n");
-	ret = print_to_console(file_transfer_string);
-	return RET_SUCCESS;
+// 	char buf[DEF_STRING_SIZE];
+// 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
+// // Print data in cosole
+// 	string file_transfer_string("file transfer\n");
+// 	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
+// 	while (iter != cluster_file_transfer_map.end())
+// 	{
+// 		int node_id = (int)iter->first;
+// 		string node_token;
+// 		ret = cluster_map.get_node_token(node_id, node_token);
+// 		if (CHECK_FAILURE(ret))
+// 			return ret;
+// 		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+// 		file_transfer_string += string(buf);
+// 		++iter;
+// 	}
+// 	file_transfer_string += string("\n");
+// 	ret = print_to_console(file_transfer_string);
+// 	return RET_SUCCESS;
+	return handle_sync_file_command(argc, argv);
 }
 
 unsigned short InteractiveSession::handle_install_simulator_command(int argc, char **argv)
