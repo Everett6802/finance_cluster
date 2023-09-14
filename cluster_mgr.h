@@ -42,6 +42,8 @@ private:
 	char* cluster_token; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;
+	FileTxType file_tx_type;
+	PIFILETX file_tx;
 
 // parameters related to session
 	InteractiveServer* interactive_server;
@@ -60,6 +62,8 @@ private:
 	void stop_keepalive_timer();
 	unsigned short become_leader();
 	unsigned short become_follower(bool need_rebuild_cluster=false);
+	unsigned short become_file_sender();
+	unsigned short become_file_receiver();
 	// unsigned short start_connection();
 	unsigned short stop_connection();
 	unsigned short rebuild_cluster(int new_leader_node_id=-1);

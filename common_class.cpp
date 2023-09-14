@@ -1560,6 +1560,35 @@ const char* NotifyFakeAcsptDetailCfg::get_fake_acspt_detail()const
 
 ///////////////////////////
 
+NotifyFileTransferConnectCfg::NotifyFileTransferConnectCfg(const void* param, size_t param_size) :
+	NotifyCfgEx(NOTIFY_CONNECT_FILE_TRANSFER, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+	filepath = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+	if (strlen(filepath) == 0)
+		filepath = NULL;
+}
+
+NotifyFileTransferConnectCfg::~NotifyFileTransferConnectCfg()
+{
+	filepath = NULL;
+}
+
+const char* NotifyFileTransferConnectCfg::get_filepath()const
+{
+	return filepath;
+}
+
+///////////////////////////
+
 NotifyFileTransferAbortCfg::NotifyFileTransferAbortCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_ABORT_FILE_TRANSFER, param, param_size)
 {
@@ -1629,11 +1658,25 @@ unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
 //////////////////////////////////////////////////////////
 
 NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_size) :
-	NotifyCfg(NOTIFY_SEND_FILE_DONE, param, param_size)
+	NotifyCfgEx(NOTIFY_SEND_FILE_DONE, param, param_size)
 {
 	// printf("NotifyFileTransferAbortCfg()\n");
 	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	remote_token = (char*)notify_param;
+	// remote_token = (char*)notify_param;
+
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	// static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+
+	const char* param_char = (const char*)notify_param;
+	remote_token = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+	if (strlen(remote_token) == 0)
+		remote_token = NULL;
 }
 
 NotifySendFileDoneCfg::~NotifySendFileDoneCfg()

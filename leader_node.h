@@ -8,7 +8,7 @@
 #include "common.h"
 #include "node_base.h"
 #include "node_channel.h"
-#include "file_channel.h"
+// #include "file_channel.h"
 
 
 class LeaderNode : public INode
@@ -17,12 +17,12 @@ class LeaderNode : public INode
 
 private:
 	static const char* listen_thread_tag;
-	static const char* tx_listen_thread_tag;
+	// static const char* tx_listen_thread_tag;
 	static const int WAIT_CONNECTION_TIMEOUT;
 
 	PIMANAGER observer;
 	int socketfd;
-	int tx_socketfd; // For file transfer
+	// int tx_socketfd; // For file transfer
 	bool local_cluster;
 	char* local_token;
 // Start from 1, 1 for leader, otherwise for follower
@@ -34,30 +34,30 @@ private:
 	volatile int listen_exit;
 	pthread_t listen_tid;
 	volatile unsigned short listen_thread_ret;
-// For file transfer
-	pthread_mutex_t tx_mtx;
-	volatile int tx_listen_exit;
-	pthread_t tx_listen_tid;
-	volatile unsigned short tx_listen_thread_ret;
-	int tx_session_id;
-	char* tx_filepath;
+// // For file transfer
+// 	pthread_mutex_t tx_mtx;
+// 	volatile int tx_listen_exit;
+// 	pthread_t tx_listen_tid;
+// 	volatile unsigned short tx_listen_thread_ret;
+// 	int tx_session_id;
+// 	char* tx_filepath;
 
 	// std::deque<PNODE_CHANNEL> node_channel_deque;
 	std::map<std::string, PNODE_CHANNEL> node_channel_map;
 	std::map<std::string, int> node_keepalive_map;
-	std::map<std::string, PFILE_CHANNEL> file_channel_map;
+	// std::map<std::string, PFILE_CHANNEL> file_channel_map;
 
 	pthread_mutex_t node_channel_mtx;
-	pthread_mutex_t file_channel_mtx;
-	// pthread_mutex_t mtx_cluster_map;
+	// pthread_mutex_t file_channel_mtx;
+	// // pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
 	unsigned short send_data(MessageType message_type, const char* data=NULL, const char* remote_token=NULL);
 	unsigned short remove_follower(const std::string& node_token);
-	unsigned short remove_file_channel(const std::string& node_token);
-	unsigned short become_file_sender();
-	unsigned short start_file_transfer();
-	unsigned short stop_file_transfer();
+	// unsigned short remove_file_channel(const std::string& node_token);
+	// unsigned short become_file_sender();
+	// unsigned short start_file_transfer();
+	// unsigned short stop_file_transfer();
 	unsigned short find_new_follower_pid(int& new_follower_pid)const;
 // events
 // recv
@@ -103,10 +103,10 @@ private:
 	static void listen_thread_cleanup_handler(void* pvoid);
 	void listen_thread_cleanup_handler_internal();
 
-	static void* tx_listen_thread_handler(void* pvoid);
-	unsigned short tx_listen_thread_handler_internal();
-	static void tx_listen_thread_cleanup_handler(void* pvoid);
-	void tx_listen_thread_cleanup_handler_internal();
+	// static void* tx_listen_thread_handler(void* pvoid);
+	// unsigned short tx_listen_thread_handler_internal();
+	// static void tx_listen_thread_cleanup_handler(void* pvoid);
+	// void tx_listen_thread_cleanup_handler_internal();
 
 public:
 	LeaderNode(PIMANAGER parent, const char* token=NULL); // token is NULL for local cluster

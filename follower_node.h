@@ -6,7 +6,7 @@
 #include "common.h"
 #include "node_base.h"
 #include "node_channel.h"
-#include "file_channel.h"
+// #include "file_channel.h"
 
 
 class FollowerNode : public INode
@@ -23,7 +23,7 @@ private:
 	// CHAR_LIST server_list;
 	PIMANAGER observer;
 	int socketfd;
-	int tx_socketfd; // For file transfer
+	// int tx_socketfd; // For file transfer
 	bool local_cluster;
 	char* local_token;
 	char* cluster_token;
@@ -32,16 +32,16 @@ private:
 	ClusterMap cluster_map;
 	int keepalive_cnt;
 	bool connection_retry;
+	// PFILE_CHANNEL file_channel;
 	PNODE_CHANNEL node_channel;
 	PNOTIFY_THREAD notify_thread;
-	PFILE_CHANNEL file_channel;
 
 	pthread_mutex_t cluster_map_mtx;
 	pthread_mutex_t node_channel_mtx;
 
 	unsigned short connect_leader();
 	unsigned short become_follower();
-	unsigned short connect_file_sender();
+	// unsigned short connect_file_sender();
 	unsigned short send_data(MessageType message_type, const char* data=NULL);
 // events
 // recv

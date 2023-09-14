@@ -6,13 +6,13 @@
 #include "common.h"
 
 
-class LeaderNode;
-class FollowerNode;
+class FileSender;
+class FileReceiver;
 
 class FileChannel
 {
-	friend class LeaderNode;
-	friend class FollowerNode;
+	friend class FileSender;
+	friend class FileReceiver;
 
 	DECLARE_MSG_DUMPER()
 
@@ -21,7 +21,7 @@ class FileChannel
 	static const long MAX_BUF_SIZE;
 
 private:
-	PINODE observer;
+	PIFILETX observer;
 	volatile int exit;
     std::string node_token;
     std::string remote_token;
@@ -53,7 +53,7 @@ private:
 	void recv_thread_cleanup_handler_internal();
 	void clearall();
 
-	FileChannel(PINODE node);
+	FileChannel(PIFILETX file_tx);
 	~FileChannel();
 	unsigned short initialize(const char* filepath, const char* channel_token, const char* channel_remote_token, int channel_socket, bool sender=false, bool session_id=-1/*Only for sender*/);
 	unsigned short deinitialize();

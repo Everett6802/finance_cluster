@@ -19,18 +19,20 @@ const int FollowerNode::TOTAL_KEEPALIVE_PERIOD = KEEPALIVE_PERIOD * CHECK_KEEPAL
 FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const char* token) :
 	observer(parent),
 	socketfd(0),
-	tx_socketfd(0),
+	// tx_socketfd(0),
 	local_cluster(true),
 	local_token(NULL),
 	cluster_token(NULL),
 	cluster_id(0),
 	keepalive_cnt(0),
 	connection_retry(false),
+	// file_channel(NULL),
 	node_channel(NULL),
-	notify_thread(NULL),
-	file_channel(NULL)
+	notify_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
+	observer = parent;
+	assert(observer != NULL && "observer should NOT be NULL");
 
 	local_token = strdup(token);
 	cluster_token = strdup(server_token);
@@ -194,121 +196,120 @@ unsigned short FollowerNode::become_follower()
 	return ret;
 }
 
+// unsigned short FollowerNode::connect_file_sender()
+// {
+// 	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_token);
 
-unsigned short FollowerNode::connect_file_sender()
-{
-	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_token);
+// // Create socket
+// 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+// 	if (sock_fd < 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
+// 		return RET_FAILURE_SYSTEM_API;
+// 	}
 
-// Create socket
-	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock_fd < 0)
-	{
-		WRITE_FORMAT_ERROR("socket() fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
-	}
+// // Set non-blocking
+// 	long sock_arg;
+// 	if((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+// 		return RET_FAILURE_SYSTEM_API;
+// 	}
+// 	sock_arg |= O_NONBLOCK;
+// 	if(fcntl(sock_fd, F_SETFL, sock_arg) < 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+// 		return RET_FAILURE_SYSTEM_API;
+// 	}
+// // http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
+// 	int res;
+// 	if (local_cluster)
+// 	{
+// 		int socket_len;
+// 		sockaddr_un client_address;
+// 		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
+// 		client_address.sun_family = AF_UNIX;
+// 		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
+// 		socket_len = sizeof(client_address.sun_family) + strlen(client_address.sun_path);
+// 		// fprintf(stderr, "socket_len: %d, sun_path: %s\n", socket_len, client_address.sun_path);
+// 		res = connect(sock_fd, (struct sockaddr*)&client_address, socket_len);
+// 	}
+// 	else
+// 	{
+// 		sockaddr_in client_address;
+// 		memset(&client_address, 0x0, sizeof(struct sockaddr_in));
+// 		client_address.sin_family = AF_INET;
+// 		client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
+// 		client_address.sin_addr.s_addr = inet_addr(cluster_token);
+// 		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
+// 	}
+// 	if (res < 0)
+// 	{
+// 		if (errno == EINPROGRESS)
+// 		{
+// 			WRITE_DEBUG("Connection is NOT established......");
+// 			struct timeval tv;
+// 			fd_set sock_set;
 
-// Set non-blocking
-	long sock_arg;
-	if((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
-	{
-		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
-	}
-	sock_arg |= O_NONBLOCK;
-	if(fcntl(sock_fd, F_SETFL, sock_arg) < 0)
-	{
-		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
-	}
-// http://www.cas.mcmaster.ca/~qiao/courses/cs3mh3/tutorials/socket.html
-	int res;
-	if (local_cluster)
-	{
-		int socket_len;
-		sockaddr_un client_address;
-		memset(&client_address, 0x0, sizeof(struct sockaddr_un));
-		client_address.sun_family = AF_UNIX;
-		strcpy(client_address.sun_path, CLUSTER_UDS_FILEPATH);
-		socket_len = sizeof(client_address.sun_family) + strlen(client_address.sun_path);
-		// fprintf(stderr, "socket_len: %d, sun_path: %s\n", socket_len, client_address.sun_path);
-		res = connect(sock_fd, (struct sockaddr*)&client_address, socket_len);
-	}
-	else
-	{
-		sockaddr_in client_address;
-		memset(&client_address, 0x0, sizeof(struct sockaddr_in));
-		client_address.sin_family = AF_INET;
-		client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
-		client_address.sin_addr.s_addr = inet_addr(cluster_token);
-		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
-	}
-	if (res < 0)
-	{
-		if (errno == EINPROGRESS)
-		{
-			WRITE_DEBUG("Connection is NOT established......");
-			struct timeval tv;
-			fd_set sock_set;
+// 			tv.tv_sec = WAIT_CONNECTION_TIMEOUT;
+// 			tv.tv_usec = 0;
 
-			tv.tv_sec = WAIT_CONNECTION_TIMEOUT;
-			tv.tv_usec = 0;
+// 			FD_ZERO(&sock_set);
+// 			FD_SET(sock_fd, &sock_set);
+// 			res = select(sock_fd + 1, NULL, &sock_set, NULL, &tv);
+// 			if (res < 0 && errno != EINTR)
+// 			{
+// 				WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
+// 				return RET_FAILURE_SYSTEM_API;
+// 			}
+// 			else if (res > 0)
+// 			{
+// // Socket selected for writing
+// 				int error;
+// 				socklen_t error_len = sizeof(error);
+// 				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, (void*)&error, &error_len) < 0)
+// 				{
+// 					WRITE_FORMAT_ERROR("getsockopt() fails, due to: %s", strerror(errno));
+// 					return RET_FAILURE_SYSTEM_API;
+// 				}
+// // Check the value returned...
+// 				if (error)
+// 				{
+// 					WRITE_FORMAT_ERROR("Error in delayed connection(), due to: %s", strerror(error));
+// 					return RET_FAILURE_SYSTEM_API;
+// 				}
+// 			}
+// 			else
+// 			{
+// 				WRITE_DEBUG("Connection timeout");
+// 				return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			WRITE_FORMAT_ERROR("connect() fails, due to: %s", strerror(errno));
+// 			return RET_FAILURE_SYSTEM_API;
+// 		}
+// 	}
 
-			FD_ZERO(&sock_set);
-			FD_SET(sock_fd, &sock_set);
-			res = select(sock_fd + 1, NULL, &sock_set, NULL, &tv);
-			if (res < 0 && errno != EINTR)
-			{
-				WRITE_FORMAT_ERROR("select() fails, due to: %s", strerror(errno));
-				return RET_FAILURE_SYSTEM_API;
-			}
-			else if (res > 0)
-			{
-// Socket selected for writing
-				int error;
-				socklen_t error_len = sizeof(error);
-				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, (void*)&error, &error_len) < 0)
-				{
-					WRITE_FORMAT_ERROR("getsockopt() fails, due to: %s", strerror(errno));
-					return RET_FAILURE_SYSTEM_API;
-				}
-// Check the value returned...
-				if (error)
-				{
-					WRITE_FORMAT_ERROR("Error in delayed connection(), due to: %s", strerror(error));
-					return RET_FAILURE_SYSTEM_API;
-				}
-			}
-			else
-			{
-				WRITE_DEBUG("Connection timeout");
-				return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
-			}
-		}
-		else
-		{
-			WRITE_FORMAT_ERROR("connect() fails, due to: %s", strerror(errno));
-			return RET_FAILURE_SYSTEM_API;
-		}
-	}
+// // Set to blocking mode again...
+// 	if ((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
+// 		return RET_FAILURE_SYSTEM_API;
+// 	}
+// 	sock_arg &= (~O_NONBLOCK);
+// 	if (fcntl(sock_fd, F_SETFL, sock_arg) < 0)
+// 	{
+// 		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
+// 		return RET_FAILURE_SYSTEM_API;
+// 	}
 
-// Set to blocking mode again...
-	if ((sock_arg = fcntl(sock_fd, F_GETFL, NULL)) < 0)
-	{
-		WRITE_FORMAT_ERROR("fcntl(F_GETFL) fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
-	}
-	sock_arg &= (~O_NONBLOCK);
-	if (fcntl(sock_fd, F_SETFL, sock_arg) < 0)
-	{
-		WRITE_FORMAT_ERROR("fcntl(F_SETFL) fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
-	}
+// 	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
+// 	tx_socketfd = sock_fd;
 
-	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
-	tx_socketfd = sock_fd;
-
-	return RET_SUCCESS;
-}
+// 	return RET_SUCCESS;
+// }
 
 unsigned short FollowerNode::send_data(MessageType message_type, const char* data)
 {
@@ -333,7 +334,6 @@ unsigned short FollowerNode::send_data(MessageType message_type, const char* dat
 	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_token, (node_message_assembler.get_full_message() + 1), (int)(*node_message_assembler.get_full_message()));
 	return ret;
 }
-
 
 unsigned short FollowerNode::initialize()
 {
@@ -395,16 +395,14 @@ unsigned short FollowerNode::initialize()
 unsigned short FollowerNode::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
-
-	if (file_channel != NULL)
-	{
-		ret = file_channel->deinitialize();
-		delete file_channel;
-		file_channel = NULL;
-		if (CHECK_FAILURE(ret))
-			WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_token);
-	}
-
+	// if (file_channel != NULL)
+	// {
+	// 	ret = file_channel->deinitialize();
+	// 	delete file_channel;
+	// 	file_channel = NULL;
+	// 	if (CHECK_FAILURE(ret))
+	// 		WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_token);
+	// }
 	if (node_channel != NULL)
 	{
 		ret = node_channel->deinitialize();
@@ -413,7 +411,6 @@ unsigned short FollowerNode::deinitialize()
 		delete node_channel;
 		node_channel = NULL;
 	}
-
 	if (socketfd != 0)
 	{
 		close(socketfd);
@@ -684,28 +681,37 @@ unsigned short FollowerNode::recv_get_fake_acspt_detail(const std::string& messa
 
 unsigned short FollowerNode::recv_request_file_transfer(const std::string& message_data)
 {
-// Message format:
-// EventType | filepath | EOD
-	assert(file_channel == NULL && "file_channel should be NULL");
-	const char* tx_filepath = (const char*)message_data.c_str();
-	unsigned short ret = RET_SUCCESS;
-	usleep((random() % 10) * 100000);
-// Receiver tries to connect to Sender
-	ret = connect_file_sender();
-	if (CHECK_FAILURE(ret))
-		return ret;
-// Create the channel for file tranfer
-	file_channel = new FileChannel(this);
-	if (file_channel == NULL)
-	{
-		WRITE_ERROR("Fail to allocate memory: file_channel");
-		return RET_FAILURE_INSUFFICIENT_MEMORY;
-	}
+// // Message format:
+// // EventType | session id | filepath | EOD
+// 	assert(file_channel == NULL && "file_channel should be NULL");
+// 	const char* buf = (const char*)message_data.c_str();
+	// unsigned short ret = RET_SUCCESS;
+// // Receiver tries to connect to Sender
+// 	ret = connect_file_sender();
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
+// // Create the channel for file tranfer
+// 	file_channel = new FileChannel(this);
+// 	if (file_channel == NULL)
+// 	{
+// 		WRITE_ERROR("Fail to allocate memory: file_channel");
+// 		return RET_FAILURE_INSUFFICIENT_MEMORY;
+// 	}
 
-	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_token);
-	ret = file_channel->initialize(tx_filepath, local_token, cluster_token, tx_socketfd);
-	if (CHECK_FAILURE(ret))
-		return ret;
+// 	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_token);
+// 	ret = file_channel->initialize(tx_filepath, local_token, cluster_token, tx_socketfd);
+// 	if (CHECK_FAILURE(ret))
+// 		return ret;
+	usleep((random() % 10) * 100000);
+	const char* nofity_param = message_data.c_str();
+	size_t notify_param_size = strlen(nofity_param);
+	PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)nofity_param, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Asynchronous event
+    observer->notify(NOTIFY_CONNECT_FILE_TRANSFER, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
 
 	return RET_SUCCESS;
 }
@@ -715,17 +721,17 @@ unsigned short FollowerNode::recv_complete_file_transfer(const std::string& mess
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	if (file_channel != NULL)
-	{
-// ret is the recv thread return code
-		ret = file_channel->deinitialize();
-		delete file_channel;
-		file_channel = NULL;
-		if (CHECK_FAILURE(ret))
-			return ret;
-	}
-	else
-		WRITE_WARN("The file channel does NOT exist");
+// 	if (file_channel != NULL)
+// 	{
+// // ret is the recv thread return code
+// 		ret = file_channel->deinitialize();
+// 		delete file_channel;
+// 		file_channel = NULL;
+// 		if (CHECK_FAILURE(ret))
+// 			return ret;
+// 	}
+// 	else
+// 		WRITE_WARN("The file channel does NOT exist");
 
 	int session_id = atoi(message_data.c_str());
 	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
@@ -1152,15 +1158,15 @@ unsigned short FollowerNode::notify(NotifyType notify_type, void* notify_param)
     	}
     	break;
 // Asynchronous event:
-      	case NOTIFY_ABORT_FILE_TRANSFER:
-    	{
-    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+     //  	case NOTIFY_ABORT_FILE_TRANSFER:
+    	// {
+    	// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    	// 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 
-    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
-    		ret = notify_thread->add_event(notify_cfg);
-    	}
-    	break;
+    	// 	assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    	// 	ret = notify_thread->add_event(notify_cfg);
+    	// }
+    	// break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1181,17 +1187,17 @@ unsigned short FollowerNode::async_handle(NotifyCfg* notify_cfg)
     NotifyType notify_type = notify_cfg->get_notify_type();
     switch(notify_type)
     {
-    	case NOTIFY_ABORT_FILE_TRANSFER:
-    	{
-    		WRITE_DEBUG("File transfer ABORT !!!");
-    		assert(file_channel != NULL && "file_channel should NOT be NULL");
-			ret = file_channel->deinitialize();
-			delete file_channel;
-			file_channel = NULL;
-			if (CHECK_FAILURE(ret))
-				return ret;
-    	}
-    	break;
+   //  	case NOTIFY_ABORT_FILE_TRANSFER:
+   //  	{
+   //  		WRITE_DEBUG("File transfer ABORT !!!");
+   //  		assert(file_channel != NULL && "file_channel should NOT be NULL");
+			// ret = file_channel->deinitialize();
+			// delete file_channel;
+			// file_channel = NULL;
+			// if (CHECK_FAILURE(ret))
+			// 	return ret;
+   //  	}
+   //  	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

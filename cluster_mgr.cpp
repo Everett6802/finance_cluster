@@ -11,6 +11,8 @@
 #include "cluster_mgr.h"
 #include "leader_node.h"
 #include "follower_node.h"
+#include "file_sender.h"
+#include "file_receiver.h"
 
 
 using namespace std;
@@ -262,7 +264,9 @@ ClusterMgr::ClusterMgr() :
 	local_token(NULL),
 	cluster_token(NULL),
 	node_type(NONE),
+	file_tx_type(TX_NONE),
 	cluster_node(NULL),
+	file_tx(NULL),
 	interactive_server(NULL),
 	simulator_handler(NULL),
 	simulator_installed(false)
@@ -286,7 +290,11 @@ ClusterMgr::~ClusterMgr()
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in ClusterMgr::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
-
+	if (file_tx != NULL)
+	{
+		delete file_tx;
+		file_tx = NULL;
+	}
 	if (cluster_node != NULL)
 	{
 		delete cluster_node;
@@ -381,6 +389,48 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 	node_type = FOLLOWER;
 	WRITE_FORMAT_DEBUG("This Node[%s] is Follower !!!", local_token);
 	return ret;
+}
+
+unsigned short ClusterMgr::become_file_sender()
+{
+	file_tx = new FileSender(this, local_token);
+	if (file_tx == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: file_tx (sender)");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+	unsigned short ret = RET_SUCCESS;
+	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ret = file_tx->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	file_tx_type = TX_SENDER;
+	WRITE_FORMAT_DEBUG("This Node[%s] is a File Sender !!!", local_token);
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::become_file_receiver()
+{
+	file_tx = new FileReceiver(this, local_token);
+	if (file_tx == NULL)
+	{
+		WRITE_ERROR("Fail to allocate memory: file_tx (receiver)");
+		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	}
+	unsigned short ret = RET_SUCCESS;
+	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	ret = file_tx->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+
+	file_tx_type = TX_RECEIVER;
+	WRITE_FORMAT_DEBUG("This Node[%s] is a File Receiver !!!", local_token);
+	return RET_SUCCESS;
 }
 
 // unsigned short ClusterMgr::start_connection(bool need_rebuild_cluster)
@@ -980,136 +1030,121 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     {
     	case PARAM_FILE_TRANSFER:
     	{
-// Only leader can do the file transfer to the follower
-	    	if (node_type != LEADER)
-			{
-	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
-	    		return RET_FAILURE_INCORRECT_OPERATION;
-			}
-        	if (param1 == NULL)
+// // Only leader can do the file transfer to the follower
+// 	    	if (node_type != LEADER)
+// 			{
+// 	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
+// 	    		return RET_FAILURE_INCORRECT_OPERATION;
+// 			}
+        	if (param1 == NULL || param2 == NULL)
     		{
-    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			WRITE_ERROR("The param1/param2 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-	    	assert(cluster_node != NULL && "cluster_node should NOT be NULL");
-
+	    	assert(file_tx != NULL && "file_tx should be NULL");
 	    	unsigned short ret = RET_SUCCESS;
-			if (node_type == LEADER)
-			{
-// Leader node
-	    		PCLUSTER_FILE_TRANSFER_PARAM cluster_file_transfer_param = (PCLUSTER_FILE_TRANSFER_PARAM)param1;
-	    		assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
-	    		const char* filepath = (const char*)param2;
-	    		assert(filepath != NULL && "filepath should NOT be NULL");
+	    	PCLUSTER_FILE_TRANSFER_PARAM cluster_file_transfer_param = (PCLUSTER_FILE_TRANSFER_PARAM)param1;
+	    	assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
+	    	const char* filepath = (const char*)param2;
+	    	assert(filepath != NULL && "filepath should NOT be NULL");
 
-		    	int cluster_node_amount;
-				ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
-				if (CHECK_FAILURE(ret))
-					return ret;
-				assert(cluster_node_amount != 0 && "cluster_node_amount should NOT be 0");
-					// printf("Cluster Node Count: %d\n", cluster_node_amount);
-				if (cluster_node_amount == 1)
-				{
-					WRITE_FORMAT_ERROR("No follwer nodes in the cluster, no need to transfer the file: %s", filepath);
-					return RET_SUCCESS;
-				}
+		    int cluster_node_amount;
+			ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			assert(cluster_node_amount != 0 && "cluster_node_amount should NOT be 0");
+			// printf("Cluster Node Count: %d\n", cluster_node_amount);
+			if (cluster_node_amount == 1)
+			{
+				WRITE_FORMAT_ERROR("No follwer nodes in the cluster, no need to transfer the file: %s", filepath);
+				return RET_SUCCESS;
+			}
 // Start the file transfer sender
-				FileTransferParam file_transfer_param;
-				file_transfer_param.session_id = cluster_file_transfer_param->session_id;
-				file_transfer_param.filepath = new char[strlen(filepath) + 1];
-				if (file_transfer_param.filepath == NULL)
-					throw bad_alloc();
-				memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
-				strcpy(file_transfer_param.filepath, filepath);
-
-				WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
-				ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
-				if (CHECK_FAILURE(ret))
-					return ret;
+			FileTransferParam file_transfer_param;
+			file_transfer_param.session_id = cluster_file_transfer_param->session_id;
+			file_transfer_param.filepath = new char[strlen(filepath) + 1];
+			if (file_transfer_param.filepath == NULL)
+				throw bad_alloc();
+			memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
+			strcpy(file_transfer_param.filepath, filepath);
+			WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
+			ret = become_file_sender();
+			if (CHECK_FAILURE(ret))
+				return ret;
+			ret = file_tx->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+			if (CHECK_FAILURE(ret))
+				return ret;
 // Reset the counter 
-				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
-				interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount = cluster_node_amount - 1;
-				interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
-				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+			pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+			interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount = cluster_node_amount - 1;
+			interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
+			pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 // Receive the response
-				bool found = false;
-				struct timespec ts;
-				clock_gettime(CLOCK_REALTIME, &ts);
-				ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
-				pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
-				int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
+			bool found = false;
+			struct timespec ts;
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
+			pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+			int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
 // Stop the listening thread
-				ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+			ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+			if (CHECK_FAILURE(ret))
+				return ret;
+
+			if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+			{
+		    	WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+				return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+			}
+					// dump_interactive_session_data_list(session_id);
+			std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
+			std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+			std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
+			while (iter != interactive_session_data.end())
+			{
+				PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
+				if (notify_cfg->get_notify_type() == NOTIFY_COMPLETE_FILE_TRANSFER)
+				{
+					interactive_session_file_transfer_data.push_back(notify_cfg);
+					interactive_session_data.erase(iter);
+					if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount)
+					{
+						found = true;
+						break;
+					}
+				}
+				iter++;
+			}
+			pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+	    	if (!found)
+	    	{
+		    	WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_amount - 1, interactive_session_file_transfer_data.size());
+				return RET_FAILURE_NOT_FOUND;
+			}
+			std::list<PNOTIFY_CFG>::iterator iter_file_transfer= interactive_session_file_transfer_data.begin();
+			while (iter_file_transfer != interactive_session_file_transfer_data.end())
+			{
+				PNOTIFY_FILE_TRANSFER_COMPLETE_CFG notify_file_transfer_cfg = (PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)*iter_file_transfer;
+				assert(cluster_file_transfer_param->session_id == notify_file_transfer_cfg->get_session_id() && "The session ID is NOT identical");
+				// string node_ip;
+				// ret = cluster_node->get(PARAM_CLUSTER_ID2IP, (void*)&notify_file_transfer_cfg->get_cluster_id(), (void*)&node_ip);
 				if (CHECK_FAILURE(ret))
 					return ret;
-
-				if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+				char buf[DEF_STRING_SIZE];
+				if (CHECK_SUCCESS(notify_file_transfer_cfg->get_return_code()))
 				{
-		    		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-					return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+					static const char* success_str = "Success";
+					// static int success_str_len = strlen(success_str);
+					strcpy(buf, success_str);
 				}
-					// dump_interactive_session_data_list(session_id);
-				std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
-				std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
-				std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
-				while (iter != interactive_session_data.end())
-				{
-					PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					if (notify_cfg->get_notify_type() == NOTIFY_COMPLETE_FILE_TRANSFER)
-					{
-						interactive_session_file_transfer_data.push_back(notify_cfg);
-						interactive_session_data.erase(iter);
-						if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount)
-						{
-							found = true;
-							break;
-						}
-					}
-					iter++;
-				}
-				pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
-	    		if (!found)
-	    		{
-		    		WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_amount - 1, interactive_session_file_transfer_data.size());
-					return RET_FAILURE_NOT_FOUND;
-				}
-				std::list<PNOTIFY_CFG>::iterator iter_file_transfer= interactive_session_file_transfer_data.begin();
-				while (iter_file_transfer != interactive_session_file_transfer_data.end())
-				{
-					PNOTIFY_FILE_TRANSFER_COMPLETE_CFG notify_file_transfer_cfg = (PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)*iter_file_transfer;
-					assert(cluster_file_transfer_param->session_id == notify_file_transfer_cfg->get_session_id() && "The session ID is NOT identical");
-					// string node_ip;
-					// ret = cluster_node->get(PARAM_CLUSTER_ID2IP, (void*)&notify_file_transfer_cfg->get_cluster_id(), (void*)&node_ip);
-					if (CHECK_FAILURE(ret))
-						return ret;
-					char buf[DEF_STRING_SIZE];
-					if (CHECK_SUCCESS(notify_file_transfer_cfg->get_return_code()))
-					{
-						static const char* success_str = "Success";
-						// static int success_str_len = strlen(success_str);
-						strcpy(buf, success_str);
-					}
-					else
-						snprintf(buf, DEF_STRING_SIZE, "Fail, due to: %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
-					cluster_file_transfer_param->cluster_data_map[notify_file_transfer_cfg->get_cluster_id()] = string(buf);					
-					iter_file_transfer++;
-					SAFE_RELEASE(notify_file_transfer_cfg)
-				}
-			}
-			else if (node_type == FOLLOWER)
-			{
-	   //  		PSYSTEM_INFO_PARAM system_info_param = (PSYSTEM_INFO_PARAM)param1;
-	   //  		assert(system_info_param != NULL && "system_info_param should NOT be NULL");
-				// ret = system_operator->get_system_info(system_info_param->system_info);
-				// if (CHECK_FAILURE(ret))
-				// 	return ret;
-	    		WRITE_ERROR("Unable to transfer data from follower");
-	    		return RET_FAILURE_INCORRECT_OPERATION;	
-			}
-			else
-			{
-	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect", node_type);
-	    		return RET_FAILURE_INCORRECT_OPERATION;		
+				else
+					snprintf(buf, DEF_STRING_SIZE, "Fail, due to: %s", GetErrorDescription(notify_file_transfer_cfg->get_return_code()));
+				cluster_file_transfer_param->cluster_data_map[notify_file_transfer_cfg->get_cluster_id()] = string(buf);					
+				iter_file_transfer++;
+				SAFE_RELEASE(notify_file_transfer_cfg)
 			}
     	}
     	break;
@@ -2210,6 +2245,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			}
 		}
 		break;
+		case NOTIFY_SEND_FILE_DONE:
+		{
+    		PNOTIFY_SEND_FILE_DONE_CFG notify_send_file_done_cfg = (PNOTIFY_SEND_FILE_DONE_CFG)notify_param;
+			assert(notify_send_file_done_cfg != NULL && "notify_send_file_done_cfg should NOT be NULL");
+    		int tx_session_id = notify_send_file_done_cfg->get_session_id();
+    		string remote_token(notify_send_file_done_cfg->get_remote_token());
+
+			assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+			cluster_node->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
+		}
+		break;
 // Asynchronous event:
       	case NOTIFY_NODE_DIE:
     	{
@@ -2266,12 +2312,23 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_CONNECT_FILE_TRANSFER:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		// assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the notification of establishing connection for file transfer for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
 		case NOTIFY_COMPLETE_FILE_TRANSFER:
 		{
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 
-     		assert(node_type == LEADER && "node type should be LEADER");
+     		// assert(node_type == LEADER && "node type should be LEADER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		WRITE_DEBUG("Receive the notification of transfering file completely for session......");
     		ret = notify_thread->add_event(notify_cfg);
@@ -2413,6 +2470,20 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
 			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+    	}
+    	break;
+    	case NOTIFY_CONNECT_FILE_TRANSFER:
+    	{
+			unsigned short ret = RET_SUCCESS;
+    		ret = become_file_receiver();
+			if (CHECK_FAILURE(ret))
+				return ret;
+			ret = file_tx->notify(NOTIFY_CONNECT_FILE_TRANSFER, (void*)notify_cfg);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			// ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+			// if (CHECK_FAILURE(ret))
+			// 	return ret;
     	}
     	break;
     	case NOTIFY_COMPLETE_FILE_TRANSFER:

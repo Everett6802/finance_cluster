@@ -191,6 +191,12 @@ enum NodeType{
 	NONE
 };
 
+enum FileTxType{
+	TX_SENDER, 
+	TX_RECEIVER, 
+	TX_NONE
+};
+
 enum MessageType{
 	MSG_CAN_NOT_USE = 0, // 0 can NOT use, due to serialization/deserialization
 	MSG_CHECK_KEEPALIVE, // Bi-Direction, Leader <-> Follower 
@@ -254,6 +260,7 @@ enum NotifyType{
 	NOTIFY_GET_FAKE_ACSPT_STATE,
 	NOTIFY_GET_FAKE_ACSPT_DETAIL,
 	NOTIFY_RUN_MULTI_CLIS,
+	NOTIFY_CONNECT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SEND_FILE_DONE,
@@ -360,6 +367,17 @@ public:
 	virtual ~IManager(){}
 };
 typedef IManager* PIMANAGER;
+
+class IFileTx : public IParam, public INotify
+{
+public:
+	virtual ~IFileTx(){}
+
+	virtual unsigned short initialize()=0;
+	virtual unsigned short deinitialize()=0;
+};
+typedef IFileTx* PIFILETX;
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class
@@ -942,6 +960,22 @@ public:
 };
 typedef NotifyFakeAcsptDetailCfg* PNOTIFY_FAKE_ACSPT_DETAIL_CFG;
 
+///////////////////////////
+
+class NotifyFileTransferConnectCfg : public NotifyCfgEx
+{
+private:
+	int get_cluster_id()const;
+	char* filepath;
+
+public:
+	NotifyFileTransferConnectCfg(const void* param, size_t param_size);
+	virtual ~NotifyFileTransferConnectCfg();
+
+	const char* get_filepath()const;
+};
+typedef NotifyFileTransferConnectCfg* PNOTIFY_FILE_TRANSFER_CONNECT_CFG;
+
 ///////////////////////////////////////////////////
 
 class NotifyFileTransferAbortCfg : public NotifyCfg
@@ -978,10 +1012,11 @@ typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
 
 ///////////////////////////
 
-class NotifySendFileDoneCfg : public NotifyCfg
+class NotifySendFileDoneCfg : public NotifyCfgEx
 {
 private:
 	char* remote_token;
+	int get_cluster_id()const; // No cluster id
 
 public:
 	NotifySendFileDoneCfg(const void* param, size_t param_size);

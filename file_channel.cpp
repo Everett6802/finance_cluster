@@ -12,7 +12,7 @@ const char* FileChannel::thread_tag = "File Channel Thread";
 const int FileChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 const long FileChannel::MAX_BUF_SIZE = 1024 * 100;
 
-FileChannel::FileChannel(PINODE node) :
+FileChannel::FileChannel(PIFILETX file_tx) :
 	exit(0),
 //	node_token(NULL),
 	is_sender(false),
@@ -28,7 +28,7 @@ FileChannel::FileChannel(PINODE node) :
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
-	observer = node;
+	observer = file_tx;
 	assert(observer != NULL && "observer should NOT be NULL");
 }
 
@@ -399,18 +399,22 @@ unsigned short FileChannel::send_thread_handler_internal()
    	}
 
 OUT:
-	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is done. Notify the follower", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is done", thread_tag);
 
 	assert(observer != NULL && "observer should NOT be NULL");
-// Notify the follower 
-	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
+// // Notify the follower 
+// 	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
 // // Close the local file transfer channel
 // 	NodeFileTransferDoneParam node_file_transfer_done_param;
 // 	snprintf(node_file_transfer_done_param.node_token, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_token.c_str());
 // 	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
 // Close the parent to close the local file transfer channel
-	size_t notify_param_size = strlen(remote_token.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(remote_token.c_str(), notify_param_size);
+	const int BUF_SIZE = sizeof(int);
+	char buf[BUF_SIZE];
+	snprintf(buf, BUF_SIZE, "%d", tx_session_id);
+	string notify_param = string(buf) + remote_token;
+	size_t notify_param_size = strlen(notify_param.c_str()) + 1;  // strlen(remote_token.c_str()) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(notify_param.c_str(), notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
