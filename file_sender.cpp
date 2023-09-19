@@ -536,7 +536,7 @@ unsigned short FileSender::tx_listen_thread_handler_internal()
 		file_channel_map[client_token] = file_channel;
 		pthread_mutex_unlock(&file_channel_mtx);
 		PRINT("[%s] The File Channel between Receiver[%s] and Sender is Established......\n", tx_listen_thread_tag, client_token);
-		WRITE_FORMAT_INFO("[%s] Follower File Channel[%s] connects to the Leader...... successfully !!!", tx_listen_thread_tag, client_token);
+		WRITE_FORMAT_INFO("[%s] Receiver File Channel[%s] connects to the Sender...... successfully !!!", tx_listen_thread_tag, client_token);
 	}
 
 	WRITE_FORMAT_INFO("[%s] The worker thread of file trasnfer listening socket is dead", tx_listen_thread_tag);

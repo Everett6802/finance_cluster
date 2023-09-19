@@ -732,6 +732,8 @@ unsigned short FollowerNode::recv_complete_file_transfer(const std::string& mess
 // 	}
 // 	else
 // 		WRITE_WARN("The file channel does NOT exist");
+// Synchronous event
+	ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
 
 	int session_id = atoi(message_data.c_str());
 	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);

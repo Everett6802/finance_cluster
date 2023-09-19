@@ -293,6 +293,11 @@ unsigned short FileReceiver::set(ParamType param_type, void* param1, void* param
 // 				return ret;
 //     	}
 //     	break;
+    	case PARAM_FILE_TRANSFER_DONE:
+    	{
+    		ret = complete_file_transfer();
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

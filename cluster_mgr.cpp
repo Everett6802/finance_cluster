@@ -2325,13 +2325,22 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 		break;
 		case NOTIFY_COMPLETE_FILE_TRANSFER:
 		{
-    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
-    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+			assert(file_tx_type != TX_NONE && "file tx type should NOT be TX_NONE");
+			if (file_tx_type == TX_SENDER)
+			{
+	    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+	    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 
-     		// assert(node_type == LEADER && "node type should be LEADER");
-    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
-    		WRITE_DEBUG("Receive the notification of transfering file completely for session......");
-    		ret = notify_thread->add_event(notify_cfg);
+	     		// assert(node_type == LEADER && "node type should be LEADER");
+	    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+	    		WRITE_DEBUG("Receive the notification of transfering file completely for session......");
+	    		ret = notify_thread->add_event(notify_cfg);				
+			}
+			else if (file_tx_type == TX_RECEIVER)
+			{
+				assert(file_tx != NULL && "file_tx should NOT be NULL");
+				ret = file_tx->set(PARAM_FILE_TRANSFER_DONE);
+			}
 		}
 		break;
 		case NOTIFY_SWITCH_LEADER:
