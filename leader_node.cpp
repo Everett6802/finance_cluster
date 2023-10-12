@@ -259,7 +259,10 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 
 unsigned short LeaderNode::send_string_data(MessageType message_type, const char* data, const char* remote_token)
 {
-	return send_raw_data(message_type, data, -1, remote_token);
+	int data_size = 0;
+	if (data != NULL)
+		data_size = strlen(data) + 1;
+	return send_raw_data(message_type, data, data_size, remote_token);
 }
 
 unsigned short LeaderNode::remove_follower(const string& node_token)
