@@ -196,13 +196,13 @@ since they will inherit that state from the listening socket.
 	return ret;
 }
 
-unsigned short LeaderNode::send_data(MessageType message_type, const char* data, const char* remote_token)
+unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* data, int data_size, const char* remote_token)
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(data != NULL && "data should NOT be NULL");
 
 	NodeMessageAssembler node_message_assembler;
-	ret = node_message_assembler.assemble(message_type, data);
+	ret = node_message_assembler.assemble(message_type, data, data_size);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to assemble the message, due to: %s", GetErrorDescription(ret));
@@ -230,7 +230,7 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 		// {
 		// 	PNODE_CHANNEL node_channel = (PNODE_CHANNEL)*iter;
 		// 	assert(node_channel != NULL && "node_channel should NOT be NULL");
-		// 	ret = node_channel->send_data(data);
+		// 	ret = node_channel->send_string_data(data);
 		// 	if (CHECK_FAILURE(ret))
 		// 	{
 		// 		WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_token(), GetErrorDescription(ret));
@@ -243,6 +243,7 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 		{
 			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
 			assert(node_channel != NULL && "node_channel should NOT be NULL");
+			fprintf(stderr, "send_msg: %s\n", node_message_assembler.get_full_message());
 			ret = node_channel->send_msg(node_message_assembler.get_full_message());
 			if (CHECK_FAILURE(ret))
 			{
@@ -254,6 +255,11 @@ unsigned short LeaderNode::send_data(MessageType message_type, const char* data,
 	}
 	pthread_mutex_unlock(&node_channel_mtx);
 	return ret;
+}
+
+unsigned short LeaderNode::send_string_data(MessageType message_type, const char* data, const char* remote_token)
+{
+	return send_raw_data(message_type, data, -1, remote_token);
 }
 
 unsigned short LeaderNode::remove_follower(const string& node_token)
@@ -728,10 +734,10 @@ unsigned short LeaderNode::deinitialize()
 	return ret;
 }
 
-unsigned short LeaderNode::recv(MessageType message_type, const std::string& message_data)
+unsigned short LeaderNode::recv(MessageType message_type, const char* message_data, int message_size)
 {
 	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", token.c_str(), message.c_str(), (int)message.length());
-	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const std::string& message_data);
+	typedef unsigned short (LeaderNode::*RECV_FUNC_PTR)(const char* message_data, int message_size);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
 		NULL,
@@ -758,7 +764,7 @@ unsigned short LeaderNode::recv(MessageType message_type, const std::string& mes
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	// fprintf(stderr, "Leader[%s] recv Message from remote: type: %d, data: %s\n", local_token, message_type, message_data.c_str());
-	return (this->*(recv_func_array[message_type]))(message_data);
+	return (this->*(recv_func_array[message_type]))(message_data, message_size);
 }
 
 unsigned short LeaderNode::send(MessageType message_type, void* param1, void* param2, void* param3)
@@ -793,11 +799,12 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 	return (this->*(send_func_array[message_type]))(param1, param2, param3);
 }
 
-unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
+unsigned short LeaderNode::recv_check_keepalive(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
-	const string& follower_token = message_data;
+	// const string& follower_token = message_data;
+	const string& follower_token = string(message_data);
 	// fprintf(stderr, "KeepAlive follower_token: %s\n", follower_token.c_str());
 	pthread_mutex_lock(&node_channel_mtx);
 	map<string, int>::iterator iter = node_keepalive_map.find(follower_token);
@@ -816,21 +823,23 @@ unsigned short LeaderNode::recv_check_keepalive(const std::string& message_data)
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_update_cluster_map(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSTER_MAP);}
+unsigned short LeaderNode::recv_update_cluster_map(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSTER_MAP);}
 
-unsigned short LeaderNode::recv_transmit_text(const std::string& message_data)
+unsigned short LeaderNode::recv_transmit_text(const char* message_data, int message_size)
 {
-	printf("Recv Text: %s\n", message_data.c_str());
+	// printf("Recv Text: %s\n", message_data.c_str());
+	printf("Recv Text: %s\n", message_data);
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_get_system_info(const std::string& message_data)
+unsigned short LeaderNode::recv_get_system_info(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|system info) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifySystemInfoCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -839,13 +848,14 @@ unsigned short LeaderNode::recv_get_system_info(const std::string& message_data)
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_get_system_monitor(const std::string& message_data)
+unsigned short LeaderNode::recv_get_system_monitor(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|system info) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySystemMonitorCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifySystemMonitorCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifySystemMonitorCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -854,13 +864,14 @@ unsigned short LeaderNode::recv_get_system_monitor(const std::string& message_da
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_get_simulator_version(const std::string& message_data)
+unsigned short LeaderNode::recv_get_simulator_version(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|simulator_version) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySimulatorVersionCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifySimulatorVersionCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorVersionCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -869,23 +880,24 @@ unsigned short LeaderNode::recv_get_simulator_version(const std::string& message
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_install_simulator(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_INSTALL_SIMULATOR);}
+unsigned short LeaderNode::recv_install_simulator(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_INSTALL_SIMULATOR);}
 
-unsigned short LeaderNode::recv_apply_fake_acspt_config(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_ACSPT_CONFIG);}
+unsigned short LeaderNode::recv_apply_fake_acspt_config(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_ACSPT_CONFIG);}
 
-unsigned short LeaderNode::recv_apply_fake_usrept_config(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_USREPT_CONFIG);}
+unsigned short LeaderNode::recv_apply_fake_usrept_config(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_APPLY_FAKE_USREPT_CONFIG);}
 
-unsigned short LeaderNode::recv_control_fake_acspt(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
+unsigned short LeaderNode::recv_control_fake_acspt(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_ACSPT);}
 
-unsigned short LeaderNode::recv_control_fake_usrept(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_USREPT);}
+unsigned short LeaderNode::recv_control_fake_usrept(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_CONTROL_FAKE_USREPT);}
 
-unsigned short LeaderNode::recv_get_fake_acspt_state(const std::string& message_data)
+unsigned short LeaderNode::recv_get_fake_acspt_state(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|fake acspt state) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptStateCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptStateCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptStateCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -894,13 +906,14 @@ unsigned short LeaderNode::recv_get_fake_acspt_state(const std::string& message_
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_get_fake_acspt_detail(const std::string& message_data)
+unsigned short LeaderNode::recv_get_fake_acspt_detail(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|fake acspt detail) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptDetailCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptDetailCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptDetailCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -909,15 +922,16 @@ unsigned short LeaderNode::recv_get_fake_acspt_detail(const std::string& message
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_request_file_transfer(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REQUEST_FILE_TRANSFER);}
+unsigned short LeaderNode::recv_request_file_transfer(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REQUEST_FILE_TRANSFER);}
 
-unsigned short LeaderNode::recv_complete_file_transfer(const std::string& message_data)
+unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
-	size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
+	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 // Asynchronous event
@@ -926,7 +940,7 @@ unsigned short LeaderNode::recv_complete_file_transfer(const std::string& messag
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_switch_leader(const std::string& message_data){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
+unsigned short LeaderNode::recv_switch_leader(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -981,7 +995,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 // Update the cluster map to Followers
 	if (follower_dead_found)
 	{
-		ret = send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg);
+		ret = send_string_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg);
 		free(cluster_map_msg);
 		if (CHECK_FAILURE(ret))
 		{
@@ -990,7 +1004,7 @@ unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void
 		}
 	}
 
-	return send_data(MSG_CHECK_KEEPALIVE);
+	return send_string_data(MSG_CHECK_KEEPALIVE);
 }
 
 unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, void* param3)
@@ -1009,7 +1023,7 @@ unsigned short LeaderNode::send_update_cluster_map(void* param1, void* param2, v
 		WRITE_FORMAT_ERROR("Fail to assemble the message[%d, %s], due to: %s", MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str(), GetErrorDescription(ret));
 		return ret;
 	}
-	return send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
+	return send_string_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
 }
 
 unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* param3)
@@ -1028,7 +1042,7 @@ unsigned short LeaderNode::send_transmit_text(void* param1, void* param2, void* 
 	const char* text_data = (const char*)param1;
 	const char* remote_token = (const char*)param2;
 
-	return send_data(MSG_TRANSMIT_TEXT, text_data, remote_token);
+	return send_string_data(MSG_TRANSMIT_TEXT, text_data, remote_token);
 }
 
 unsigned short LeaderNode::send_get_system_info(void* param1, void* param2, void* param3)
@@ -1045,7 +1059,7 @@ unsigned short LeaderNode::send_get_system_info(void* param1, void* param2, void
 // 	char buf[BUF_SIZE];
 // 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 // 	snprintf(buf, BUF_SIZE, "%d", session_id);
-// 	return send_data(MSG_GET_SYSTEM_INFO, buf, remote_token);
+// 	return send_string_data(MSG_GET_SYSTEM_INFO, buf, remote_token);
 
 // Parameters:
 // param1: session id
@@ -1056,7 +1070,7 @@ unsigned short LeaderNode::send_get_system_info(void* param1, void* param2, void
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_GET_SYSTEM_INFO, buf);
+	return send_string_data(MSG_GET_SYSTEM_INFO, buf);
 }
 
 unsigned short LeaderNode::send_get_system_monitor(void* param1, void* param2, void* param3)
@@ -1070,7 +1084,7 @@ unsigned short LeaderNode::send_get_system_monitor(void* param1, void* param2, v
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_GET_SYSTEM_MONITOR, buf);
+	return send_string_data(MSG_GET_SYSTEM_MONITOR, buf);
 }
 
 unsigned short LeaderNode::send_get_simulator_version(void* param1, void* param2, void* param3)
@@ -1084,7 +1098,7 @@ unsigned short LeaderNode::send_get_simulator_version(void* param1, void* param2
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_GET_SIMULATOR_VERSION, buf);
+	return send_string_data(MSG_GET_SIMULATOR_VERSION, buf);
 }
 
 unsigned short LeaderNode::send_install_simulator(void* param1, void* param2, void* param3)
@@ -1098,7 +1112,7 @@ unsigned short LeaderNode::send_install_simulator(void* param1, void* param2, vo
 	char buf[BUF_SIZE + 1];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%s", simulator_packge_filepath);
-	return send_data(MSG_INSTALL_SIMULATOR, buf);
+	return send_string_data(MSG_INSTALL_SIMULATOR, buf);
 }
 
 unsigned short LeaderNode::send_apply_fake_acspt_config(void* param1, void* param2, void* param3)
@@ -1112,7 +1126,7 @@ unsigned short LeaderNode::send_apply_fake_acspt_config(void* param1, void* para
 	// char buf[BUF_SIZE + 1];
 	// memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	// snprintf(buf, BUF_SIZE, "%s", fake_acspt_config_filepath);
-	return send_data(MSG_APPLY_FAKE_ACSPT_CONFIG, fake_acspt_config_line_list_str);
+	return send_string_data(MSG_APPLY_FAKE_ACSPT_CONFIG, fake_acspt_config_line_list_str);
 }
 
 unsigned short LeaderNode::send_apply_fake_usrept_config(void* param1, void* param2, void* param3)
@@ -1126,7 +1140,7 @@ unsigned short LeaderNode::send_apply_fake_usrept_config(void* param1, void* par
 	// char buf[BUF_SIZE + 1];
 	// memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	// snprintf(buf, BUF_SIZE, "%s", fake_usrept_config_filepath);
-	return send_data(MSG_APPLY_FAKE_USREPT_CONFIG, fake_usrept_config_line_list_str);
+	return send_string_data(MSG_APPLY_FAKE_USREPT_CONFIG, fake_usrept_config_line_list_str);
 }
 
 unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, void* param3)
@@ -1141,7 +1155,7 @@ unsigned short LeaderNode::send_control_fake_acspt(void* param1, void* param2, v
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", fake_acspt_control_type);
-	return send_data(MSG_CONTROL_FAKE_ACSPT, buf);
+	return send_string_data(MSG_CONTROL_FAKE_ACSPT, buf);
 }
 
 unsigned short LeaderNode::send_control_fake_usrept(void* param1, void* param2, void* param3)
@@ -1156,7 +1170,7 @@ unsigned short LeaderNode::send_control_fake_usrept(void* param1, void* param2, 
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", fake_usrept_control_type);
-	return send_data(MSG_CONTROL_FAKE_USREPT, buf);
+	return send_string_data(MSG_CONTROL_FAKE_USREPT, buf);
 }
 
 unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2, void* param3)
@@ -1170,7 +1184,7 @@ unsigned short LeaderNode::send_get_fake_acspt_state(void* param1, void* param2,
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_GET_FAKE_ACSPT_STATE, buf);
+	return send_string_data(MSG_GET_FAKE_ACSPT_STATE, buf);
 }
 
 unsigned short LeaderNode::send_get_fake_acspt_detail(void* param1, void* param2, void* param3)
@@ -1184,7 +1198,7 @@ unsigned short LeaderNode::send_get_fake_acspt_detail(void* param1, void* param2
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_GET_FAKE_ACSPT_DETAIL, buf);
+	return send_string_data(MSG_GET_FAKE_ACSPT_DETAIL, buf);
 }
 
 unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2, void* param3)
@@ -1211,16 +1225,20 @@ unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2
 		return RET_FAILURE_SYSTEM_API;
 	}
 	int filepath_len = strlen(file_transfer_param->filepath);
-	int buf_size = PAYLOAD_SESSION_ID_DIGITS + filepath_len;
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + filepath_len + 1;
 	char* buf = new char[buf_size];
 	if (buf == NULL)
 		throw bad_alloc();
+	fprintf(stderr, "session_id: %d, filepath: %s\n", file_transfer_param->session_id, file_transfer_param->filepath);
 	memset(buf, 0x0, sizeof(char) * buf_size);
 	memcpy(buf, &file_transfer_param->session_id, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
 	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->filepath, sizeof(char) * filepath_len);
+	fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
 
 	WRITE_DEBUG("Notify the receiver to establish the connection for file transfer");
-	unsigned short ret = send_data(MSG_REQUEST_FILE_TRANSFER, buf);
+	unsigned short ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER, buf, buf_size);
 	if (buf != NULL)
 	{
 		delete[] buf;
@@ -1247,7 +1265,7 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	return send_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
+	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
 }
 
 unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* param3)
@@ -1267,7 +1285,7 @@ unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* 
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
 
-	return send_data(MSG_SWITCH_LEADER, buf);
+	return send_string_data(MSG_SWITCH_LEADER, buf);
 }
 
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
@@ -1313,7 +1331,7 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     	break;
 //     	case PARAM_FILE_TRANSFER_DONE:
 //     	{
-//     		ret = stop_file_transfer();
+//     		// ret = stop_file_transfer();
 //     	}
 //     	break;
 // //     	case PARAM_NODE_FILE_TRANSFER_DONE:
@@ -1686,7 +1704,7 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_token);
 // Update the cluster map to Followers
 		// fprintf(stderr, "LeaderNode::listen_thread_handler_internal %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
-		ret = send_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
+		ret = send_string_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
 		if (CHECK_FAILURE(ret))
 		{
 			// return ret;

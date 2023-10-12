@@ -300,6 +300,24 @@ int main(int argc, char** argv)
 // //   	}
 // 	exit(0);
 
+	// const char* test_string = "Damn";
+	// int test_string_len = strlen(test_string);
+	// printf("test_string_len: %d\n", test_string_len);
+	// char* test_buf1 = new char[test_string_len + 1];
+	// memset(test_buf1, 0x0, sizeof(char) * (test_string_len + 1));
+	// memcpy(test_buf1, test_string, sizeof(char) * test_string_len);
+	// printf("test_buf1: %s, %d\n", test_buf1, strlen(test_buf1));
+	// char* test_buf2 = new char[test_string_len];
+	// memset(test_buf2, 0x0, sizeof(char) * test_string_len);
+	// memcpy(test_buf2, test_string, sizeof(char) * test_string_len);
+	// printf("test_buf2: %s, %d\n", test_buf2, strlen(test_buf2));
+
+	// char my_str[] = "Fuck";
+	// printf("%d, %d\n", sizeof(my_str)/sizeof(my_str[0]), strlen(my_str));
+
+	// exit(0);
+
+
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));

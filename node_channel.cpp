@@ -206,13 +206,36 @@ const char* NodeChannel::get_remote_token()const
 	return remote_token.c_str();
 }
 
+unsigned short NodeChannel::send_msg_ex(const char* msg_data, int msg_data_size)
+{
+	assert(msg_data != NULL && "msg_data should NOT be NULL");
+	char* msg_data_copy = (char*)malloc(sizeof(char) * msg_data_size);
+	if (msg_data_copy == NULL)
+		throw bad_alloc();
+	memset(msg_data_copy, 0x0, sizeof(char) * msg_data_size);
+	memcpy(msg_data_copy, msg_data, sizeof(char) * msg_data_size);
+	// fprintf(stderr, "msg_data_copy: %s, msg_data: %s\n", msg_data_copy, msg_data);
+// Put the new incoming message to the buffer first
+	pthread_mutex_lock(&mtx_buffer);
+	send_buffer_list.push_back(msg_data_copy);
+	if (!send_msg_trigger)
+	{
+		pthread_cond_signal(&cond_buffer);
+		send_msg_trigger = true;
+	}
+	pthread_mutex_unlock(&mtx_buffer);
+
+	return RET_SUCCESS;
+}
+
 unsigned short NodeChannel::send_msg(const char* msg_data)
 {
 	assert(msg_data != NULL && "msg_data should NOT be NULL");
-	char* msg_data_dup = strdup(msg_data);
+	char* msg_data_copy = strdup(msg_data);
+	fprintf(stderr, "msg_data_copy: %s, msg_data: %s\n", msg_data_copy, msg_data);
 // Put the new incoming message to the buffer first
 	pthread_mutex_lock(&mtx_buffer);
-	send_buffer_list.push_back(msg_data_dup);
+	send_buffer_list.push_back(msg_data_copy);
 	if (!send_msg_trigger)
 	{
 		pthread_cond_signal(&cond_buffer);
@@ -412,13 +435,14 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
 			int recv_count = 0;
+			size_t recv_ret;
 			do{
 // Read the data from the remote
 				memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
-				ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
+				recv_ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
 				// fprintf(stderr, "===> recv: %s, %d\n", buf, ret);
 				// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
-				if (ret == 0) // if recv() returns zero, that means the connection has been closed
+				if (recv_ret == 0) // if recv() returns zero, that means the connection has been closed
 				{
 // Allocate the nofity event parameter
 					// const char* notify_param = remote_token.c_str();
@@ -434,7 +458,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				else
 				{
 // Parse the message
-					ret = node_message_parser.parse(buf);
+					ret = node_message_parser.parse(buf, recv_ret);
 					if (CHECK_FAILURE(ret))
 					{
 						if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
@@ -458,7 +482,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 // Send the message to the observer
 					// fprintf(stderr, "Check !!!\n");
 					// fprintf(stderr, "===> recv: message: (%d, %s)\n", node_message_parser.get_message_type(), node_message_parser.get_message());
-					ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message());
+					ret = observer->recv(node_message_parser.get_message_type(), node_message_parser.get_message(), node_message_parser.get_message_size());
 					if (CHECK_FAILURE(ret))
 					{
 						WRITE_FORMAT_ERROR("[%s] Fail to update message to the observer[%s], due to: %s", thread_tag, node_token.c_str(), GetErrorDescription(ret));
@@ -480,9 +504,9 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 			// if (data_buffer.length() != 0)
 			// 	WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, data_buffer.c_str());
 			// WRITE_DEBUG("Time out. Nothing happen...");
-			if (!node_message_parser.is_cur_message_empty())
+			if (!node_message_parser.is_buffer_empty())
 			{
-				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.cur_get_message());
+				WRITE_FORMAT_ERROR("[%s] The data[%s] is STILL in the buffer !!!", thread_tag, node_message_parser.get_buffer());
 			}
 		}
 	}

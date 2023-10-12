@@ -52,7 +52,11 @@ private:
 	// // pthread_mutex_t mtx_cluster_map;
 
 	unsigned short become_leader();
-	unsigned short send_data(MessageType message_type, const char* data=NULL, const char* remote_token=NULL);
+// If the message_size is -1, the message argument is treated as a string
+// Don't treat the data content as string. It's required to know the data size
+	unsigned short send_raw_data(MessageType message_type, const char* data, int data_size, const char* remote_token=NULL);
+// Treat the data content as string. Calculate the size via strlen()
+	unsigned short send_string_data(MessageType message_type, const char* data=NULL, const char* remote_token=NULL);
 	unsigned short remove_follower(const std::string& node_token);
 	// unsigned short remove_file_channel(const std::string& node_token);
 	// unsigned short become_file_sender();
@@ -61,22 +65,22 @@ private:
 	unsigned short find_new_follower_pid(int& new_follower_pid)const;
 // events
 // recv
-	unsigned short recv_check_keepalive(const std::string& message_data);
-	unsigned short recv_update_cluster_map(const std::string& message_data);
-	unsigned short recv_transmit_text(const std::string& message_data);
-	unsigned short recv_get_system_info(const std::string& message_data);
-	unsigned short recv_get_system_monitor(const std::string& message_data);
-	unsigned short recv_get_simulator_version(const std::string& message_data);
-	unsigned short recv_install_simulator(const std::string& message_data);
-	unsigned short recv_apply_fake_acspt_config(const std::string& message_data);
-	unsigned short recv_apply_fake_usrept_config(const std::string& message_data);
-	unsigned short recv_control_fake_acspt(const std::string& message_data);
-	unsigned short recv_control_fake_usrept(const std::string& message_data);
-	unsigned short recv_get_fake_acspt_state(const std::string& message_data);
-	unsigned short recv_get_fake_acspt_detail(const std::string& message_data);
-	unsigned short recv_request_file_transfer(const std::string& message_data);
-	unsigned short recv_complete_file_transfer(const std::string& message_data);
-	unsigned short recv_switch_leader(const std::string& message_data);
+	unsigned short recv_check_keepalive(const char* message_data, int message_size);
+	unsigned short recv_update_cluster_map(const char* message_data, int message_size);
+	unsigned short recv_transmit_text(const char* message_data, int message_size);
+	unsigned short recv_get_system_info(const char* message_data, int message_size);
+	unsigned short recv_get_system_monitor(const char* message_data, int message_size);
+	unsigned short recv_get_simulator_version(const char* message_data, int message_size);
+	unsigned short recv_install_simulator(const char* message_data, int message_size);
+	unsigned short recv_apply_fake_acspt_config(const char* message_data, int message_size);
+	unsigned short recv_apply_fake_usrept_config(const char* message_data, int message_size);
+	unsigned short recv_control_fake_acspt(const char* message_data, int message_size);
+	unsigned short recv_control_fake_usrept(const char* message_data, int message_size);
+	unsigned short recv_get_fake_acspt_state(const char* message_data, int message_size);
+	unsigned short recv_get_fake_acspt_detail(const char* message_data, int message_size);
+	unsigned short recv_request_file_transfer(const char* message_data, int message_size);
+	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
+	unsigned short recv_switch_leader(const char* message_data, int message_size);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -116,7 +120,7 @@ public:
 // INode
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short recv(MessageType message_type, const std::string& message_data);
+	virtual unsigned short recv(MessageType message_type, const char* message_data, int message_size);
 	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL);
 // IParam
     virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);

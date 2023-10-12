@@ -192,12 +192,14 @@ bool IPv4Addr::is_same_network(int netmask_digits, const char* ipv4_network_str)
 //////////////////////////////////////////////////////////
 
 NodeMessageAssembler::NodeMessageAssembler() :
-	full_message_buf(NULL)
+	full_message_buf(NULL),
+	full_message_buf_size(0)
 {
 }
 
 NodeMessageAssembler::~NodeMessageAssembler()
 {
+	full_message_buf_size = 0;
 	if (full_message_buf != NULL)
 	{
 		delete[] full_message_buf;
@@ -205,24 +207,52 @@ NodeMessageAssembler::~NodeMessageAssembler()
 	}
 }
 
-unsigned short NodeMessageAssembler::assemble(MessageType message_type, const char* message)
+unsigned short NodeMessageAssembler::assemble(MessageType message_type, const char* message, unsigned int message_size)
 {
 	if (full_message_buf != NULL)
 		return RET_FAILURE_INCORRECT_OPERATION;
 
-	int buf_size = MESSAGE_TYPE_LEN + (message != NULL ? strlen(message) : 0) + END_OF_MESSAGE_LEN + 1;
-	full_message_buf = new char[buf_size];
+// // Caution: Should NOT always handle the data like a string. If the first character of the message is 0, for example, 
+// // strlen() will return the wrong value
+// 	if (message_size == -1)
+// 		message_size = (message != NULL ? strlen(message) : 0);
+
+// Format:  message_type | message_size | message | End Of message
+	full_message_buf_size = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN + 1;
+	full_message_buf = new char[full_message_buf_size];
 	if (full_message_buf == NULL)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
+	// if (message_size == -1)
+	// {
+	// 	if (message != NULL)
+	// 		snprintf(full_message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
+	// 	else
+	// 		snprintf(full_message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
+	// }
+	// else
+	// {
+	// 	memset(full_message_buf, 0x0, sizeof(char) * buf_size);
+	// 	char* full_message_buf_ptr = full_message_buf;
+	// 	memcpy(full_message_buf_ptr, (void*)&message_type, sizeof(char));
+	// 	full_message_buf_ptr += 1;
+	// 	memcpy(full_message_buf_ptr, (void*)message, sizeof(char) * message_size);
+	// 	full_message_buf_ptr += message_size;
+	// 	memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
+	// }
+	// memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
+	memset(full_message_buf, 0x0, sizeof(char) * full_message_buf_size);
+	char* full_message_buf_ptr = full_message_buf;
+	memcpy(full_message_buf_ptr, (void*)&message_type, MESSAGE_TYPE_LEN);
+	full_message_buf_ptr += MESSAGE_TYPE_LEN;
+	memcpy(full_message_buf_ptr, (void*)&message_size, MESSAGE_SIZE_LEN);
+	full_message_buf_ptr += MESSAGE_SIZE_LEN;
+	if (message_size != 0)
+	{
+		memcpy(full_message_buf_ptr, (void*)message, sizeof(char) * message_size);
+		full_message_buf_ptr += message_size;
+	}
+	memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE, sizeof(char) * END_OF_MESSAGE_LEN);
 
-	if (message != NULL)
-	{
-		snprintf(full_message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
-	}
-	else
-	{
-		snprintf(full_message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
-	}
 	return RET_SUCCESS;
 }
 
@@ -237,8 +267,13 @@ const char* NodeMessageAssembler::get_full_message()const
 
 NodeMessageParser::NodeMessageParser() :
 	full_message_found(false),
+	buf_index(0),
 	message(NULL)
 {
+	buf_size = DEF_LONG_STRING_SIZE;
+	buf = (char*)malloc(sizeof(char) * buf_size);
+	if (buf == NULL)
+		throw bad_alloc();
 }
 
 NodeMessageParser::~NodeMessageParser()
@@ -248,34 +283,54 @@ NodeMessageParser::~NodeMessageParser()
 		free(message);
 		message = NULL;
 	}
+	buf_size = buf_index = 0;
 }
 
-unsigned short NodeMessageParser::add(const char* new_message)
+unsigned short NodeMessageParser::add(const char* data, unsigned int data_size)
 {
 	if (full_message_found)
 	{
 		PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
-    if (new_message == NULL)
+    if (data == NULL)
     {
-    	PRINT_ERROR("%s", "invalid Argument: new_message should NOT be NULL\n");
+    	PRINT_ERROR("%s", "invalid Argument: data should NOT be NULL\n");
     	return RET_FAILURE_INVALID_ARGUMENT;
     }
+// Check if the buffer capacity is insufficient
+    if (buf_index + data_size >= buf_size)
+    {
+    	buf_size <<= 1;
+    	char* buf_tmp = buf;
+    	buf = (char*)realloc(buf_tmp, sizeof(char) * buf_size);
+	 	if (buf == NULL)
+			throw bad_alloc();
+    }
+    memcpy(&buf[buf_index], data, sizeof(char) * data_size);
+    buf_index += data_size;
 
-	data_buffer += string(new_message);
-	// fprintf(stderr, "data_buffer: %s\n", data_buffer.c_str());
+	// data_buffer += string(new_message);
+	// // fprintf(stderr, "data_buffer: %s\n", data_buffer.c_str());
 	return RET_SUCCESS;
 }
 
 unsigned short NodeMessageParser::check_completion()
 {
 // Check if the data is completely sent from the remote site
-	data_end_pos = data_buffer.find(END_OF_MESSAGE);
-	if (data_end_pos == string::npos)
+	// data_end_pos = data_buffer.find(END_OF_MESSAGE);
+	// if (data_end_pos == string::npos)
+	char* message_end_ptr = strstr(buf, END_OF_MESSAGE);
+	if (message_end_ptr == NULL)
 		return RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
 // Parse the content of the full message
-	message_type = (MessageType)data_buffer.front();
+	int message_index = 0;
+// Parse message_type
+	// message_type = (MessageType)data_buffer.front();
+	char message_type_tmp;
+	memcpy(&message_type_tmp, &buf[message_index], MESSAGE_TYPE_LEN);
+	message_index += MESSAGE_TYPE_LEN;
+	message_type = (MessageType)message_type_tmp;
 	if (message_type < 0 || message_type >= MSG_SIZE)
 	{
 		// static int char ERRMSG_SIZE = 256;
@@ -285,13 +340,29 @@ unsigned short NodeMessageParser::check_completion()
 		PRINT_ERROR("The message type[%d] is NOT in range [0, %d)\n", message_type, MSG_SIZE);
 		return RET_FAILURE_RUNTIME;	
 	}
-
+// Parse message_size
+	unsigned int message_size_tmp;
+	memcpy(&message_size_tmp, &buf[message_index], MESSAGE_SIZE_LEN);
+	message_index += MESSAGE_SIZE_LEN;
+	message_size = message_size_tmp;
+// Parse message
 	if (message != NULL)
 	{
 		free(message);
 		message = NULL;
 	}
-	message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
+	// message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
+	int message_size_in_buf = message_end_ptr - (buf + message_index);
+	if (message_size != message_size_in_buf)
+	{
+		PRINT_ERROR("The message size is incorrect, message_size: %d, message_size_in_buf: %d\n", message_size, message_size_in_buf);
+		return RET_FAILURE_RUNTIME;			
+	}
+	// message = new char[message_size];
+	// if (message == NULL)
+	// 	throw bad_alloc();
+	// memcpy(message, &buf[message_index], sizeof(char) * message_size);
+	message = &buf[message_index];
 
 	full_message_found = true;
 #if 0
@@ -304,10 +375,10 @@ unsigned short NodeMessageParser::check_completion()
 	return RET_SUCCESS;
 }
 
-unsigned short NodeMessageParser::parse(const char* new_message)
+unsigned short NodeMessageParser::parse(const char* data, unsigned int data_size)
 {
 	unsigned short ret = RET_SUCCESS;
-	ret = add(new_message);
+	ret = add(data, data_size);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	ret = check_completion();
@@ -321,19 +392,50 @@ unsigned short NodeMessageParser::remove_old()
 		PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
-	data_buffer = data_buffer.substr(data_end_pos + END_OF_MESSAGE_LEN);
+	// data_buffer = data_buffer.substr(data_end_pos + END_OF_MESSAGE_LEN);
+	int message_index = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN;
+	int buf_index_diff = buf_index - message_index;
+	if (buf_index_diff < 0)
+	{
+		PRINT_ERROR("%s", "Incorrect buffer index, buf_index: %d, message_index: %d\n", buf_index, message_index);
+		return RET_FAILURE_RUNTIME;
+	}
+	if (buf_index_diff > 0)
+	{
+// new data exist !!!
+		char* buf_tmp = (char*)malloc(sizeof(char) * buf_index_diff);
+		if (buf_tmp == NULL)
+			throw bad_alloc();
+		memcpy(buf_tmp, &buf[message_index], sizeof(char) * buf_index_diff);
+		memcpy(buf, buf_tmp, sizeof(char) * buf_index_diff);
+		free(buf_tmp);
+	}
+	buf_index -= message_index;
+
 	full_message_found = false;
 	return RET_SUCCESS;
 }
 
-bool NodeMessageParser::is_cur_message_empty()const
+MessageType NodeMessageParser::get_message_type()const
 {
-	return data_buffer.empty();
+	assert(full_message_found && "Incorrect Operation: full_message_found should NOT be True");
+	// if (!full_message_found)
+	// {
+	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+	// 	return RET_FAILURE_INCORRECT_OPERATION;
+	// }
+	return message_type;	
 }
 
-const char* NodeMessageParser::cur_get_message()const
+unsigned int NodeMessageParser::get_message_size()const
 {
-	return data_buffer.c_str();
+	assert(full_message_found && "Incorrect Operation: full_message_found should NOT be True");
+	// if (!full_message_found)
+	// {
+	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
+	// 	return RET_FAILURE_INCORRECT_OPERATION;
+	// }
+	return message_size;	
 }
 
 const char* NodeMessageParser::get_message()const
@@ -352,15 +454,16 @@ const char* NodeMessageParser::get_message()const
 	return message;
 }
 
-MessageType NodeMessageParser::get_message_type()const
+bool NodeMessageParser::is_buffer_empty()const
 {
-	assert(full_message_found && "Incorrect Operation: full_message_found should NOT be True");
-	// if (!full_message_found)
-	// {
-	// 	PRINT_ERROR("%s", "Incorrect Operation: full_message_found should NOT be True\n");
-	// 	return RET_FAILURE_INCORRECT_OPERATION;
-	// }
-	return message_type;	
+	// return data_buffer.empty();
+	return (buf_index == 0 ? true : false);
+}
+
+const char* NodeMessageParser::get_buffer()const
+{
+	// return data_buffer.c_str();
+	return buf;
 }
 
 //////////////////////////////////////////////////////////

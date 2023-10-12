@@ -128,9 +128,10 @@ bool SHOW_CONSOLE = true;
 // const string CHECK_SERVER_CANDIDATE_TAG = string("*@ServerCandidate@*");
 // const int CHECK_KEEPALIVE_TAG_LEN = string(CHECK_KEEPALIVE_TAG).length();
 // const int CHECK_SERVER_CANDIDATE_TAG_LEN = CHECK_SERVER_CANDIDATE_TAG.length();
-const int MESSAGE_TYPE_LEN = 1;
-const string END_OF_MESSAGE = std::string("\r\n\r\n");
-const int END_OF_MESSAGE_LEN = END_OF_MESSAGE.length();
+const int MESSAGE_TYPE_LEN = sizeof(char);
+const int MESSAGE_SIZE_LEN = sizeof(unsigned int);
+const char* END_OF_MESSAGE = "\r\n\r\n";  // std::string("\r\n\r\n");
+const int END_OF_MESSAGE_LEN = strlen(END_OF_MESSAGE);  // END_OF_MESSAGE.length();
 
 // const char* END_OF_PACKET = "\r\n\r\n";
 const int KEEPALIVE_DELAY_TIME = 30;

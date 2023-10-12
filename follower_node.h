@@ -42,25 +42,25 @@ private:
 	unsigned short connect_leader();
 	unsigned short become_follower();
 	// unsigned short connect_file_sender();
-	unsigned short send_data(MessageType message_type, const char* data=NULL);
+	unsigned short send_string_data(MessageType message_type, const char* data=NULL);
 // events
 // recv
-	unsigned short recv_check_keepalive(const std::string& message_data);
-	unsigned short recv_update_cluster_map(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
-	unsigned short recv_transmit_text(const std::string& message_data);
-	unsigned short recv_get_system_info(const std::string& message_data);
-	unsigned short recv_get_system_monitor(const std::string& message_data);	
-	unsigned short recv_get_simulator_version(const std::string& message_data);
-	unsigned short recv_install_simulator(const std::string& message_data);
-	unsigned short recv_apply_fake_acspt_config(const std::string& message_data);
-	unsigned short recv_apply_fake_usrept_config(const std::string& message_data);
-	unsigned short recv_control_fake_acspt(const std::string& message_data);
-	unsigned short recv_control_fake_usrept(const std::string& message_data);
-	unsigned short recv_get_fake_acspt_state(const std::string& message_data);
-	unsigned short recv_get_fake_acspt_detail(const std::string& message_data);
-	unsigned short recv_request_file_transfer(const std::string& message_data);
-	unsigned short recv_complete_file_transfer(const std::string& message_data);
-	unsigned short recv_switch_leader(const std::string& message_data);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+	unsigned short recv_check_keepalive(const char* message_data, int message_size);
+	unsigned short recv_update_cluster_map(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
+	unsigned short recv_transmit_text(const char* message_data, int message_size);
+	unsigned short recv_get_system_info(const char* message_data, int message_size);
+	unsigned short recv_get_system_monitor(const char* message_data, int message_size);	
+	unsigned short recv_get_simulator_version(const char* message_data, int message_size);
+	unsigned short recv_install_simulator(const char* message_data, int message_size);
+	unsigned short recv_apply_fake_acspt_config(const char* message_data, int message_size);
+	unsigned short recv_apply_fake_usrept_config(const char* message_data, int message_size);
+	unsigned short recv_control_fake_acspt(const char* message_data, int message_size);
+	unsigned short recv_control_fake_usrept(const char* message_data, int message_size);
+	unsigned short recv_get_fake_acspt_state(const char* message_data, int message_size);
+	unsigned short recv_get_fake_acspt_detail(const char* message_data, int message_size);
+	unsigned short recv_request_file_transfer(const char* message_data, int message_size);
+	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
+	unsigned short recv_switch_leader(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
@@ -87,7 +87,7 @@ public:
 // INode
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
-	virtual unsigned short recv(MessageType message_type, const std::string& message_data);
+	virtual unsigned short recv(MessageType message_type, const char* message_data, int message_size);
 	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL);
 // IParam
     virtual unsigned short set(ParamType param_type, void* param1=NULL, void* param2=NULL);

@@ -146,7 +146,8 @@ const char* GetErrorDescription(unsigned short ret);
 extern bool SHOW_CONSOLE;
 
 extern const int MESSAGE_TYPE_LEN;
-extern const std::string END_OF_MESSAGE;
+extern const int MESSAGE_SIZE_LEN;
+extern const char* END_OF_MESSAGE;
 extern const int END_OF_MESSAGE_LEN;
 
 extern const int KEEPALIVE_DELAY_TIME;
@@ -356,7 +357,8 @@ public:
 
 	virtual unsigned short initialize()=0;
 	virtual unsigned short deinitialize()=0;
-	virtual unsigned short recv(MessageType message_type, const std::string& message_data)=0;
+	// virtual unsigned short recv(MessageType message_type, const std::string& message_data)=0;
+	virtual unsigned short recv(MessageType message_type, const char* message_data, int message_size)=0;
 	virtual unsigned short send(MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)=0;
 };
 typedef INode* PINODE;
@@ -406,43 +408,50 @@ public:
 
 ///////////////////////////////////////////////////
 
+// Assemble the message. Should NOT treat the buffer as a string
 class NodeMessageAssembler
 {
 private:
+// Format:  message_type | message_size | message | End Of message
 	char* full_message_buf;
+	size_t full_message_buf_size;
 
 public:
 	NodeMessageAssembler();
 	~NodeMessageAssembler();
 
-	unsigned short assemble(MessageType message_type, const char* message=NULL);
+	unsigned short assemble(MessageType message_type, const char* message=NULL, unsigned int message_size=0);
 
     const char* get_full_message()const;
 };
 
+// Parse the message. Should NOT treat the buffer as a string
 class NodeMessageParser
 {
 private:
 	bool full_message_found;
-	std::string data_buffer;
-	size_t data_end_pos;
+	char* buf;
+	unsigned int buf_size;
+	unsigned int buf_index;
+
 	MessageType message_type;
+	unsigned int message_size;
 	char* message;
+
+	unsigned short add(const char* data, unsigned int data_size);
+	unsigned short check_completion();
 
 public:
 	NodeMessageParser();
 	~NodeMessageParser();
 
-	unsigned short add(const char* new_message);
-	unsigned short check_completion();
-
-	unsigned short parse(const char* new_message);
-	unsigned short remove_old();
-
-	bool is_cur_message_empty()const;
-	const char* cur_get_message()const;
-    const char* get_message()const;
+	unsigned short parse(const char* data, unsigned int data_size);
     MessageType get_message_type()const;
+    unsigned int get_message_size()const;
+    const char* get_message()const;
+	bool is_buffer_empty()const;
+	const char* get_buffer()const;
+	unsigned short remove_old();
 };
 
 ///////////////////////////////////////////////////

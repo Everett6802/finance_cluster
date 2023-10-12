@@ -1041,7 +1041,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     			WRITE_ERROR("The param1/param2 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-	    	assert(file_tx != NULL && "file_tx should be NULL");
+	    	assert(file_tx == NULL && "file_tx should be NULL");
 	    	unsigned short ret = RET_SUCCESS;
 	    	PCLUSTER_FILE_TRANSFER_PARAM cluster_file_transfer_param = (PCLUSTER_FILE_TRANSFER_PARAM)param1;
 	    	assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
@@ -1090,7 +1090,8 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 			int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[cluster_file_transfer_param->session_id].cond, &interactive_session_param[cluster_file_transfer_param->session_id].mtx, &ts);
 // Stop the listening thread
-			ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+			// ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+			ret = file_tx->set(PARAM_FILE_TRANSFER_DONE);
 			if (CHECK_FAILURE(ret))
 				return ret;
 

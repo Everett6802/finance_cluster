@@ -311,7 +311,7 @@ unsigned short FollowerNode::become_follower()
 // 	return RET_SUCCESS;
 // }
 
-unsigned short FollowerNode::send_data(MessageType message_type, const char* data)
+unsigned short FollowerNode::send_string_data(MessageType message_type, const char* data)
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(msg != NULL && "msg should NOT be NULL");
@@ -436,10 +436,10 @@ unsigned short FollowerNode::deinitialize()
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv(MessageType message_type, const std::string& message_data)
+unsigned short FollowerNode::recv(MessageType message_type, const char* message_data, int message_size)
 {
 	// WRITE_FORMAT_DEBUG("Leader got the message from the Follower[%s], data: %s, size: %d", token.c_str(), message.c_str(), (int)message.length());
-	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const std::string& message_data);
+	typedef unsigned short (FollowerNode::*RECV_FUNC_PTR)(const char* message_data, int message_size);
 	static RECV_FUNC_PTR recv_func_array[] =
 	{
 		NULL,
@@ -465,7 +465,7 @@ unsigned short FollowerNode::recv(MessageType message_type, const std::string& m
 		WRITE_FORMAT_ERROR("Unknown Message Type: %d", message_type);
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
-	return (this->*(recv_func_array[message_type]))(message_data);
+	return (this->*(recv_func_array[message_type]))(message_data, message_size);
 }
 
 unsigned short FollowerNode::send(MessageType message_type, void* param1, void* param2, void* param3)
@@ -500,7 +500,7 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 	return (this->*(send_func_array[message_type]))(param1, param2, param3);
 }
 
-unsigned short FollowerNode::recv_check_keepalive(const std::string& message_data)
+unsigned short FollowerNode::recv_check_keepalive(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: Client IP| EOD
@@ -513,13 +513,14 @@ unsigned short FollowerNode::recv_check_keepalive(const std::string& message_dat
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv_update_cluster_map(const std::string& message_data)
+unsigned short FollowerNode::recv_update_cluster_map(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: Cluster map string| EOD
 	unsigned short ret = RET_SUCCESS;
 	pthread_mutex_lock(&cluster_map_mtx);
-	ret = cluster_map.from_string(message_data.c_str());
+	// ret = cluster_map.from_string(message_data.c_str());
+	ret = cluster_map.from_string(message_data);
 	// fprintf(stderr, "Follower: message_data: %s, cluster_map: %s\n", message_data.c_str(), cluster_map.to_string());
 	if (CHECK_FAILURE(ret))
 	{
@@ -536,52 +537,57 @@ OUT:
 	return ret;
 }
 
-unsigned short FollowerNode::recv_transmit_text(const std::string& message_data)
+unsigned short FollowerNode::recv_transmit_text(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | text string| EOD
-	printf("Recv Text: %s\n", message_data.c_str());
+	// printf("Recv Text: %s\n", message_data.c_str());
+	printf("Recv Text: %s\n", message_data);
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv_get_system_info(const std::string& message_data)
+unsigned short FollowerNode::recv_get_system_info(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);
 	ret = send_get_system_info((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_get_system_monitor(const std::string& message_data)
+unsigned short FollowerNode::recv_get_system_monitor(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);
 	ret = send_get_system_monitor((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_get_simulator_version(const std::string& message_data)
+unsigned short FollowerNode::recv_get_simulator_version(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);	
 	ret = send_get_simulator_version((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_install_simulator(const std::string& message_data)
+unsigned short FollowerNode::recv_install_simulator(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: simulator package filepath | EOD
 	unsigned short ret = RET_SUCCESS;
-	const char* simulator_package_filepath = (const char*)message_data.c_str();
-	size_t notify_param_size = strlen(simulator_package_filepath) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)simulator_package_filepath, notify_param_size);
+	// const char* simulator_package_filepath = (const char*)message_data.c_str();
+	// size_t notify_param_size = strlen(simulator_package_filepath) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)simulator_package_filepath, notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifySimulatorInstallCfg((void*)message_data, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -591,14 +597,15 @@ unsigned short FollowerNode::recv_install_simulator(const std::string& message_d
 	return ret;
 }
 
-unsigned short FollowerNode::recv_apply_fake_acspt_config(const std::string& message_data)
+unsigned short FollowerNode::recv_apply_fake_acspt_config(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: simulator package filepath | EOD
 	unsigned short ret = RET_SUCCESS;
-	const char* fake_acspt_config_line_list_str = (const char*)message_data.c_str();
-	size_t notify_param_size = strlen(fake_acspt_config_line_list_str) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptConfigApplyCfg((void*)fake_acspt_config_line_list_str, notify_param_size);
+	// const char* fake_acspt_config_line_list_str = (const char*)message_data.c_str();
+	// size_t notify_param_size = strlen(fake_acspt_config_line_list_str) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptConfigApplyCfg((void*)fake_acspt_config_line_list_str, notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptConfigApplyCfg((void*)message_data, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -608,14 +615,15 @@ unsigned short FollowerNode::recv_apply_fake_acspt_config(const std::string& mes
 	return ret;
 }
 
-unsigned short FollowerNode::recv_apply_fake_usrept_config(const std::string& message_data)
+unsigned short FollowerNode::recv_apply_fake_usrept_config(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: simulator package filepath | EOD
 	unsigned short ret = RET_SUCCESS;
-	const char* fake_usrept_config_line_list_str = (const char*)message_data.c_str();
-	size_t notify_param_size = strlen(fake_usrept_config_line_list_str) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptConfigApplyCfg((void*)fake_usrept_config_line_list_str, notify_param_size);
+	// const char* fake_usrept_config_line_list_str = (const char*)message_data.c_str();
+	// size_t notify_param_size = strlen(fake_usrept_config_line_list_str) + 1;
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptConfigApplyCfg((void*)fake_usrept_config_line_list_str, notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptConfigApplyCfg((void*)message_data, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -625,14 +633,16 @@ unsigned short FollowerNode::recv_apply_fake_usrept_config(const std::string& me
 	return ret;
 }
 
-unsigned short FollowerNode::recv_control_fake_acspt(const std::string& message_data)
+unsigned short FollowerNode::recv_control_fake_acspt(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: simulator ap control type | EOD
 	unsigned short ret = RET_SUCCESS;
-	FakeAcsptControlType fake_acspt_control_type = (FakeAcsptControlType)atoi(message_data.c_str());
-	size_t notify_param_size = sizeof(FakeAcsptControlType);
-	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	// FakeAcsptControlType fake_acspt_control_type = (FakeAcsptControlType)atoi(message_data.c_str());
+	// size_t notify_param_size = sizeof(FakeAcsptControlType);
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	FakeAcsptControlType fake_acspt_control_type = (FakeAcsptControlType)atoi(message_data);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -642,14 +652,16 @@ unsigned short FollowerNode::recv_control_fake_acspt(const std::string& message_
 	return ret;
 }
 
-unsigned short FollowerNode::recv_control_fake_usrept(const std::string& message_data)
+unsigned short FollowerNode::recv_control_fake_usrept(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | Payload: simulator ue control type | EOD
 	unsigned short ret = RET_SUCCESS;
-	FakeUsreptControlType fake_usrept_control_type = (FakeUsreptControlType)atoi(message_data.c_str());
-	size_t notify_param_size = sizeof(FakeUsreptControlType);
-	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, notify_param_size);
+	// FakeUsreptControlType fake_usrept_control_type = (FakeUsreptControlType)atoi(message_data.c_str());
+	// size_t notify_param_size = sizeof(FakeUsreptControlType);
+	// PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, notify_param_size);
+	FakeUsreptControlType fake_usrept_control_type = (FakeUsreptControlType)atoi(message_data);
+	PNOTIFY_CFG notify_cfg = new NotifyFakeUsreptControlCfg((void*)&fake_usrept_control_type, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -659,27 +671,29 @@ unsigned short FollowerNode::recv_control_fake_usrept(const std::string& message
 	return ret;
 }
 
-unsigned short FollowerNode::recv_get_fake_acspt_state(const std::string& message_data)
+unsigned short FollowerNode::recv_get_fake_acspt_state(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);
 	ret = send_get_fake_acspt_state((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_get_fake_acspt_detail(const std::string& message_data)
+unsigned short FollowerNode::recv_get_fake_acspt_detail(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);
 	ret = send_get_fake_acspt_detail((void*)&session_id, (void*)&cluster_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_request_file_transfer(const std::string& message_data)
+unsigned short FollowerNode::recv_request_file_transfer(const char* message_data, int message_size)
 {
 // // Message format:
 // // EventType | session id | filepath | EOD
@@ -703,9 +717,10 @@ unsigned short FollowerNode::recv_request_file_transfer(const std::string& messa
 // 	if (CHECK_FAILURE(ret))
 // 		return ret;
 	usleep((random() % 10) * 100000);
-	const char* nofity_param = message_data.c_str();
-	size_t notify_param_size = strlen(nofity_param);
-	PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)nofity_param, notify_param_size);
+	// const char* nofity_param = message_data.c_str();
+	// size_t notify_param_size = strlen(nofity_param);
+	// PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)nofity_param, notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)message_data, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -716,7 +731,7 @@ unsigned short FollowerNode::recv_request_file_transfer(const std::string& messa
 	return RET_SUCCESS;
 }
 
-unsigned short FollowerNode::recv_complete_file_transfer(const std::string& message_data)
+unsigned short FollowerNode::recv_complete_file_transfer(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | session ID | EOD
@@ -734,21 +749,22 @@ unsigned short FollowerNode::recv_complete_file_transfer(const std::string& mess
 // 		WRITE_WARN("The file channel does NOT exist");
 // Synchronous event
 	ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
-
-	int session_id = atoi(message_data.c_str());
+	// int session_id = atoi(message_data.c_str());
+	int session_id = atoi(message_data);
 	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_switch_leader(const std::string& message_data)
+unsigned short FollowerNode::recv_switch_leader(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | leader candidate node ID | EOD
 	unsigned short ret = RET_SUCCESS;
-	int leader_candidate_node_id = atoi(message_data.c_str());
-
-	size_t notify_param_size = sizeof(int);
-	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, notify_param_size);
+	// int leader_candidate_node_id = atoi(message_data.c_str());
+	// size_t notify_param_size = sizeof(int);
+	// PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, notify_param_size);
+	int leader_candidate_node_id = atoi(message_data);
+	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
     assert(observer != NULL && "observer should NOT be NULL");
@@ -771,9 +787,9 @@ unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, vo
 	}
 
 	// fprintf(stderr, "KeepAlive Sent\n");
-	return send_data(MSG_CHECK_KEEPALIVE, local_token);
+	return send_string_data(MSG_CHECK_KEEPALIVE, local_token);
 	// char msg = (char)MSG_CHECK_KEEPALIVE;
-	// return send_data(&msg);
+	// return send_string_data(&msg);
 }
 
 unsigned short FollowerNode::send_update_cluster_map(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSTER_MAP);}
@@ -790,7 +806,7 @@ unsigned short FollowerNode::send_transmit_text(void* param1, void* param2, void
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	const char* text_data = (const char*)param1;
-	return send_data(MSG_TRANSMIT_TEXT, text_data);
+	return send_string_data(MSG_TRANSMIT_TEXT, text_data);
 }
 
 unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, void* param3)
@@ -832,7 +848,7 @@ unsigned short FollowerNode::send_get_system_info(void* param1, void* param2, vo
 	// memset(session_id_str, 0x0, sizeof(char) * 3);
 	// memcpy(session_id_str, system_info_data.c_str(), sizeof(char) * 2);
 	// fprintf(stderr, "Follower[%s] send_get_system_info session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_info_data.c_str() + 2));
-	return send_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
+	return send_string_data(MSG_GET_SYSTEM_INFO, system_info_data.c_str());
 }
 
 unsigned short FollowerNode::send_get_system_monitor(void* param1, void* param2, void* param3)
@@ -874,7 +890,7 @@ unsigned short FollowerNode::send_get_system_monitor(void* param1, void* param2,
 	// memset(session_id_str, 0x0, sizeof(char) * 3);
 	// memcpy(session_id_str, system_monitor_data.c_str(), sizeof(char) * 2);
 	// fprintf(stderr, "Follower[%s] send_get_system_monitor session id: %d, system info: %s\n", local_token, atoi(session_id_str), (system_monitor_data.c_str() + 2));
-	return send_data(MSG_GET_SYSTEM_MONITOR, system_monitor_data.c_str());
+	return send_string_data(MSG_GET_SYSTEM_MONITOR, system_monitor_data.c_str());
 }
 
 unsigned short FollowerNode::send_get_simulator_version(void* param1, void* param2, void* param3)
@@ -921,7 +937,7 @@ unsigned short FollowerNode::send_get_simulator_version(void* param1, void* para
 		simulator_version_param = NULL;
 	}
 
-	return send_data(MSG_GET_SIMULATOR_VERSION, simulator_version_data.c_str());
+	return send_string_data(MSG_GET_SIMULATOR_VERSION, simulator_version_data.c_str());
 }
 
 unsigned short FollowerNode::send_install_simulator(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_INSTALL_SIMULATOR);}
@@ -978,7 +994,7 @@ unsigned short FollowerNode::send_get_fake_acspt_state(void* param1, void* param
 		fake_acspt_state_param = NULL;
 	}
 
-	return send_data(MSG_GET_FAKE_ACSPT_STATE, fake_acspt_state_data.c_str());
+	return send_string_data(MSG_GET_FAKE_ACSPT_STATE, fake_acspt_state_data.c_str());
 }
 
 unsigned short FollowerNode::send_get_fake_acspt_detail(void* param1, void* param2, void* param3)
@@ -1025,7 +1041,7 @@ unsigned short FollowerNode::send_get_fake_acspt_detail(void* param1, void* para
 		fake_acspt_detail_param = NULL;
 	}
 
-	return send_data(MSG_GET_FAKE_ACSPT_DETAIL, fake_acspt_detail_data.c_str());
+	return send_string_data(MSG_GET_FAKE_ACSPT_DETAIL, fake_acspt_detail_data.c_str());
 }
 
 unsigned short FollowerNode::send_request_file_transfer(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REQUEST_FILE_TRANSFER);}
@@ -1060,7 +1076,7 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
 
 	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf);
-	return send_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
+	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
 }
 
 unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}
