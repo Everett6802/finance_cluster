@@ -320,8 +320,21 @@ unsigned short NodeMessageParser::check_completion()
 // Check if the data is completely sent from the remote site
 	// data_end_pos = data_buffer.find(END_OF_MESSAGE);
 	// if (data_end_pos == string::npos)
-	char* message_end_ptr = strstr(buf, END_OF_MESSAGE);
-	if (message_end_ptr == NULL)
+	// char* message_end_ptr = strstr(buf, END_OF_MESSAGE);
+	// if (message_end_ptr == NULL)
+	// 	return RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
+	bool check_end_of_message = false;
+	int message_end_index;
+	for (int i = buf_index ; i >= END_OF_MESSAGE_LEN ; i--)
+	{
+		if (memcmp(&buf[i - END_OF_MESSAGE_LEN], END_OF_MESSAGE, sizeof(char) * END_OF_MESSAGE_LEN) == 0)
+		{
+			check_end_of_message = true;
+			message_end_index = i - END_OF_MESSAGE_LEN;
+			break;
+		}
+	}
+	if (!check_end_of_message)
 		return RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
 // Parse the content of the full message
 	int message_index = 0;
@@ -351,8 +364,9 @@ unsigned short NodeMessageParser::check_completion()
 		free(message);
 		message = NULL;
 	}
-	// message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
-	int message_size_in_buf = message_end_ptr - (buf + message_index);
+	// // message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
+	// int message_size_in_buf = message_end_ptr - (buf + message_index);
+	int message_size_in_buf = message_end_index - message_index;
 	if (message_size != message_size_in_buf)
 	{
 		PRINT_ERROR("The message size is incorrect, message_size: %d, message_size_in_buf: %d\n", message_size, message_size_in_buf);
