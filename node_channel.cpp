@@ -206,7 +206,7 @@ const char* NodeChannel::get_remote_token()const
 	return remote_token.c_str();
 }
 
-unsigned short NodeChannel::send_msg_ex(const char* msg_data, int msg_data_size)
+unsigned short NodeChannel::send_msg(const char* msg_data, int msg_data_size)
 {
 	assert(msg_data != NULL && "msg_data should NOT be NULL");
 	char* msg_data_copy = (char*)malloc(sizeof(char) * msg_data_size);
@@ -215,24 +215,6 @@ unsigned short NodeChannel::send_msg_ex(const char* msg_data, int msg_data_size)
 	memset(msg_data_copy, 0x0, sizeof(char) * msg_data_size);
 	memcpy(msg_data_copy, msg_data, sizeof(char) * msg_data_size);
 	// fprintf(stderr, "msg_data_copy: %s, msg_data: %s\n", msg_data_copy, msg_data);
-// Put the new incoming message to the buffer first
-	pthread_mutex_lock(&mtx_buffer);
-	send_buffer_list.push_back(msg_data_copy);
-	if (!send_msg_trigger)
-	{
-		pthread_cond_signal(&cond_buffer);
-		send_msg_trigger = true;
-	}
-	pthread_mutex_unlock(&mtx_buffer);
-
-	return RET_SUCCESS;
-}
-
-unsigned short NodeChannel::send_msg(const char* msg_data)
-{
-	assert(msg_data != NULL && "msg_data should NOT be NULL");
-	char* msg_data_copy = strdup(msg_data);
-	fprintf(stderr, "msg_data_copy: %s, msg_data: %s\n", msg_data_copy, msg_data);
 // Put the new incoming message to the buffer first
 	pthread_mutex_lock(&mtx_buffer);
 	send_buffer_list.push_back(msg_data_copy);
@@ -459,7 +441,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				{
 // Parse the message
 					ret = node_message_parser.parse(buf, recv_ret);
-					if (CHECK_FAILURE(ret))
+					if (CHECK_FAILURE(ret) || CHECK_FAILURE_CONNECTION(ret))
 					{
 						if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
 						{

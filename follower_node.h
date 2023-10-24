@@ -42,6 +42,9 @@ private:
 	unsigned short connect_leader();
 	unsigned short become_follower();
 	// unsigned short connect_file_sender();
+// Don't treat the data content as string. It's required to know the data size
+	unsigned short send_raw_data(MessageType message_type, const char* data=NULL, int data_size=0);
+// Treat the data content as string. Calculate the size via strlen()
 	unsigned short send_string_data(MessageType message_type, const char* data=NULL);
 // events
 // recv

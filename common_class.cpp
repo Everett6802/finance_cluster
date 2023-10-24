@@ -192,75 +192,85 @@ bool IPv4Addr::is_same_network(int netmask_digits, const char* ipv4_network_str)
 //////////////////////////////////////////////////////////
 
 NodeMessageAssembler::NodeMessageAssembler() :
-	full_message_buf(NULL),
-	full_message_buf_size(0)
+	message_buf(NULL),
+	message_buf_size(0)
 {
 }
 
 NodeMessageAssembler::~NodeMessageAssembler()
 {
-	full_message_buf_size = 0;
-	if (full_message_buf != NULL)
+	message_buf_size = 0;
+	if (message_buf != NULL)
 	{
-		delete[] full_message_buf;
-		full_message_buf = NULL;
+		delete[] message_buf;
+		message_buf = NULL;
 	}
 }
 
 unsigned short NodeMessageAssembler::assemble(MessageType message_type, const char* message, unsigned int message_size)
 {
-	if (full_message_buf != NULL)
+	if (message_buf != NULL)
 		return RET_FAILURE_INCORRECT_OPERATION;
-
+	if (message_size != 0 && message == NULL)
+		return RET_FAILURE_INVALID_ARGUMENT;
+	else if (message_size == 0 && message != NULL)
+		return RET_FAILURE_INVALID_ARGUMENT;
 // // Caution: Should NOT always handle the data like a string. If the first character of the message is 0, for example, 
 // // strlen() will return the wrong value
 // 	if (message_size == -1)
 // 		message_size = (message != NULL ? strlen(message) : 0);
 
 // Format:  message_type | message_size | message | End Of message
-	full_message_buf_size = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN + 1;
-	full_message_buf = new char[full_message_buf_size];
-	if (full_message_buf == NULL)
+	message_buf_size = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN + 1;
+	message_buf = new char[message_buf_size];
+	if (message_buf == NULL)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	// if (message_size == -1)
 	// {
 	// 	if (message != NULL)
-	// 		snprintf(full_message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
+	// 		snprintf(message_buf, buf_size, "%c%s%s", message_type, message, END_OF_MESSAGE.c_str());
 	// 	else
-	// 		snprintf(full_message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
+	// 		snprintf(message_buf, buf_size, "%c%s", message_type, END_OF_MESSAGE.c_str());
 	// }
 	// else
 	// {
-	// 	memset(full_message_buf, 0x0, sizeof(char) * buf_size);
-	// 	char* full_message_buf_ptr = full_message_buf;
-	// 	memcpy(full_message_buf_ptr, (void*)&message_type, sizeof(char));
-	// 	full_message_buf_ptr += 1;
-	// 	memcpy(full_message_buf_ptr, (void*)message, sizeof(char) * message_size);
-	// 	full_message_buf_ptr += message_size;
-	// 	memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
+	// 	memset(message_buf, 0x0, sizeof(char) * buf_size);
+	// 	char* message_buf_ptr = message_buf;
+	// 	memcpy(message_buf_ptr, (void*)&message_type, sizeof(char));
+	// 	message_buf_ptr += 1;
+	// 	memcpy(message_buf_ptr, (void*)message, sizeof(char) * message_size);
+	// 	message_buf_ptr += message_size;
+	// 	memcpy(message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
 	// }
-	// memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
-	memset(full_message_buf, 0x0, sizeof(char) * full_message_buf_size);
-	char* full_message_buf_ptr = full_message_buf;
-	memcpy(full_message_buf_ptr, (void*)&message_type, MESSAGE_TYPE_LEN);
-	full_message_buf_ptr += MESSAGE_TYPE_LEN;
-	memcpy(full_message_buf_ptr, (void*)&message_size, MESSAGE_SIZE_LEN);
-	full_message_buf_ptr += MESSAGE_SIZE_LEN;
+	// memcpy(message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
+	memset(message_buf, 0x0, sizeof(char) * message_buf_size);
+	char* message_buf_ptr = message_buf;
+	memcpy(message_buf_ptr, (void*)&message_type, MESSAGE_TYPE_LEN);
+	message_buf_ptr += MESSAGE_TYPE_LEN;
+	memcpy(message_buf_ptr, (void*)&message_size, MESSAGE_SIZE_LEN);
+	message_buf_ptr += MESSAGE_SIZE_LEN;
 	if (message_size != 0)
 	{
-		memcpy(full_message_buf_ptr, (void*)message, sizeof(char) * message_size);
-		full_message_buf_ptr += message_size;
+		memcpy(message_buf_ptr, (void*)message, sizeof(char) * message_size);
+		message_buf_ptr += message_size;
 	}
-	memcpy(full_message_buf_ptr, (void*)END_OF_MESSAGE, sizeof(char) * END_OF_MESSAGE_LEN);
+	memcpy(message_buf_ptr, (void*)END_OF_MESSAGE, sizeof(char) * END_OF_MESSAGE_LEN);
 
 	return RET_SUCCESS;
 }
 
-const char* NodeMessageAssembler::get_full_message()const
+unsigned int NodeMessageAssembler::get_message_size()const
 {
-	if (full_message_buf == NULL)
-		throw runtime_error("node_message_type should be NodeMessage_Assemble");
-	return full_message_buf;
+	if (message_buf_size == 0)
+		throw runtime_error("message_buf_size should NOT be 0");
+	return message_buf_size;
+}
+
+const char* NodeMessageAssembler::get_message()const
+{
+	if (message_buf == NULL)
+		throw runtime_error("message_buf should NOT be NULL");
+	return message_buf;
 }
 
 //////////////////////////////////////////////////////////

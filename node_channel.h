@@ -55,9 +55,7 @@ private:
 	const char* get_remote_token()const;
 
 // Don't treat the data content as string. It's required to know the data size
-	unsigned short send_msg_ex(const char* msg_data, int msg_data_size);
-// Treat the data content as string. Copy the data by strdup
-	unsigned short send_msg(const char* msg_data);
+	unsigned short send_msg(const char* msg_data, int msg_data_size);
 };
 typedef NodeChannel* PNODE_CHANNEL;
 

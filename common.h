@@ -413,8 +413,8 @@ class NodeMessageAssembler
 {
 private:
 // Format:  message_type | message_size | message | End Of message
-	char* full_message_buf;
-	size_t full_message_buf_size;
+	unsigned int message_buf_size;
+	char* message_buf;
 
 public:
 	NodeMessageAssembler();
@@ -422,7 +422,8 @@ public:
 
 	unsigned short assemble(MessageType message_type, const char* message=NULL, unsigned int message_size=0);
 
-    const char* get_full_message()const;
+    unsigned int get_message_size()const;
+    const char* get_message()const;
 };
 
 // Parse the message. Should NOT treat the buffer as a string

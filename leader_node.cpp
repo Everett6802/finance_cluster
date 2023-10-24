@@ -217,8 +217,7 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 // Send to single node
 		PNODE_CHANNEL node_channel = node_channel_map[remote_token];
 		assert(node_channel != NULL && "node_channel should NOT be NULL");
-		fprintf(stderr, "send_msg: %s\n", node_message_assembler.get_full_message());
-		ret = node_channel->send_msg(node_message_assembler.get_full_message());
+		ret = node_channel->send_msg(node_message_assembler.get_message(), node_message_assembler.get_message_size());
 		if (CHECK_FAILURE(ret))
 			WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", remote_token, GetErrorDescription(ret));
 	}
@@ -243,8 +242,7 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 		{
 			PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
 			assert(node_channel != NULL && "node_channel should NOT be NULL");
-			fprintf(stderr, "send_msg: %s\n", node_message_assembler.get_full_message());
-			ret = node_channel->send_msg(node_message_assembler.get_full_message());
+			ret = node_channel->send_msg(node_message_assembler.get_message(), node_message_assembler.get_message_size());
 			if (CHECK_FAILURE(ret))
 			{
 				WRITE_FORMAT_ERROR("Fail to send data to the Follower[%s], due to: %s", node_channel->get_remote_token(), GetErrorDescription(ret));

@@ -311,7 +311,7 @@ unsigned short FollowerNode::become_follower()
 // 	return RET_SUCCESS;
 // }
 
-unsigned short FollowerNode::send_string_data(MessageType message_type, const char* data)
+unsigned short FollowerNode::send_raw_data(MessageType message_type, const char* data, int data_size)
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(msg != NULL && "msg should NOT be NULL");
@@ -327,12 +327,20 @@ unsigned short FollowerNode::send_string_data(MessageType message_type, const ch
 	pthread_mutex_lock(&node_channel_mtx);
 // Send to leader
 	assert(node_channel != NULL && "node_channel should NOT be NULL");
-	ret = node_channel->send_msg(node_message_assembler.get_full_message());
+	ret = node_channel->send_msg(node_message_assembler.get_message(), node_message_assembler.get_message_size());
 	if (CHECK_FAILURE(ret))
 		WRITE_FORMAT_ERROR("Fail to send msg to the Leader[%s], due to: %s", cluster_token, GetErrorDescription(ret));
 	pthread_mutex_unlock(&node_channel_mtx);
-	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_token, (node_message_assembler.get_full_message() + 1), (int)(*node_message_assembler.get_full_message()));
+	// fprintf(stderr, "Follower[%s] send Message to remote: %s[type: %d]\n", local_token, (node_message_assembler.get_message() + 1), (int)(*node_message_assembler.get_message()));
 	return ret;
+}
+
+unsigned short FollowerNode::send_string_data(MessageType message_type, const char* data)
+{
+	int data_size = 0;
+	if (data != NULL)
+		data_size = strlen(data) + 1;
+	return send_raw_data(message_type, data, data_size);
 }
 
 unsigned short FollowerNode::initialize()
