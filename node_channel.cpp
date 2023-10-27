@@ -437,7 +437,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 					observer->notify(NOTIFY_NODE_DIE, notify_cfg);
 					return RET_FAILURE_CONNECTION_CLOSE;
 				}
-				else
+				else if (recv_ret > 0) // Success
 				{
 // Parse the message
 					ret = node_message_parser.parse(buf, recv_ret);
@@ -478,6 +478,29 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 						break;
 					}
 				}
+				else if (recv_ret < 0 ) 
+				{
+					if (errno == EAGAIN || errno == EWOULDBLOCK) 
+					{
+				        // This is expected on a non-blocking socket,
+				        // so just return with what's available at the moment.
+						recv_count++;
+						if (recv_count >= MAX_RECV_COUNT)
+						{
+							WRITE_FORMAT_ERROR("[%s] fails to receive message. Max retries exprie......", thread_tag);
+							goto OUT;
+						}
+						else 
+							continue;		      
+				    } 
+				    else 
+				    {
+				        // Everything else is a hard error.
+				        // Do something with it in the caller.
+						WRITE_FORMAT_ERROR("[%s] recv() fails, due to: %s", thread_tag, strerror(errno));
+						return RET_FAILURE_CONNECTION_CLOSE;
+				    }
+			    }
 			}while(true);
 			// fprintf(stderr, "===> recv...... DONE\n");
 		}
