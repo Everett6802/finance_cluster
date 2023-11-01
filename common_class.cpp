@@ -192,8 +192,8 @@ bool IPv4Addr::is_same_network(int netmask_digits, const char* ipv4_network_str)
 //////////////////////////////////////////////////////////
 
 NodeMessageAssembler::NodeMessageAssembler() :
-	message_buf(NULL),
-	message_buf_size(0)
+	message_buf_size(0),
+	message_buf(NULL)
 {
 }
 
@@ -221,7 +221,7 @@ unsigned short NodeMessageAssembler::assemble(MessageType message_type, const ch
 // 		message_size = (message != NULL ? strlen(message) : 0);
 
 // Format:  message_type | message_size | message | End Of message
-	message_buf_size = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN + 1;
+	message_buf_size = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + message_size + END_OF_MESSAGE_LEN;
 	message_buf = new char[message_buf_size];
 	if (message_buf == NULL)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
@@ -243,6 +243,7 @@ unsigned short NodeMessageAssembler::assemble(MessageType message_type, const ch
 	// 	memcpy(message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
 	// }
 	// memcpy(message_buf_ptr, (void*)END_OF_MESSAGE.c_str(), sizeof(char) * END_OF_MESSAGE_LEN);
+	// fprintf(stderr, "message_buf_size: %d, MESSAGE_TYPE_LEN: %d, MESSAGE_SIZE_LEN: %d, END_OF_MESSAGE_LEN: %d\n", message_buf_size, MESSAGE_TYPE_LEN, MESSAGE_SIZE_LEN, END_OF_MESSAGE_LEN);
 	memset(message_buf, 0x0, sizeof(char) * message_buf_size);
 	char* message_buf_ptr = message_buf;
 	memcpy(message_buf_ptr, (void*)&message_type, MESSAGE_TYPE_LEN);
@@ -255,6 +256,8 @@ unsigned short NodeMessageAssembler::assemble(MessageType message_type, const ch
 		message_buf_ptr += message_size;
 	}
 	memcpy(message_buf_ptr, (void*)END_OF_MESSAGE, sizeof(char) * END_OF_MESSAGE_LEN);
+	// message_buf_ptr += END_OF_MESSAGE_LEN;
+	// fprintf(stderr, "message_type: %d, message_size: %d, %d\n", message_type, message_size, message_buf_ptr - message_buf);
 
 	return RET_SUCCESS;
 }
@@ -376,7 +379,7 @@ unsigned short NodeMessageParser::check_completion()
 	}
 	// // message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
 	// int message_size_in_buf = message_end_ptr - (buf + message_index);
-	int message_size_in_buf = message_end_index - message_index;
+	unsigned int message_size_in_buf = message_end_index - message_index;
 	if (message_size != message_size_in_buf)
 	{
 		PRINT_ERROR("The message size is incorrect, message_size: %d, message_size_in_buf: %d\n", message_size, message_size_in_buf);

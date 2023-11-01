@@ -290,8 +290,10 @@ unsigned short NodeChannel::send_thread_handler_internal()
 			// printf("NodeChannel::send_thread_handler_internal(), message sent: %s\n", msg_data);
 			assert(msg_data != NULL && "msg_data should NOT be NULL in send_access_list");
 			int start_pos = 0;
-			// fprintf(stderr, "===> send: %s\n", msg_data);
-			int write_to_byte = strlen(msg_data);
+			// // // fprintf(stderr, "===> send: %s\n", msg_data);
+			// // int write_to_byte = strlen(msg_data);
+			// fprintf(stderr, "===> send: Type: %d,Size: %d, Full Size: %d\n", GET_BUF_TYPE(msg_data), GET_BUF_SIZE(msg_data), GET_BUF_FULL_SIZE(msg_data));
+			int write_to_byte = GET_BUF_FULL_SIZE(msg_data);
 			while (write_to_byte > 0)
 			{
 				int write_bytes = send(node_socket, &msg_data[start_pos], write_to_byte, 0);

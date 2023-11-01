@@ -132,6 +132,7 @@ const int MESSAGE_TYPE_LEN = sizeof(char);
 const int MESSAGE_SIZE_LEN = sizeof(unsigned int);
 const char* END_OF_MESSAGE = "\r\n\r\n";  // std::string("\r\n\r\n");
 const int END_OF_MESSAGE_LEN = strlen(END_OF_MESSAGE);  // END_OF_MESSAGE.length();
+const int MESSAGE_FIXED_SIZE_LEN = MESSAGE_TYPE_LEN + MESSAGE_SIZE_LEN + END_OF_MESSAGE_LEN;
 
 // const char* END_OF_PACKET = "\r\n\r\n";
 const int KEEPALIVE_DELAY_TIME = 30;

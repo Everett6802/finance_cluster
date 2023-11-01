@@ -93,6 +93,22 @@ if (x != NULL)\
 }
 #endif
 
+#ifndef GET_BUF_TYPE
+#define GET_BUF_TYPE(x) ((char*)x)[0]
+#endif
+
+#ifndef GET_BUF_SIZE
+#define GET_BUF_SIZE(x) (unsigned int)*(int*)((char*)x+MESSAGE_TYPE_LEN)
+#endif
+
+#ifndef GET_BUF_FULL_SIZE
+#define GET_BUF_FULL_SIZE(x) GET_BUF_SIZE(x) + MESSAGE_FIXED_SIZE_LEN
+#endif
+
+#ifndef GET_BUF
+#define GET_BUF(x) ((char*)x+MESSAGE_TYPE_LEN+MESSAGE_SIZE_LEN)
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 
@@ -149,6 +165,7 @@ extern const int MESSAGE_TYPE_LEN;
 extern const int MESSAGE_SIZE_LEN;
 extern const char* END_OF_MESSAGE;
 extern const int END_OF_MESSAGE_LEN;
+extern const int MESSAGE_FIXED_SIZE_LEN;
 
 extern const int KEEPALIVE_DELAY_TIME;
 extern const int KEEPALIVE_PERIOD;
