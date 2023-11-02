@@ -723,10 +723,10 @@ void ClusterMgr::check_keepalive()
 			{
 				if (!IS_KEEP_ALIVE_TIMEOUT(ret))
 				{
-					WRITE_ERROR("Error should NOT occur when checking keep-alive on the client side !!!");
+					WRITE_FORMAT_ERROR("Error occurs while checking keep-alive on the client side, due to: %s", GetErrorDescription(ret));
 					// notify_exit(ret);
 					// return;
-					FPRINT_ERROR("Follower[%s] keep-alive time-out !!!\n", local_token);
+					FPRINT_ERROR("Follower[%s] keep-alive time-out, due to: %s\n", local_token, GetErrorDescription(ret));
 					raise(SIGTERM);
 				}
 				else

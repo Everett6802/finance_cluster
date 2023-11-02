@@ -292,9 +292,11 @@ NodeMessageParser::NodeMessageParser() :
 NodeMessageParser::~NodeMessageParser()
 {
 	if (message != NULL)
-	{
-		free(message);
 		message = NULL;
+	if (buf != NULL)
+	{
+		free(buf);
+		buf = NULL;
 	}
 	buf_size = buf_index = 0;
 }
@@ -372,11 +374,11 @@ unsigned short NodeMessageParser::check_completion()
 	message_index += MESSAGE_SIZE_LEN;
 	message_size = message_size_tmp;
 // Parse message
-	if (message != NULL)
-	{
-		free(message);
-		message = NULL;
-	}
+	// if (message != NULL)
+	// {
+	// 	free(message);
+	// 	message = NULL;
+	// }
 	// // message = strdup(data_buffer.substr(1, data_end_pos - 1).c_str());
 	// int message_size_in_buf = message_end_ptr - (buf + message_index);
 	unsigned int message_size_in_buf = message_end_index - message_index;
