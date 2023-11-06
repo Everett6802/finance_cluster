@@ -317,7 +317,7 @@ unsigned short FollowerNode::send_raw_data(MessageType message_type, const char*
 	// assert(msg != NULL && "msg should NOT be NULL");
 	// fprintf(stderr, "Follower[%s] Message: type: %d, data: %s\n", local_token, message_type, data);
 	NodeMessageAssembler node_message_assembler;
-	ret = node_message_assembler.assemble(message_type, data);
+	ret = node_message_assembler.assemble(message_type, data, data_size);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fails to assemble the message, due to: %s", GetErrorDescription(ret));
