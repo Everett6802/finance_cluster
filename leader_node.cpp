@@ -42,7 +42,8 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 {
 	IMPLEMENT_MSG_DUMPER()
 	assert(observer != NULL && "observer should NOT be NULL");
-	local_token = strdup(token);
+	if (token != NULL)
+		local_token = strdup(token);
 }
 
 LeaderNode::~LeaderNode()
@@ -200,6 +201,7 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 {
 	unsigned short ret = RET_SUCCESS;
 	// assert(data != NULL && "data should NOT be NULL");
+	// fprintf(stderr, "[send_raw_data]  message_type: %d\n", message_type);
 
 	NodeMessageAssembler node_message_assembler;
 	ret = node_message_assembler.assemble(message_type, data, data_size);
@@ -212,10 +214,20 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 	pthread_mutex_lock(&node_channel_mtx);
 	if (remote_token != NULL)
 	{
-		// fprintf(stderr, "remote_token: %s\n", remote_token);
-		// dump_node_channel_map();
+		// fprintf(stderr, "[send_raw_data]  remote_token: %s\n", remote_token);
+		dump_node_channel_map();
 // Send to single node
-		PNODE_CHANNEL node_channel = node_channel_map[remote_token];
+		string remote_token_str = string(remote_token);
+		PNODE_CHANNEL node_channel = node_channel_map[remote_token_str];
+		// map<string, PNODE_CHANNEL>::iterator iter = node_channel_map.find(remote_token);
+		// if (iter == node_channel_map.end())
+		// {
+		// 	WRITE_FORMAT_ERROR("The Follower[%s] does NOT exist", remote_token.c_str());
+		// 	return RET_FAILURE_INVALID_ARGUMENT;
+		// }
+		// PNODE_CHANNEL node_channel = (PNODE_CHANNEL)iter->second;
+
+		// fprintf(stderr, "[send_raw_data]  node_channel: %p\n", (void*)node_channel);
 		assert(node_channel != NULL && "node_channel should NOT be NULL");
 		ret = node_channel->send_msg(node_message_assembler.get_message(), node_message_assembler.get_message_size());
 		if (CHECK_FAILURE(ret))
@@ -1230,13 +1242,13 @@ unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2
 	char* buf = new char[buf_size];
 	if (buf == NULL)
 		throw bad_alloc();
-	fprintf(stderr, "session_id: %d, filepath: %s\n", file_transfer_param->session_id, file_transfer_param->filepath);
+	// fprintf(stderr, "session_id: %d, filepath: %s\n", file_transfer_param->session_id, file_transfer_param->filepath);
 	memset(buf, 0x0, sizeof(char) * buf_size);
 	memcpy(buf, &file_transfer_param->session_id, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
-	fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
+	// fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
 	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->filepath, sizeof(char) * filepath_len);
-	fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
-	fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
+	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	// fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
 
 	WRITE_DEBUG("Notify the receiver to establish the connection for file transfer");
 	unsigned short ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER, buf, buf_size);
@@ -1266,6 +1278,7 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
+	// fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
 	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
 }
 
@@ -1536,7 +1549,7 @@ void LeaderNode::dump_node_channel_map()const
 	{
 		string node_token = (string)(iter->first);
 		PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
-		fprintf(stderr, "%s %p\n", node_token.c_str(), (void*)node_channel);
+		// fprintf(stderr, "%s %p\n", node_token.c_str(), (void*)node_channel);
 		iter++;
 	}
 }

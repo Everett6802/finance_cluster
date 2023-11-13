@@ -23,8 +23,10 @@ FileReceiver::FileReceiver(PIMANAGER parent, const char* server_token, const cha
 	observer = parent;
 	assert(observer != NULL && "observer should NOT be NULL");
 
-	local_token = strdup(token);
-	cluster_token = strdup(server_token);
+	if (token != NULL)
+		local_token = strdup(token);
+	if (server_token != NULL)
+		cluster_token = strdup(server_token);
 }
 
 FileReceiver::~FileReceiver()

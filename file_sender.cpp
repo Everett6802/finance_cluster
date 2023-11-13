@@ -29,7 +29,8 @@ FileSender::FileSender(PIMANAGER parent, const char* token) :
 	IMPLEMENT_MSG_DUMPER()
 	observer = parent;
 	assert(observer != NULL && "observer should NOT be NULL");
-	local_token = strdup(token);
+	if (token != NULL)
+		local_token = strdup(token);
 }
 
 FileSender::~FileSender()

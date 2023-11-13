@@ -1789,12 +1789,32 @@ unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
 
 //////////////////////////////////////////////////////////
 
+unsigned short NotifySendFileDoneCfg::generate_obj(NotifySendFileDoneCfg **obj, int session_id_cfg, const char* remote_token_cfg)
+{
+	assert(obj != NULL && "obj should NOT be NULL");
+	assert(remote_token_cfg != NULL && "remote_token_cfg should NOT be NULL");
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + strlen(remote_token_cfg) + 1;
+	char* buf = new char[buf_size];
+	if (buf == NULL) throw bad_alloc();
+	memset(buf, 0x0, sizeof(char) * buf_size);
+	char* buf_ptr = buf;
+	memcpy(buf_ptr, &session_id_cfg, PAYLOAD_SESSION_ID_DIGITS);
+	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+	memcpy(buf_ptr, remote_token_cfg, strlen(remote_token_cfg));
+	NotifySendFileDoneCfg *obj_tmp = new NotifySendFileDoneCfg(buf, buf_size);
+	if (obj_tmp == NULL) throw bad_alloc();
+	*obj = obj_tmp;
+	delete[] buf;
+	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_cfg, remote_token_cfg, strlen(remote_token_cfg));
+	// fprintf(stderr, "[generate_obj] obj, session_id: %d, remote_token: %s\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token());
+}
+
 NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_size) :
 	NotifyCfgEx(NOTIFY_SEND_FILE_DONE, param, param_size)
 {
-	// printf("NotifyFileTransferAbortCfg()\n");
-	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	// remote_token = (char*)notify_param;
+	// printf("NotifySendFileDoneCfg()\n");
+	// fprintf(stderr, "NotifySendFileDoneCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	// // remote_token = (char*)notify_param;
 
 	assert(param != NULL && "param should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;

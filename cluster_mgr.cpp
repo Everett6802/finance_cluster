@@ -414,7 +414,7 @@ unsigned short ClusterMgr::become_file_sender()
 
 unsigned short ClusterMgr::become_file_receiver()
 {
-	file_tx = new FileReceiver(this, local_token);
+	file_tx = new FileReceiver(this, cluster_token);
 	if (file_tx == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: file_tx (receiver)");
@@ -1074,14 +1074,16 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			ret = file_tx->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
-			if (CHECK_FAILURE(ret))
-				return ret;
 // Reset the counter 
 			pthread_mutex_lock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
 			interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount = cluster_node_amount - 1;
 			interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
 			pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+// Nodify the remote Node
+			usleep(100000);
+			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+			if (CHECK_FAILURE(ret))
+				return ret;
 // Receive the response
 			bool found = false;
 			struct timespec ts;
@@ -2252,6 +2254,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			assert(notify_send_file_done_cfg != NULL && "notify_send_file_done_cfg should NOT be NULL");
     		int tx_session_id = notify_send_file_done_cfg->get_session_id();
     		string remote_token(notify_send_file_done_cfg->get_remote_token());
+    		// fprintf(stderr, "[ClusterMgr::async_handle]  tx_session_id: %d, remote_token: %s\n", tx_session_id, remote_token.c_str());
 
 			assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 			cluster_node->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());

@@ -402,21 +402,26 @@ OUT:
 	WRITE_FORMAT_INFO("[%s] The worker thread of sending file is done", thread_tag);
 
 	assert(observer != NULL && "observer should NOT be NULL");
-// // Notify the follower 
-// 	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
-// // Close the local file transfer channel
-// 	NodeFileTransferDoneParam node_file_transfer_done_param;
-// 	snprintf(node_file_transfer_done_param.node_token, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_token.c_str());
-// 	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
-// Close the parent to close the local file transfer channel
-	const int BUF_SIZE = sizeof(int);
-	char buf[BUF_SIZE];
-	snprintf(buf, BUF_SIZE, "%d", tx_session_id);
-	string notify_param = string(buf) + remote_token;
-	size_t notify_param_size = strlen(notify_param.c_str()) + 1;  // strlen(remote_token.c_str()) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(notify_param.c_str(), notify_param_size);
-	if (notify_cfg == NULL)
-		throw bad_alloc();
+// // // Notify the follower 
+// // 	observer->send(MSG_COMPLETE_FILE_TRANSFER, (void*)&tx_session_id, (void*)remote_token.c_str());
+// // // Close the local file transfer channel
+// // 	NodeFileTransferDoneParam node_file_transfer_done_param;
+// // 	snprintf(node_file_transfer_done_param.node_token, DEF_VERY_SHORT_STRING_SIZE, "%s", remote_token.c_str());
+// // 	observer->set(PARAM_NODE_FILE_TRANSFER_DONE, (void*)&node_file_transfer_done_param);
+// // Close the parent to close the local file transfer channel
+// 	const int BUF_SIZE = sizeof(int);
+// 	char buf[BUF_SIZE];
+// 	snprintf(buf, BUF_SIZE, "%d", tx_session_id);
+// 	string notify_param = string(buf) + remote_token;
+// 	size_t notify_param_size = strlen(notify_param.c_str()) + 1;  // strlen(remote_token.c_str()) + 1;
+// 	PNOTIFY_CFG notify_cfg = new NotifySendFileDoneCfg(notify_param.c_str(), notify_param_size);
+// 	if (notify_cfg == NULL)
+// 		throw bad_alloc();
+	PNOTIFY_SEND_FILE_DONE_CFG notify_send_file_done_cfg = NULL;
+	NotifySendFileDoneCfg::generate_obj(&notify_send_file_done_cfg, tx_session_id, remote_token.c_str());
+	// fprintf(stderr, "[send_thread_handler_internal]  tx_session_id: %d, remote_token: %s\n", tx_session_id, remote_token.c_str());
+	// fprintf(stderr, "[send_thread_handler_internal] obj  tx_session_id: %d, remote_token: %s\n", notify_send_file_done_cfg->get_session_id(), notify_send_file_done_cfg->get_remote_token());
+	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_send_file_done_cfg;
 // Asynchronous event
 	observer->notify(NOTIFY_SEND_FILE_DONE, notify_cfg);
 	SAFE_RELEASE(notify_cfg);

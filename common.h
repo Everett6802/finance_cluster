@@ -1046,7 +1046,10 @@ private:
 	int get_cluster_id()const; // No cluster id
 
 public:
+	static unsigned short generate_obj(NotifySendFileDoneCfg **obj, int session_id_cfg, const char* remote_token_cfg);
+
 	NotifySendFileDoneCfg(const void* param, size_t param_size);
+	NotifySendFileDoneCfg(int session_id_cfg, const char* remote_token_cfg);
 	virtual ~NotifySendFileDoneCfg();
 
 	const char* get_remote_token()const;
