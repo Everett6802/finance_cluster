@@ -414,7 +414,7 @@ unsigned short ClusterMgr::become_file_sender()
 
 unsigned short ClusterMgr::become_file_receiver()
 {
-	file_tx = new FileReceiver(this, cluster_token);
+	file_tx = new FileReceiver(this, cluster_token, local_token);
 	if (file_tx == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: file_tx (receiver)");
@@ -2342,8 +2342,14 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			}
 			else if (file_tx_type == TX_RECEIVER)
 			{
-				assert(file_tx != NULL && "file_tx should NOT be NULL");
+				assert(file_tx != NULL && "file_tx(Receiver) should NOT be NULL");
 				ret = file_tx->set(PARAM_FILE_TRANSFER_DONE);
+				if (CHECK_SUCCESS(ret))
+				{
+					ret = file_tx->deinitialize();	
+					delete file_tx;
+					file_tx = NULL;
+				}
 			}
 		}
 		break;
@@ -2517,6 +2523,11 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
 			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			WRITE_DEBUG("Complete transferring the file. Release the sender....");
+			assert(file_tx != NULL && "file_tx(Sender) should NOT be NULL");
+			file_tx->deinitialize();
+			delete file_tx;
+			file_tx = NULL;	
     	}
     	break;
     	case NOTIFY_SWITCH_LEADER:

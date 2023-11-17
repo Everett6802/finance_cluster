@@ -122,9 +122,10 @@ unsigned short FileChannel::deinitialize()
 	WRITE_DEBUG("Release resource in FileChannel......");
 	unsigned short ret = RET_SUCCESS;
 	// int kill_ret;
-	__sync_fetch_and_add(&exit, 1);
+	int old_exit = __sync_fetch_and_add(&exit, 1);
 	// sleep(1);
-	usleep(100000);
+	if (old_exit == 0)
+		usleep(100000);
 
 	// bool thread_alive = false;
 	// bool send_thread_alive = false;
@@ -175,6 +176,7 @@ unsigned short FileChannel::deinitialize()
 					ret = send_thread_ret;
 				}
 			}
+			send_tid = 0;
 		}
 	}
 	else
@@ -224,6 +226,7 @@ unsigned short FileChannel::deinitialize()
 					ret = recv_thread_ret;
 				}
 			}
+			recv_tid = 0;
 		}
 	}
 

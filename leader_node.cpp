@@ -215,7 +215,7 @@ unsigned short LeaderNode::send_raw_data(MessageType message_type, const char* d
 	if (remote_token != NULL)
 	{
 		// fprintf(stderr, "[send_raw_data]  remote_token: %s\n", remote_token);
-		dump_node_channel_map();
+		// dump_node_channel_map();
 // Send to single node
 		string remote_token_str = string(remote_token);
 		PNODE_CHANNEL node_channel = node_channel_map[remote_token_str];
