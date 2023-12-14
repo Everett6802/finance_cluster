@@ -35,9 +35,9 @@
 #define CHECK_FAILURE(X) (X >= RET_FAILURE_BASE && X <= RET_FAILURE_END ? true : false)
 #endif
 
-#ifndef CHECK_FAILURE_CONNECTION
-#define CHECK_FAILURE_CONNECTION(X) (X >= RET_FAILURE_CONNECTION_BASE && X <= RET_FAILURE_CONNECTION_END ? true : false)
-#endif
+// #ifndef CHECK_FAILURE_CONNECTION
+// #define CHECK_FAILURE_CONNECTION(X) (X >= RET_FAILURE_CONNECTION_BASE && X <= RET_FAILURE_CONNECTION_END ? true : false)
+// #endif
 
 #ifndef CHECK_WARN
 #define CHECK_WARN(X) (X >= RET_WARN_BASE && X <= RET_WARN_END ? true : false)
@@ -137,8 +137,7 @@ extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
 extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
 extern const unsigned short RET_FAILURE_INCORRECT_VALUE;
-extern const unsigned short RET_FAILURE_END;
-
+///// Connection Related /////
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_FAIL;
@@ -149,6 +148,8 @@ extern const unsigned short RET_FAILURE_CONNECTION_ALREADY_IN_USE;
 extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE;
 extern const unsigned short RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_END;
+///// Connection Related /////
+extern const unsigned short RET_FAILURE_END;
 
 extern const unsigned short RET_WARN_BASE;
 extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
@@ -257,6 +258,7 @@ enum ParamType{
 	PARAM_FAKE_ACSPT_DETAIL,
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
+	PARAM_REMOVE_FILE_CHANNEL,
 	// PARAM_NODE_FILE_TRANSFER_DONE,
 	PARAM_SIZE
 };
@@ -282,6 +284,7 @@ enum NotifyType{
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
 	NOTIFY_SEND_FILE_DONE,
+	// NOTIFY_RECEIVE_FILE_DONE,
 	NOTIFY_SWITCH_LEADER,
 	NOTIFY_SIZE
 };
@@ -1026,6 +1029,7 @@ private:
 	// int session_id;
 	// int cluster_id;
 	unsigned short return_code;
+	const char* remote_token;
 
 public:
 	NotifyFileTransferCompleteCfg(const void* param, size_t param_size);
@@ -1034,6 +1038,7 @@ public:
 	// int get_session_id()const;
 	// int get_cluster_id()const;
 	unsigned short get_return_code()const;
+	const char* get_remote_token()const;
 };
 typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
 
@@ -1042,19 +1047,38 @@ typedef NotifyFileTransferCompleteCfg* PNOTIFY_FILE_TRANSFER_COMPLETE_CFG;
 class NotifySendFileDoneCfg : public NotifyCfgEx
 {
 private:
-	char* remote_token;
+	const char* remote_token;
 	int get_cluster_id()const; // No cluster id
 
 public:
-	static unsigned short generate_obj(NotifySendFileDoneCfg **obj, int session_id_cfg, const char* remote_token_cfg);
+	static unsigned short generate_obj(NotifySendFileDoneCfg **obj, int session_id_param, const char* remote_token_param);
 
 	NotifySendFileDoneCfg(const void* param, size_t param_size);
-	NotifySendFileDoneCfg(int session_id_cfg, const char* remote_token_cfg);
+	// NotifySendFileDoneCfg(int session_id_param, const char* remote_token_param);
 	virtual ~NotifySendFileDoneCfg();
 
 	const char* get_remote_token()const;
 };
 typedef NotifySendFileDoneCfg* PNOTIFY_SEND_FILE_DONE_CFG;
+
+// ///////////////////////////
+
+// class NotifyRecvFileDoneCfg : public NotifyCfgEx
+// {
+// private:
+// 	char* client_token;
+// 	int get_cluster_id()const; // No cluster id
+
+// public:
+// 	static unsigned short generate_obj(NotifyRecvFileDoneCfg **obj, int session_id_param, const char* node_token_param);
+
+// 	NotifyRecvFileDoneCfg(const void* param, size_t param_size);
+// 	// NotifyRecvFileDoneCfg(int session_id_param, const char* client_token_param);
+// 	virtual ~NotifyRecvFileDoneCfg();
+
+// 	const char* get_node_token()const;
+// };
+// typedef NotifyRecvFileDoneCfg* PNOTIFY_RECV_FILE_DONE_CFG;
 
 ///////////////////////////
 

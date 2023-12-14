@@ -1076,7 +1076,7 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
-// Serialize: convert the type of session id from integer to string  
+// Serialize: convert the type of cluster id from integer to string  
 	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
 	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
 	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
@@ -1085,7 +1085,7 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
 
-	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf);
+	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
 	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
 }
 

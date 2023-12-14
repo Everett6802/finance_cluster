@@ -344,6 +344,15 @@ unsigned short FileSender::set(ParamType param_type, void* param1, void* param2)
     		ret = stop_file_transfer();
     	}
     	break;
+    	case PARAM_REMOVE_FILE_CHANNEL:
+    	{
+    		string follower_token((char*)param1);
+    		WRITE_FORMAT_WARN("Send file to the follwer[%s] completely, remove the file channel to the follower", follower_token.c_str());
+			ret = remove_file_channel(follower_token);
+    		if (CHECK_FAILURE(ret))
+    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", follower_token.c_str(), GetErrorDescription(ret));
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -416,12 +425,12 @@ unsigned short FileSender::async_handle(NotifyCfg* notify_cfg)
     		assert(observer != NULL && "observer should NOT be NULL");
     		observer->notify(NOTIFY_SEND_FILE_DONE, (void*)notify_cfg);
     		// string follower_token((char*)notify_cfg->get_notify_param());
-    		PNOTIFY_SEND_FILE_DONE_CFG notify_send_file_done_cfg = (PNOTIFY_SEND_FILE_DONE_CFG)notify_cfg;
-    		string follower_token(notify_send_file_done_cfg->get_remote_token());
-    		WRITE_FORMAT_WARN("Send file to the follwer[%s] completely, remove the file channel to the follower", follower_token.c_str());
-			ret = remove_file_channel(follower_token);
-    		if (CHECK_FAILURE(ret))
-    			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", follower_token.c_str(), GetErrorDescription(ret));
+   //  		PNOTIFY_SEND_FILE_DONE_CFG notify_send_file_done_cfg = (PNOTIFY_SEND_FILE_DONE_CFG)notify_cfg;
+   //  		string follower_token(notify_send_file_done_cfg->get_remote_token());
+   //  		WRITE_FORMAT_WARN("Send file to the follwer[%s] completely, remove the file channel to the follower", follower_token.c_str());
+			// ret = remove_file_channel(follower_token);
+   //  		if (CHECK_FAILURE(ret))
+   //  			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", follower_token.c_str(), GetErrorDescription(ret));
     	}
     	break;
     	default:

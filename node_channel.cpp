@@ -443,7 +443,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				{
 // Parse the message
 					ret = node_message_parser.parse(buf, recv_ret);
-					if (CHECK_FAILURE(ret) || CHECK_FAILURE_CONNECTION(ret))
+					if (CHECK_FAILURE(ret))  //  || CHECK_FAILURE_CONNECTION(ret))
 					{
 						if (ret == RET_FAILURE_CONNECTION_MESSAGE_INCOMPLETE)
 						{

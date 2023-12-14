@@ -577,7 +577,17 @@ unsigned short FileChannel::recv_thread_handler_internal()
 // I don't know why. Perhaps similiar issue as below:
 // https://forum.bitcraze.io/viewtopic.php?t=1089
 OUT:
-	WRITE_FORMAT_INFO("[%s] The worker thread of receiving file is dead", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of receiving file is done", thread_tag);
+
+// 	assert(observer != NULL && "observer should NOT be NULL");
+// 	PNOTIFY_RECV_FILE_DONE_CFG notify_send_file_done_cfg = NULL;
+// 	NotifyRecvFileDoneCfg::generate_obj(&notify_recv_file_done_cfg, tx_session_id, node_token.c_str());
+// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_recv_file_done_cfg;
+// // Asynchronous event
+// 	observer->notify(NOTIFY_RECV_FILE_DONE, notify_cfg);
+// 	SAFE_RELEASE(notify_cfg);
+
+	WRITE_FORMAT_DEBUG("[%s] The worker thread of receiving file is dead", thread_tag);
 	return ret;
 }
 

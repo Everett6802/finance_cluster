@@ -2512,6 +2512,9 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 // Caution: Required to add reference count, since another thread will access it
 			notify_file_transfer_complete_cfg->addref(__FILE__, __LINE__);
 			int session_id = notify_file_transfer_complete_cfg->get_session_id();
+			WRITE_FORMAT_DEBUG("Remote[%s] notify receviving data complete !", notify_file_transfer_complete_cfg->get_remote_token());
+			usleep(100);
+			file_tx->set(PARAM_REMOVE_FILE_CHANNEL, (void*)notify_file_transfer_complete_cfg->get_remote_token());
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);

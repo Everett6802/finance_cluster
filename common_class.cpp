@@ -1767,9 +1767,20 @@ NotifyFileTransferCompleteCfg::NotifyFileTransferCompleteCfg(const void* param, 
 	memset(return_code_buf, 0x0, sizeof(char) * RETURN_CODE_BUF_SIZE);
 	memcpy(return_code_buf, param_char, sizeof(unsigned short));
 	return_code = atoi(return_code_buf);
+// De-Serialize: remote token
+	param_char += sizeof(unsigned short);
+	remote_token = param_char;
 }
 
-NotifyFileTransferCompleteCfg::~NotifyFileTransferCompleteCfg(){}
+NotifyFileTransferCompleteCfg::~NotifyFileTransferCompleteCfg()
+{
+	remote_token = NULL;
+}
+
+const char* NotifyFileTransferCompleteCfg::get_remote_token()const
+{
+	return remote_token;
+}
 
 // int NotifyFileTransferCompleteCfg::get_session_id()const
 // {
@@ -1789,23 +1800,23 @@ unsigned short NotifyFileTransferCompleteCfg::get_return_code()const
 
 //////////////////////////////////////////////////////////
 
-unsigned short NotifySendFileDoneCfg::generate_obj(NotifySendFileDoneCfg **obj, int session_id_cfg, const char* remote_token_cfg)
+unsigned short NotifySendFileDoneCfg::generate_obj(NotifySendFileDoneCfg **obj, int session_id_param, const char* remote_token_param)
 {
 	assert(obj != NULL && "obj should NOT be NULL");
-	assert(remote_token_cfg != NULL && "remote_token_cfg should NOT be NULL");
-	int buf_size = PAYLOAD_SESSION_ID_DIGITS + strlen(remote_token_cfg) + 1;
+	assert(remote_token_param != NULL && "remote_token_param should NOT be NULL");
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + strlen(remote_token_param) + 1;
 	char* buf = new char[buf_size];
 	if (buf == NULL) throw bad_alloc();
 	memset(buf, 0x0, sizeof(char) * buf_size);
 	char* buf_ptr = buf;
-	memcpy(buf_ptr, &session_id_cfg, PAYLOAD_SESSION_ID_DIGITS);
+	memcpy(buf_ptr, &session_id_param, PAYLOAD_SESSION_ID_DIGITS);
 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
-	memcpy(buf_ptr, remote_token_cfg, strlen(remote_token_cfg));
+	memcpy(buf_ptr, remote_token_param, strlen(remote_token_param));
 	NotifySendFileDoneCfg *obj_tmp = new NotifySendFileDoneCfg(buf, buf_size);
 	if (obj_tmp == NULL) throw bad_alloc();
 	*obj = obj_tmp;
 	delete[] buf;
-	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_cfg, remote_token_cfg, strlen(remote_token_cfg));
+	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_param, remote_token_param, strlen(remote_token_param));
 	// fprintf(stderr, "[generate_obj] obj, session_id: %d, remote_token: %s\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token());
 }
 
@@ -1840,6 +1851,61 @@ const char* NotifySendFileDoneCfg::get_remote_token()const
 {
 	return remote_token;
 }
+
+
+// //////////////////////////////////////////////////////////
+
+// unsigned short NotifyRecvFileDoneCfg::generate_obj(NotifyRecvFileDoneCfg **obj, int session_id_param, const char* node_token_param)
+// {
+// 	assert(obj != NULL && "obj should NOT be NULL");
+// 	assert(node_token_param != NULL && "node_token_param should NOT be NULL");
+// 	int buf_size = PAYLOAD_SESSION_ID_DIGITS + strlen(node_token_param) + 1;
+// 	char* buf = new char[buf_size];
+// 	if (buf == NULL) throw bad_alloc();
+// 	memset(buf, 0x0, sizeof(char) * buf_size);
+// 	char* buf_ptr = buf;
+// 	memcpy(buf_ptr, &session_id_param, PAYLOAD_SESSION_ID_DIGITS);
+// 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+// 	memcpy(buf_ptr, node_token_param, strlen(node_token_param));
+// 	NotifyRecvFileDoneCfg *obj_tmp = new NotifyRecvFileDoneCfg(buf, buf_size);
+// 	if (obj_tmp == NULL) throw bad_alloc();
+// 	*obj = obj_tmp;
+// 	delete[] buf;
+// 	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_param, remote_token_param, strlen(remote_token_param));
+// 	// fprintf(stderr, "[generate_obj] obj, session_id: %d, remote_token: %s\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token());
+// }
+
+// NotifyRecvFileDoneCfg::NotifyRecvFileDoneCfg(const void* param, size_t param_size) :
+// 	NotifyCfgEx(NOTIFY_RECEIVE_FILE_DONE, param, param_size)
+// {
+// 	// printf("NotifySendFileDoneCfg()\n");
+// 	// fprintf(stderr, "NotifySendFileDoneCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+// 	// // remote_token = (char*)notify_param;
+
+// 	assert(param != NULL && "param should NOT be NULL");
+// 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+// 	// static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+// // De-Serialize: convert the type of session id from string to integer  
+// 	char session_id_buf[SESSION_ID_BUF_SIZE];
+// 	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+// 	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+// 	session_id = atoi(session_id_buf);
+
+// 	const char* param_char = (const char*)notify_param;
+// 	remote_token = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+// 	if (strlen(remote_token) == 0)
+// 		remote_token = NULL;
+// }
+
+// NotifyRecvFileDoneCfg::~NotifyRecvFileDoneCfg()
+// {
+// 	node_token = NULL;
+// }
+
+// const char* NotifyRecvFileDoneCfg::get_node_token()const
+// {
+// 	return node_token;
+// }
 
 //////////////////////////////////////////////////////////
 

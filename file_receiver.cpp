@@ -354,6 +354,15 @@ unsigned short FileReceiver::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
     	}
     	break;
+    	// case NOTIFY_RECV_FILE_DONE:
+    	// {
+    	// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    	// 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    	// 	assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    	// 	ret = notify_thread->add_event(notify_cfg);
+    	// }
+    	// break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
