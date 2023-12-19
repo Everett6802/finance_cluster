@@ -1062,7 +1062,7 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 // param1: The sessin id
 // param2: The return code
 // Message format:
-// EventType | playload: (session ID[2 digits]) | EOD
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
 	if (param1 == NULL)
 	{
 		WRITE_ERROR("param1 should NOT be NULL");
@@ -1071,22 +1071,36 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
 	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
 	static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
-    // unsigned short ret = RET_SUCCESS;
-// Serialize: convert the type of session id from integer to string  
-	char session_id_buf[SESSION_ID_BUF_SIZE];
-	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
-	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
-// Serialize: convert the type of cluster id from integer to string  
-	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
-	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
-	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
-// Serialize: convert the type of return code from integer to string  
-	char return_code_buf[RETURN_CODE_BUF_SIZE];
-	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
-	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
+//     // unsigned short ret = RET_SUCCESS;
+// // Serialize: convert the type of session id from integer to string  
+// 	char session_id_buf[SESSION_ID_BUF_SIZE];
+// 	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+// 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// // Serialize: convert the type of cluster id from integer to string  
+// 	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+// 	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+// 	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
+// // Serialize: convert the type of return code from integer to string  
+// 	char return_code_buf[RETURN_CODE_BUF_SIZE];
+// 	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
+// 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
 
-	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
-	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, file_transfer_data.c_str());
+// 	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS + sizeof(unsigned short) + strlen(local_token) + 1;
+	char* buf = new char[buf_size];
+	if (buf == NULL)
+		throw bad_alloc();
+	memset(buf, 0x0, sizeof(char) * buf_size);
+	char* buf_ptr = buf;
+	memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
+	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+	memcpy(buf_ptr, &cluster_id, PAYLOAD_CLUSTER_ID_DIGITS);
+	buf_ptr += PAYLOAD_CLUSTER_ID_DIGITS;
+	memcpy(buf_ptr, param2, sizeof(unsigned short));
+	buf_ptr += sizeof(unsigned short);
+	memcpy(buf_ptr, local_token, strlen(local_token));
+
+	return send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size);
 }
 
 unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}

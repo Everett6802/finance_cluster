@@ -947,6 +947,7 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 	PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data, (size_t)message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
+	fprintf(stderr, "[recv_complete_file_transfer]  remote_token: %s\n", ((PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg)->get_remote_token());
 // Asynchronous event
 	observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
@@ -1278,7 +1279,7 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", session_id);
-	// fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
+	fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
 	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
 }
 
