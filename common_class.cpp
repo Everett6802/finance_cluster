@@ -1817,7 +1817,7 @@ unsigned short NotifySendFileDoneCfg::generate_obj(NotifySendFileDoneCfg **obj, 
 	*obj = obj_tmp;
 	delete[] buf;
 	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_param, remote_token_param, strlen(remote_token_param));
-	fprintf(stderr, "[NotifySendFileDoneCfg::generate_obj]  session_id: %d, remote_token: %s, remote_token len: %d\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token(), strlen(remote_token_param));
+	// fprintf(stderr, "[NotifySendFileDoneCfg::generate_obj]  session_id: %d, remote_token: %s, remote_token len: %d\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token(), strlen(remote_token_param));
 }
 
 NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_size) :

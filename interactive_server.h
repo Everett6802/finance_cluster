@@ -85,7 +85,7 @@ public:
 
 	unsigned short initialize(int system_monitor_period_value);
 	unsigned short deinitialize();
-	unsigned short print_console(const std::string& console_message)const;
+	unsigned short print_console(const std::string& console_message, int session_id=-1)const;
 
 // INotify
 	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);

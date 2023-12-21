@@ -400,9 +400,13 @@ unsigned short InteractiveServer::deinitialize()
 	return ret;
 }
 
-unsigned short InteractiveServer::print_console(const std::string& console_message)const
+unsigned short InteractiveServer::print_console(const std::string& console_message, int session_id)const
 {
-	unsigned short ret = print_all_session(console_message);
+	unsigned short ret = RET_SUCCESS; 
+	if (session_id == -1)
+		ret =print_all_session(console_message);
+	else
+		ret =print_session(session_id, console_message);
 	return ret;
 }
 

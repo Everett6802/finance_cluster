@@ -117,6 +117,8 @@ const char *GetErrorDescription(unsigned short ret)
 		if (ret >= 0 && ret < ret_failure_description_len)
 			return ret_failure_description[ret];
 	}
+	else if (ret == RET_SUCCESS)
+		return ret_failure_description[ret];
 
 	static char buf[STRING_SIZE + 1];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));

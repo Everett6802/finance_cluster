@@ -2515,6 +2515,9 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			WRITE_FORMAT_DEBUG("Remote[%s] notify receviving data complete !", notify_file_transfer_complete_cfg->get_remote_token());
 			usleep(100);
 			file_tx->set(PARAM_REMOVE_FILE_CHANNEL, (void*)notify_file_transfer_complete_cfg->get_remote_token());
+			assert(interactive_server != NULL && "interactive_server should NOT be NULL");
+			string console_message = string(" ") + string(notify_file_transfer_complete_cfg->get_remote_token()) + string(" ... DONE\n");
+			interactive_server->print_console(console_message, session_id);
 			// const char* system_info = notify_system_info_cfg->get_system_info();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);

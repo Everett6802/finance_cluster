@@ -1186,17 +1186,6 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	}
 
 	unsigned short ret = RET_SUCCESS;
-// Before switching leader, check if the node exists
-	ClusterMap cluster_map;
-	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
-	if (CHECK_FAILURE(ret))
-		return ret;
-	if (cluster_map.size() == 1)
-	{
-		print_to_console(string("Only single node in the cluster. Synchronizing files does NOT take effect\n"));
-		return RET_WARN_INTERACTIVE_COMMAND;		
-	}
-
 	char filepath[DEF_LONG_STRING_SIZE]; 
 	const char* argv1_tmp = (const char*)argv[1];
 	if (strchr(argv1_tmp, '/') == NULL)
@@ -1226,43 +1215,38 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		return RET_FAILURE_NOT_FOUND;
 	}
 
+	print_to_console(string(" *** file transferring  ***\n"));
 	ClusterFileTransferParam cluster_file_transfer_param;
 // Start to transfer the file
 	cluster_file_transfer_param.session_id = session_id;
     ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+    // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
  	if (CHECK_FAILURE(ret))
 		return ret;
     // SAFE_RELEASE(notify_cfg)
-// Wait for transferring done...
-	// ClusterDetailParam cluster_detail_param;
-	// ret = manager->get(PARAM_CLUSTER_DETAIL, (void*)&cluster_detail_param);
-	// if (CHECK_FAILURE(ret))
-	// 	return ret;
-	// ClusterMap& cluster_map = cluster_detail_param.cluster_map;
-	// ClusterMap cluster_map;
-	// ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
-	// if (CHECK_FAILURE(ret))
-	// 	return ret;
 
-	char buf[DEF_LONG_STRING_SIZE];
-	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
-// Print data in cosole
+// 	char buf[DEF_LONG_STRING_SIZE];
+// 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
+// // Print data in cosole
 	// snprintf(buf, DEF_LONG_STRING_SIZE, "file transfer: %s\n", filepath);
-	string file_transfer_string = string("file transfer: ") + string(filepath) + string("\n");
-	map<int, string>::iterator iter = cluster_file_transfer_map.begin();
-	while (iter != cluster_file_transfer_map.end())
-	{
-		int node_id = (int)iter->first;
-		string node_token;
-		ret = cluster_map.get_node_token(node_id, node_token);
-		if (CHECK_FAILURE(ret))
-			return ret;
-		snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
-		file_transfer_string += string(buf);
-		++iter;
-	}
-	file_transfer_string += string("\n");
-	ret = print_to_console(file_transfer_string);
+	// string file_transfer_string = string("file transfer: ") + string(filepath) + string("\n");
+	// map<int, string>::iterator iter = cluster_file_transfer_map.begin();
+	// while (iter != cluster_file_transfer_map.end())
+	// {
+	// 	int node_id = (int)iter->first;
+	// 	string node_token;
+	// 	ret = cluster_map.get_node_token(node_id, node_token);
+	// 	if (CHECK_FAILURE(ret))
+	// 	{
+	// 		WRITE_FORMAT_ERROR("Fails to get the file node[%d] token, due to: %s", node_id, GetErrorDescription(ret));
+	// 		return ret;
+	// 	}
+	// 	snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+	// 	file_transfer_string += string(buf);
+	// 	++iter;
+	// }
+	// file_transfer_string += string("\n");
+	// ret = print_to_console(file_transfer_string);
 	return RET_SUCCESS;
 }
 

@@ -216,37 +216,37 @@ unsigned short FileSender::stop_file_transfer()
 			int kill_ret = pthread_kill(tx_listen_tid, 0);
 			if(kill_ret == ESRCH)
 			{
-				WRITE_WARN("The worker thread of tx listening did NOT exist......");
+				WRITE_WARN("The worker thread of file tx listening did NOT exist......");
 				ret = RET_SUCCESS;
 			}
 			else if(kill_ret == EINVAL)
 			{
-				WRITE_ERROR("The signal to the worker thread of tx listening is invalid");
+				WRITE_ERROR("The signal to the worker thread of file tx listening is invalid");
 				ret = RET_FAILURE_HANDLE_THREAD;
 			}
 			else
 			{
-				WRITE_DEBUG("The signal to the worker thread of tx listening is STILL alive");
+				WRITE_DEBUG("The signal to the worker thread of file tx listening is STILL alive");
 // Kill the thread
 			    if (pthread_cancel(tx_listen_tid) != 0)
-			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of tx listening, due to: %s", strerror(errno));
+			        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of file tx listening, due to: %s", strerror(errno));
 				usleep(100000);
 			}
 		}
 
-		WRITE_DEBUG("Wait for the worker thread of tx listening's death...");
+		WRITE_DEBUG("Wait for the worker thread of file tx listening's death...");
 
-// Wait for tx listen thread's death
+// Wait for file tx listen thread's death
 		pthread_join(tx_listen_tid, NULL);
 		tx_listen_tid = 0;
 		tx_listen_exit = 0;
 		if (CHECK_SUCCESS(tx_listen_thread_ret))
 		{
-			WRITE_FORMAT_DEBUG("Wait for the worker thread[tx_listen_tid: %d] of tx listening's death Successfully !!!", tx_listen_tid);
+			WRITE_FORMAT_DEBUG("Wait for the worker thread[tx_listen_tid: %d] of file tx listening's death Successfully !!!", tx_listen_tid);
 		}
 		else
 		{
-			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread[tx_listen_tid: %d] of tx listening's death, due to: %s", tx_listen_tid, GetErrorDescription(tx_listen_thread_ret));
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread[tx_listen_tid: %d] of file tx listening's death, due to: %s", tx_listen_tid, GetErrorDescription(tx_listen_thread_ret));
 			ret = tx_listen_thread_ret;
 		}
 
