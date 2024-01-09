@@ -1102,7 +1102,15 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 		    	WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 				return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 			}
-					// dump_interactive_session_data_list(session_id);
+
+// Release the resource of Sender
+			WRITE_DEBUG("Complete transferring the file. Release the sender....");
+			assert(file_tx != NULL && "file_tx(Sender) should NOT be NULL");
+			file_tx->deinitialize();
+			delete file_tx;
+			file_tx = NULL;
+
+			// dump_interactive_session_data_list(session_id);
 			std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
 			std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 			std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
@@ -1122,6 +1130,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				iter++;
 			}
 			pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
+
 	    	if (!found)
 	    	{
 		    	WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", cluster_file_transfer_param->session_id, cluster_node_amount - 1, interactive_session_file_transfer_data.size());
@@ -1134,8 +1143,8 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				assert(cluster_file_transfer_param->session_id == notify_file_transfer_cfg->get_session_id() && "The session ID is NOT identical");
 				// string node_ip;
 				// ret = cluster_node->get(PARAM_CLUSTER_ID2IP, (void*)&notify_file_transfer_cfg->get_cluster_id(), (void*)&node_ip);
-				if (CHECK_FAILURE(ret))
-					return ret;
+				// if (CHECK_FAILURE(ret))
+				// 	return ret;
 				char buf[DEF_STRING_SIZE];
 				if (CHECK_SUCCESS(notify_file_transfer_cfg->get_return_code()))
 				{
@@ -2522,18 +2531,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);
 			interactive_session_param[session_id].event_count++;
-// It's required to sleep for a while before notifying to accessing the list in another thread
+// It's required to sleep for a while before notifying to access the list in another thread
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
 			}
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-			WRITE_DEBUG("Complete transferring the file. Release the sender....");
-			assert(file_tx != NULL && "file_tx(Sender) should NOT be NULL");
-			file_tx->deinitialize();
-			delete file_tx;
-			file_tx = NULL;	
     	}
     	break;
     	case NOTIFY_SWITCH_LEADER:

@@ -347,7 +347,7 @@ unsigned short FileSender::set(ParamType param_type, void* param1, void* param2)
     	case PARAM_REMOVE_FILE_CHANNEL:
     	{
     		string follower_token((char*)param1);
-    		WRITE_FORMAT_WARN("Send file to the follwer[%s] completely, remove the file channel to the follower", follower_token.c_str());
+    		WRITE_FORMAT_WARN("Send file to the Receiver[%s] completely, remove the file channel to the Receiver", follower_token.c_str());
 			ret = remove_file_channel(follower_token);
     		if (CHECK_FAILURE(ret))
     			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", follower_token.c_str(), GetErrorDescription(ret));

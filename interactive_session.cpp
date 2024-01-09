@@ -358,6 +358,33 @@ bool InteractiveSession::check_command_authority(int command_type)
 	return CHECK_AUTHORITY(command_type, authority_mask);
 }
 
+
+unsigned short InteractiveSession::get_complete_sync_folderpath(string& sync_folderpath)const
+{
+	unsigned short ret = RET_SUCCESS;
+	// char folderpath[DEF_LONG_STRING_SIZE]; 
+	// if (strchr(sync_folderpath.c_str(), '~') != NULL)
+	// {
+	// 	const char* sync_folderpath_start_ptr = &(sync_folderpath.c_str()[2]);
+	// 	if (strcmp(get_username(), "root") == 0)
+	// 		snprintf(folderpath, DEF_LONG_STRING_SIZE, "/root/%s", sync_folderpath_start_ptr);
+	// 	else
+	// 		snprintf(folderpath, DEF_LONG_STRING_SIZE, "/home/%s/%s", get_username(), sync_folderpath_start_ptr);
+	// }
+	// else
+	// 	strcpy(folderpath, sync_folderpath.c_str());
+	if (sync_folderpath.c_str()[0] != '~')
+		return RET_FAILURE_INVALID_ARGUMENT;
+	string sync_folderpath_tmp = sync_folderpath;
+	if (strcmp(get_username(), "root") == 0)
+		sync_folderpath = string("/root/");
+	else
+		sync_folderpath = string("/home/") + string(get_username()) + string("/");
+	const char* sync_folderpath_tmp_start_ptr = &(sync_folderpath_tmp.c_str()[2]);
+	sync_folderpath += string(sync_folderpath_tmp_start_ptr);
+	return ret;
+}
+
 void* InteractiveSession::session_thread_handler(void* pvoid)
 {
 	InteractiveSession* pthis = (InteractiveSession*)pvoid;
@@ -1119,59 +1146,32 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		return ret;
 	if (strchr(sync_folderpath.c_str(), '~') != NULL)
 	{
-		const char* sync_folderpath_start_ptr = &(sync_folderpath.c_str()[2]);
-		if (strcmp(get_username(), "root") == 0)
-			snprintf(folderpath, DEF_LONG_STRING_SIZE, "/root/%s", sync_folderpath_start_ptr);
-		else
-			snprintf(folderpath, DEF_LONG_STRING_SIZE, "/home/%s/%s", get_username(), sync_folderpath_start_ptr);
+		ret = get_complete_sync_folderpath(sync_folderpath);
+		if (CHECK_FAILURE(ret))
+			return ret;
 	}
-	else
-		strcpy(folderpath, sync_folderpath.c_str());
-
-	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", folderpath);
-    struct dirent *entry = nullptr;
-    DIR *dp = opendir(folderpath);
-    if (dp == nullptr)
-    {
-		if (errno == ENOENT) 
-		{
-			WRITE_FORMAT_WARN("The folder[%s] being synchronized does NOT exist", folderpath);
-			return RET_FAILURE_NOT_FOUND;
-		} 
-		else  /* opendir() failed for some other reason. */
-		{
-			WRITE_FORMAT_WARN("opendir() fails, due to: %s", strerror(errno));
-			return RET_FAILURE_SYSTEM_API;
-		}
-    } 
-
-    int argc_tmp = 2;
-    char** argv_tmp = new char*[argc_tmp];
-    for (int i = 0; i < argc_tmp; i++)
-    	argv_tmp[i] = new char[DEF_LONG_STRING_SIZE];
-    strcpy(argv_tmp[0], argv[0]);
-    while ((entry = readdir(dp)))
-    {
-// You can't (usefully) compare strings using != or ==, you need to use strcmp
-// The reason for this is because != and == will only compare the base addresses of those strings. 
-// Not the contents of the strings themselves.
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-        	continue;
-        // printf ("%s\n", entry->d_name);
-    	argv_tmp[1] = new char[DEF_LONG_STRING_SIZE];
-        strcpy(argv_tmp[1], entry->d_name);
-        ret = handle_sync_file_command(argc_tmp, argv_tmp);
-        if (CHECK_FAILURE(ret))
-			break;     	
-    }
-    if (argv_tmp != NULL)
-    {
-    	for (int i = 0; i < argc_tmp; i++)
-    		delete[] argv_tmp[i];
-    	delete[] argv_tmp;
-    	argv_tmp = NULL;
-    }
-
+	// else
+	// 	strcpy(folderpath, sync_folderpath.c_str());
+	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
+	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
+	list<string> full_filepath_in_folder_list;
+	get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
+	list<string>::iterator iter = full_filepath_in_folder_list.begin();
+	while (iter != full_filepath_in_folder_list.end())
+	{
+		string full_filepath = (string)(*iter);
+		// printf("* %s\n", full_filepath.c_str());
+		WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
+		print_to_console(string(" *** file synchorinization: ") + full_filepath + string("  ***\n"));
+		ClusterFileTransferParam cluster_file_transfer_param;
+	// Start to transfer the file
+		cluster_file_transfer_param.session_id = session_id;
+	    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
+	    // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	 	if (CHECK_FAILURE(ret))
+			return ret;
+		iter++;
+	}
 	return ret;	
 }
 
@@ -1196,18 +1196,16 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 			return ret;
 		if (strchr(sync_folderpath.c_str(), '~') != NULL)
 		{
-			const char* sync_folderpath_start_ptr = &(sync_folderpath.c_str()[2]);
-			if (strcmp(get_username(), "root") == 0)
-				snprintf(filepath, DEF_LONG_STRING_SIZE, "/root/%s/%s", sync_folderpath_start_ptr, argv1_tmp);
-			else
-				snprintf(filepath, DEF_LONG_STRING_SIZE, "/home/%s/%s/%s", get_username(), sync_folderpath_start_ptr, argv1_tmp);
+			ret = get_complete_sync_folderpath(sync_folderpath);
+			if (CHECK_FAILURE(ret))
+				return ret;
 		}
 		else
 			snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
 	}
 	else
 		strcpy(filepath, argv1_tmp);
-	
+
 	WRITE_FORMAT_DEBUG("Try to synchorinize the file: %s", filepath);
 	if (!check_file_exist(filepath))
 	{
@@ -1215,7 +1213,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		return RET_FAILURE_NOT_FOUND;
 	}
 
-	print_to_console(string(" *** file transferring  ***\n"));
+	print_to_console(string(" *** file synchorinization  ***\n"));
 	ClusterFileTransferParam cluster_file_transfer_param;
 // Start to transfer the file
 	cluster_file_transfer_param.session_id = session_id;
@@ -1223,30 +1221,6 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
     // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
  	if (CHECK_FAILURE(ret))
 		return ret;
-    // SAFE_RELEASE(notify_cfg)
-
-// 	char buf[DEF_LONG_STRING_SIZE];
-// 	map<int, string>& cluster_file_transfer_map = cluster_file_transfer_param.cluster_data_map;
-// // Print data in cosole
-	// snprintf(buf, DEF_LONG_STRING_SIZE, "file transfer: %s\n", filepath);
-	// string file_transfer_string = string("file transfer: ") + string(filepath) + string("\n");
-	// map<int, string>::iterator iter = cluster_file_transfer_map.begin();
-	// while (iter != cluster_file_transfer_map.end())
-	// {
-	// 	int node_id = (int)iter->first;
-	// 	string node_token;
-	// 	ret = cluster_map.get_node_token(node_id, node_token);
-	// 	if (CHECK_FAILURE(ret))
-	// 	{
-	// 		WRITE_FORMAT_ERROR("Fails to get the file node[%d] token, due to: %s", node_id, GetErrorDescription(ret));
-	// 		return ret;
-	// 	}
-	// 	snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
-	// 	file_transfer_string += string(buf);
-	// 	++iter;
-	// }
-	// file_transfer_string += string("\n");
-	// ret = print_to_console(file_transfer_string);
 	return RET_SUCCESS;
 }
 

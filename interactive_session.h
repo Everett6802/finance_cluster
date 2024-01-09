@@ -53,6 +53,7 @@ private:
 	int system_monitor_period;
 
 	bool check_command_authority(int command_type);
+	unsigned short get_complete_sync_folderpath(std::string& complete_sync_folderpath)const;
 
 	static void* session_thread_handler(void* void_tr);
 	unsigned short session_thread_handler_internal();

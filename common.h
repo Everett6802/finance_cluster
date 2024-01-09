@@ -346,6 +346,7 @@ void get_curtime_str(std::string& curtime);
 // void print_curtime(const char* title=NULL);
 const char* pthread_cond_timedwait_err(int ret);
 unsigned short create_folder_recursive(const char* full_folderpath);
+unsigned short get_filepath_in_folder_recursive(std::list<std::string>& full_filepath_in_folder_list, const std::string& parent_full_folderpath);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface

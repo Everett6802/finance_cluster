@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <pwd.h>
 #include <time.h>
+#include <dirent.h>
 #include <stdexcept>
 #include "common.h"
 
@@ -365,4 +366,51 @@ OUT:
 		full_folderpath_tmp = NULL;
 	}
 	return ret;
+}
+
+unsigned short get_filepath_in_folder_recursive(std::list<std::string>& full_filepath_in_folder_list, const std::string& parent_full_folderpath)
+{
+    DIR *dp = opendir(parent_full_folderpath.c_str());
+    if (dp == nullptr)
+    {
+		if (errno == ENOENT) 
+		{
+			STATIC_WRITE_FORMAT_ERROR("The folder[%s] being synchronized does NOT exist", parent_full_folderpath.c_str());
+			return RET_FAILURE_NOT_FOUND;
+		} 
+		else  /* opendir() failed for some other reason. */
+		{
+			STATIC_WRITE_FORMAT_ERROR("opendir() fails, due to: %s", strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+    } 
+
+    unsigned short ret = RET_SUCCESS;
+    struct dirent *entry = nullptr;
+    struct stat states;
+    while ((entry = readdir(dp)))
+    {
+// You can't (usefully) compare strings using != or ==, you need to use strcmp
+// The reason for this is because != and == will only compare the base addresses of those strings. 
+// Not the contents of the strings themselves.
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        	continue;
+        // printf("%s/%s\n", parent_full_folderpath.c_str(), entry->d_name);
+		string child_full_path = parent_full_folderpath + string("/") + string(entry->d_name);
+       	stat(child_full_path.c_str(), &states);
+        if(S_ISDIR(states.st_mode))
+        {
+        	// printf("* Folder: %s\n", child_full_path.c_str());
+			ret = get_filepath_in_folder_recursive(full_filepath_in_folder_list, child_full_path);
+			if (CHECK_FAILURE(ret))
+				break;
+        }
+        else
+        {
+        	// printf("  => File: %s\n", child_full_path.c_str());
+        	full_filepath_in_folder_list.push_back(child_full_path);
+        }
+    }
+    closedir(dp);
+    return ret;
 }

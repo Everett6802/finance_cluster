@@ -176,6 +176,9 @@ void detach_from_terminal()
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string>
+
+using namespace std;
 
 // #ifndef MACSTR
 // #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -317,6 +320,17 @@ int main(int argc, char** argv)
 
 	// exit(0);
 
+	// list<string> full_filepath_in_folder_list;
+	// get_filepath_in_folder_recursive(full_filepath_in_folder_list, string("/home/super/test1"));
+	// printf("\n============\n");
+	// list<string>::iterator iter = full_filepath_in_folder_list.begin();
+	// while (iter != full_filepath_in_folder_list.end())
+	// {
+	// 	string full_filepath = (string)(*iter);
+	// 	printf("* %s\n", full_filepath.c_str());
+	// 	iter++;
+	// }
+	// exit(0);
 
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
