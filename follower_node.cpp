@@ -743,9 +743,32 @@ unsigned short FollowerNode::recv_request_file_transfer(const char* message_data
 
 unsigned short FollowerNode::recv_complete_file_transfer(const char* message_data, int message_size)
 {
+	assert(observer != NULL && "observer should NOT be NULL");
+	FileTxType file_tx_type;
+	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	unsigned short ret = RET_SUCCESS;
+	switch(file_tx_type)
+	{
+		case TX_SENDER:
+		{
+// Message format:
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
+			// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+			// PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
+			PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data, (size_t)message_size);
+			if (notify_cfg == NULL)
+				throw bad_alloc();
+			// fprintf(stderr, "[recv_complete_file_transfer]  remote_token: %s\n", ((PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg)->get_remote_token());
+		// Asynchronous event
+			observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER, notify_cfg);
+			SAFE_RELEASE(notify_cfg)
+		}
+		break;
+		case TX_RECEIVER:
+		{
 // Message format:
 // EventType | session ID | EOD
-	unsigned short ret = RET_SUCCESS;
+//	unsigned short ret = RET_SUCCESS;
 // 	if (file_channel != NULL)
 // 	{
 // // ret is the recv thread return code
@@ -758,10 +781,19 @@ unsigned short FollowerNode::recv_complete_file_transfer(const char* message_dat
 // 	else
 // 		WRITE_WARN("The file channel does NOT exist");
 // Synchronous event
-	ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
-	// int session_id = atoi(message_data.c_str());
-	int session_id = atoi(message_data);
-	ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
+			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
+			// int session_id = atoi(message_data.c_str());
+			int session_id = atoi(message_data);
+			ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
+		}
+		break;
+		default:
+		{
+			WRITE_ERROR("file_tx_type shuold NOT be TX_NONE");
+			ret = RET_FAILURE_INCORRECT_OPERATION;
+		}
+		break;
+	}
 	return ret;
 }
 
@@ -1054,23 +1086,98 @@ unsigned short FollowerNode::send_get_fake_acspt_detail(void* param1, void* para
 	return send_string_data(MSG_GET_FAKE_ACSPT_DETAIL, fake_acspt_detail_data.c_str());
 }
 
-unsigned short FollowerNode::send_request_file_transfer(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REQUEST_FILE_TRANSFER);}
+unsigned short FollowerNode::send_request_file_transfer(void* param1, void* param2, void* param3)
+{
+	// UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REQUEST_FILE_TRANSFER);
+// Parameters:
+// param1: session id/filepath
+// Message format:
+// EventType | session id | filepath | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	PFILE_TRANSFER_PARAM file_transfer_param = (PFILE_TRANSFER_PARAM)param1; 
+   assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
+	if (file_transfer_param->session_id == -1)
+	{
+		WRITE_ERROR("tx_session_id should NOT be -1");
+		return RET_FAILURE_SYSTEM_API;
+	}			
+	if (file_transfer_param->filepath == NULL)
+	{
+		WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
+	int filepath_len = strlen(file_transfer_param->filepath);
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + filepath_len + 1;
+	char* buf = new char[buf_size];
+	if (buf == NULL)
+		throw bad_alloc();
+	// fprintf(stderr, "session_id: %d, filepath: %s\n", file_transfer_param->session_id, file_transfer_param->filepath);
+	memset(buf, 0x0, sizeof(char) * buf_size);
+	memcpy(buf, &file_transfer_param->session_id, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	// fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
+	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->filepath, sizeof(char) * filepath_len);
+	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	// fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
+
+	WRITE_DEBUG("Notify the receiver to establish the connection for file transfer");
+	unsigned short ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER, buf, buf_size);
+	if (buf != NULL)
+	{
+		delete[] buf;
+		buf = NULL;
+	}
+	return ret;
+}
 
 unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* param2, void* param3)
 {
+	assert(observer != NULL && "observer should NOT be NULL");
+	FileTxType file_tx_type;
+	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	unsigned short ret = RET_SUCCESS;
+	switch(file_tx_type)
+	{
+		case TX_SENDER:
+		{
+// Parameters:
+// param1: session id
+// param2: remote token. NULL for broadcast
+// Message format:
+// EventType | session ID | EOD
+			if (param1 == NULL || param2 == NULL)
+			{
+				WRITE_ERROR("param1/param2 should NOT be NULL");
+				return RET_FAILURE_INVALID_ARGUMENT;
+			}
+			static const int BUF_SIZE = sizeof(int) + 1;
+			int session_id = *(int*)param1;
+			const char* remote_token = (const char*)param2;
+			char buf[BUF_SIZE];
+			memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+			snprintf(buf, BUF_SIZE, "%d", session_id);
+			// fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
+			ret = send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf);
+		}
+		break;
+		case TX_RECEIVER:
+		{
 // Parameters:
 // param1: The sessin id
 // param2: The return code
 // Message format:
 // EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
-	if (param1 == NULL)
-	{
-		WRITE_ERROR("param1 should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;		
-	}
-	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
-	static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
-	static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+			if (param1 == NULL)
+			{
+				WRITE_ERROR("param1 should NOT be NULL");
+				return RET_FAILURE_INVALID_ARGUMENT;		
+			}
+			static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+			static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+			static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
 //     // unsigned short ret = RET_SUCCESS;
 // // Serialize: convert the type of session id from integer to string  
 // 	char session_id_buf[SESSION_ID_BUF_SIZE];
@@ -1086,21 +1193,31 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 // 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
 
 // 	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
-	int buf_size = PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS + sizeof(unsigned short) + strlen(local_token) + 1;
-	char* buf = new char[buf_size];
-	if (buf == NULL)
-		throw bad_alloc();
-	memset(buf, 0x0, sizeof(char) * buf_size);
-	char* buf_ptr = buf;
-	memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
-	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
-	memcpy(buf_ptr, &cluster_id, PAYLOAD_CLUSTER_ID_DIGITS);
-	buf_ptr += PAYLOAD_CLUSTER_ID_DIGITS;
-	memcpy(buf_ptr, param2, sizeof(unsigned short));
-	buf_ptr += sizeof(unsigned short);
-	memcpy(buf_ptr, local_token, strlen(local_token));
+			int buf_size = PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS + sizeof(unsigned short) + strlen(local_token) + 1;
+			char* buf = new char[buf_size];
+			if (buf == NULL)
+				throw bad_alloc();
+			memset(buf, 0x0, sizeof(char) * buf_size);
+			char* buf_ptr = buf;
+			memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
+			buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+			memcpy(buf_ptr, &cluster_id, PAYLOAD_CLUSTER_ID_DIGITS);
+			buf_ptr += PAYLOAD_CLUSTER_ID_DIGITS;
+			memcpy(buf_ptr, param2, sizeof(unsigned short));
+			buf_ptr += sizeof(unsigned short);
+			memcpy(buf_ptr, local_token, strlen(local_token));
 
-	return send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size);
+			ret = send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size);
+		}
+		break;
+		default:
+		{
+			WRITE_ERROR("file_tx_type shuold NOT be TX_NONE");
+			ret = RET_FAILURE_INCORRECT_OPERATION;
+		}
+		break;
+	}
+	return ret;
 }
 
 unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}
@@ -1118,6 +1235,19 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     	case PARAM_LOCAL_CLUSTER:
     	{
     		local_cluster = *(bool*)param1;
+    	}
+    	break;
+    	case PARAM_FILE_TRANSFER:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+// Notify the leader to connect to the sender and become a receiver
+			ret = send_request_file_transfer(param1);
+			if (CHECK_FAILURE(ret))
+				return ret;	
     	}
     	break;
     	default:

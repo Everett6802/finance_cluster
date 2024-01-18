@@ -393,6 +393,7 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 
 unsigned short ClusterMgr::become_file_sender()
 {
+	assert(file_tx_type == TX_NONE && "file_tx_type shuold be TX_NONE");
 	file_tx = new FileSender(this, local_token);
 	if (file_tx == NULL)
 	{
@@ -414,6 +415,7 @@ unsigned short ClusterMgr::become_file_sender()
 
 unsigned short ClusterMgr::become_file_receiver()
 {
+	assert(file_tx_type == TX_NONE && "file_tx_type shuold be TX_NONE");
 	file_tx = new FileReceiver(this, cluster_token, local_token);
 	if (file_tx == NULL)
 	{
@@ -1049,14 +1051,19 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 	    	assert(filepath != NULL && "filepath should NOT be NULL");
 
 		    int cluster_node_amount;
-			ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
-			if (CHECK_FAILURE(ret))
-				return ret;
+		    if (is_leader())
+		    {
+				ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
+				if (CHECK_FAILURE(ret))
+					return ret;
+		    }
+		    else  // For Follower, the file/folder can only be transferred to Leader
+		    	cluster_node_amount = 2;
 			assert(cluster_node_amount != 0 && "cluster_node_amount should NOT be 0");
 			// printf("Cluster Node Count: %d\n", cluster_node_amount);
 			if (cluster_node_amount == 1)
 			{
-				WRITE_FORMAT_ERROR("No follwer nodes in the cluster, no need to transfer the file: %s", filepath);
+				WRITE_FORMAT_ERROR("Only single node in the cluster, no need to transfer the file: %s", filepath);
 				return RET_SUCCESS;
 			}
 // Start the file transfer sender
@@ -1067,7 +1074,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				throw bad_alloc();
 			memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
 			strcpy(file_transfer_param.filepath, filepath);
-			WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d follower(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
+			WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d node(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
 			ret = become_file_sender();
 			if (CHECK_FAILURE(ret))
 				return ret;
@@ -1109,6 +1116,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			file_tx->deinitialize();
 			delete file_tx;
 			file_tx = NULL;
+			file_tx_type = TX_NONE;
 
 			// dump_interactive_session_data_list(session_id);
 			std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[cluster_file_transfer_param->session_id].data_list;
@@ -2012,6 +2020,27 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
+    	case PARAM_GET_FILE_TX_TYPE:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		*(FileTxType*)param1 = file_tx_type;
+    	}
+    	break;
+    	case PARAM_GET_SENDER_TOKEN:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		assert(file_tx != NULL && "file_tx should NOT be NULL");
+    		ret = file_tx->get(PARAM_GET_SENDER_TOKEN, &param1);
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2359,6 +2388,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 					delete file_tx;
 					file_tx = NULL;
 				}
+				file_tx_type = TX_NONE;
 			}
 		}
 		break;

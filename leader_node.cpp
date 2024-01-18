@@ -935,23 +935,78 @@ unsigned short LeaderNode::recv_get_fake_acspt_detail(const char* message_data, 
 	return RET_SUCCESS;
 }
 
-unsigned short LeaderNode::recv_request_file_transfer(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REQUEST_FILE_TRANSFER);}
+unsigned short LeaderNode::recv_request_file_transfer(const char* message_data, int message_size)
+{
+	// UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REQUEST_FILE_TRANSFER);
+	usleep((random() % 10) * 100000);
+	// const char* nofity_param = message_data.c_str();
+	// size_t notify_param_size = strlen(nofity_param);
+	// PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)nofity_param, notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)message_data, message_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Asynchronous event
+    observer->notify(NOTIFY_CONNECT_FILE_TRANSFER, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+
+	return RET_SUCCESS;
+}
 
 unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data, int message_size)
 {
+	assert(observer != NULL && "observer should NOT be NULL");
+	FileTxType file_tx_type;
+	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	unsigned short ret = RET_SUCCESS;
+	switch(file_tx_type)
+	{
+		case TX_SENDER:
+		{
 // Message format:
 // EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
-	assert(observer != NULL && "observer should NOT be NULL");
-	// size_t notify_param_size = strlen(message_data.c_str()) + 1;
-	// PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
-	PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data, (size_t)message_size);
-	if (notify_cfg == NULL)
-		throw bad_alloc();
-	// fprintf(stderr, "[recv_complete_file_transfer]  remote_token: %s\n", ((PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg)->get_remote_token());
-// Asynchronous event
-	observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER, notify_cfg);
-	SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
+			// size_t notify_param_size = strlen(message_data.c_str()) + 1;
+			// PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data.c_str(), notify_param_size);
+			PNOTIFY_CFG notify_cfg = new NotifyFileTransferCompleteCfg((void*)message_data, (size_t)message_size);
+			if (notify_cfg == NULL)
+				throw bad_alloc();
+			// fprintf(stderr, "[recv_complete_file_transfer]  remote_token: %s\n", ((PNOTIFY_FILE_TRANSFER_COMPLETE_CFG)notify_cfg)->get_remote_token());
+		// Asynchronous event
+			observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER, notify_cfg);
+			SAFE_RELEASE(notify_cfg)
+		}
+		break;
+		case TX_RECEIVER:
+		{
+// Message format:
+// EventType | session ID | EOD
+//	unsigned short ret = RET_SUCCESS;
+// 	if (file_channel != NULL)
+// 	{
+// // ret is the recv thread return code
+// 		ret = file_channel->deinitialize();
+// 		delete file_channel;
+// 		file_channel = NULL;
+// 		if (CHECK_FAILURE(ret))
+// 			return ret;
+// 	}
+// 	else
+// 		WRITE_WARN("The file channel does NOT exist");
+// Synchronous event
+			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
+			// int session_id = atoi(message_data.c_str());
+			int session_id = atoi(message_data);
+			ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
+		}
+		break;
+		default:
+		{
+			WRITE_ERROR("file_tx_type shuold NOT be TX_NONE");
+			ret = RET_FAILURE_INCORRECT_OPERATION;
+		}
+		break;
+	}
+	return ret;
 }
 
 unsigned short LeaderNode::recv_switch_leader(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
@@ -1263,24 +1318,92 @@ unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2
 
 unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param2, void* param3)
 {
+	assert(observer != NULL && "observer should NOT be NULL");
+	FileTxType file_tx_type;
+	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	unsigned short ret = RET_SUCCESS;
+	switch(file_tx_type)
+	{
+		case TX_SENDER:
+		{
 // Parameters:
 // param1: session id
 // param2: remote token. NULL for broadcast
 // Message format:
 // EventType | session ID | EOD
-	if (param1 == NULL || param2 == NULL)
-	{
-		WRITE_ERROR("param1/param2 should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;
+			if (param1 == NULL || param2 == NULL)
+			{
+				WRITE_ERROR("param1/param2 should NOT be NULL");
+				return RET_FAILURE_INVALID_ARGUMENT;
+			}
+			static const int BUF_SIZE = sizeof(int) + 1;
+			int session_id = *(int*)param1;
+			const char* remote_token = (const char*)param2;
+			char buf[BUF_SIZE];
+			memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+			snprintf(buf, BUF_SIZE, "%d", session_id);
+			// fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
+			ret = send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
+		}
+		break;
+		case TX_RECEIVER:
+		{
+// Parameters:
+// param1: The sessin id
+// param2: The return code
+// Message format:
+// EventType | playload: (session ID[2 digits]|cluster ID[2 digits]|return code[unsigned short]|remote_token) | EOD
+			if (param1 == NULL)
+			{
+				WRITE_ERROR("param1 should NOT be NULL");
+				return RET_FAILURE_INVALID_ARGUMENT;		
+			}
+			static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+			static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+			static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+//     // unsigned short ret = RET_SUCCESS;
+// // Serialize: convert the type of session id from integer to string  
+// 	char session_id_buf[SESSION_ID_BUF_SIZE];
+// 	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
+// 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
+// // Serialize: convert the type of cluster id from integer to string  
+// 	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
+// 	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
+// 	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
+// // Serialize: convert the type of return code from integer to string  
+// 	char return_code_buf[RETURN_CODE_BUF_SIZE];
+// 	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
+// 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
+
+// 	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
+			int buf_size = PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS + sizeof(unsigned short) + strlen(local_token) + 1;
+			char* buf = new char[buf_size];
+			if (buf == NULL)
+				throw bad_alloc();
+			memset(buf, 0x0, sizeof(char) * buf_size);
+			char* buf_ptr = buf;
+			memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
+			buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+			memcpy(buf_ptr, &cluster_id, PAYLOAD_CLUSTER_ID_DIGITS);
+			buf_ptr += PAYLOAD_CLUSTER_ID_DIGITS;
+			memcpy(buf_ptr, param2, sizeof(unsigned short));
+			buf_ptr += sizeof(unsigned short);
+			memcpy(buf_ptr, local_token, strlen(local_token));
+
+			char* sender_token = NULL;
+			observer->get(PARAM_GET_SENDER_TOKEN, (void*)&sender_token);
+			WRITE_FORMAT_DEBUG("The sender token in Leader: %s", sender_token);
+			ret = send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size, sender_token);
+		}
+		break;
+		default:
+		{
+			WRITE_ERROR("file_tx_type shuold NOT be TX_NONE");
+			ret = RET_FAILURE_INCORRECT_OPERATION;
+		}
+		break;
 	}
-	static const int BUF_SIZE = sizeof(int) + 1;
-	int session_id = *(int*)param1;
-	const char* remote_token = (const char*)param2;
-	char buf[BUF_SIZE];
-	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
-	snprintf(buf, BUF_SIZE, "%d", session_id);
-	// fprintf(stderr, "[send_complete_file_transfer]  remote_token: %s\n", remote_token);
-	return send_string_data(MSG_COMPLETE_FILE_TRANSFER, buf, remote_token);
+	return ret;
 }
 
 unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* param3)

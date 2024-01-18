@@ -53,7 +53,8 @@ struct CommandAttribute
 typedef CommandAttribute* PCOMMAND_ATTRIBUTE;
 
 
-static const unsigned char AUTHORITY_LEADER = 0x1; 
+static const unsigned char AUTHORITY_ALL = 0x0;
+static const unsigned char AUTHORITY_LEADER = 0x1;
 static const unsigned char AUTHORITY_ROOT = 0x1 << 1; 
 
 #define CHECK_LDADER(x) ((x & AUTHORITY_LEADER) ? true : false)
@@ -65,16 +66,16 @@ static const unsigned char AUTHORITY_ROOT = 0x1 << 1;
 
 static const CommandAttribute interactive_session_command_attr[InteractiveSessionCommandSize] = 
 {
-	{.command="help", .authority=0X0, .description="The usage"},
-	{.command="exit", .authority=0X0, .description="Exit the session"},
-	{.command="get_role", .authority=0X0, .description="Get the role in the cluster"},
-	{.command="get_cluster_detail", .authority=0X0, .description="Get the cluster detail info"},
-	{.command="get_system_info", .authority=0X0, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info"},
+	{.command="help", .authority=AUTHORITY_ALL, .description="The usage"},
+	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the session"},
+	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
+	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
+	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
-	{.command="sync_folder", .authority=AUTHORITY_LEADER, .description="Synchronize all the files in the folder to the follower  Param: filepath (ex. /home/super) or No param: exploit the sync folder in the config file"},
-	{.command="sync_file", .authority=AUTHORITY_LEADER, .description="Synchronize a specific file of the folder to the follower\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)"},
+	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the follower  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
+	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the follower\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)\n Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute filepath in Follower"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
 	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
 	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
@@ -809,7 +810,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	// usage_string += string("* help\n Description: The usage\n");
 	// usage_string += string("* exit\n Description: Exit the session\n");
 	// usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
-	// usage_string += string("* get_system_info\n Description: Get the system info\n Caution: Leader get the entire cluster system info. Follwer only get the node system info\n");
+	// usage_string += string("* get_system_info\n Description: Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info\n");
 	// if (is_leader)
 	// {
 	// 	// usage_string += string("* get_node_system_info\n Description: Get the system info of certain a node\n");
@@ -1131,7 +1132,7 @@ unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, 
 unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **argv)
 {
 	assert(observer != NULL && "observer should NOT be NULL");
-	if (argc != 1)
+	if (argc != 1 || argc != 2)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
 		print_to_console(incorrect_command_phrases);
@@ -1141,17 +1142,32 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 	unsigned short ret = RET_SUCCESS;
 	char folderpath[DEF_LONG_STRING_SIZE]; 
 	string sync_folderpath;
-	ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
-	if (CHECK_FAILURE(ret))
-		return ret;
-	if (strchr(sync_folderpath.c_str(), '~') != NULL)
+	if (argc == 1)
 	{
-		ret = get_complete_sync_folderpath(sync_folderpath);
-		if (CHECK_FAILURE(ret))
-			return ret;
+		if (is_leader)
+		{
+			WRITE_DEBUG("Use the folderpath in config file to synchorinize......");
+			ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			if (strchr(sync_folderpath.c_str(), '~') != NULL)
+			{
+				ret = get_complete_sync_folderpath(sync_folderpath);
+				if (CHECK_FAILURE(ret))
+					return ret;
+			}
+		}
+		else
+		{
+			WRITE_FORMAT_WARN("WANRING!! Incorrect argument in command: %s", argv[0]);
+			print_to_console(incomplete_command_phrases);
+			return RET_WARN_INTERACTIVE_COMMAND;
+		}
 	}
-	// else
-	// 	strcpy(folderpath, sync_folderpath.c_str());
+	else
+	{
+		sync_folderpath = string(argv[1]);
+	}
 	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
 	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
 	list<string> full_filepath_in_folder_list;
@@ -1190,18 +1206,27 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	const char* argv1_tmp = (const char*)argv[1];
 	if (strchr(argv1_tmp, '/') == NULL)
 	{
-		string sync_folderpath;
-		ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
-		if (CHECK_FAILURE(ret))
-			return ret;
-		if (strchr(sync_folderpath.c_str(), '~') != NULL)
+		if (is_leader)
 		{
-			ret = get_complete_sync_folderpath(sync_folderpath);
+			string sync_folderpath;
+			ret = manager->get(PARAM_CONFIGURATION_VALUE, (void*)CONF_FIELD_SYNC_FOLDERPATH, (void*)&sync_folderpath);
 			if (CHECK_FAILURE(ret))
 				return ret;
+			if (strchr(sync_folderpath.c_str(), '~') != NULL)
+			{
+				ret = get_complete_sync_folderpath(sync_folderpath);
+				if (CHECK_FAILURE(ret))
+					return ret;
+			}
+			else
+				snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
 		}
 		else
-			snprintf(filepath, DEF_LONG_STRING_SIZE, "%s/%s", sync_folderpath.c_str(), argv1_tmp);
+		{
+			WRITE_FORMAT_WARN("WANRING!! Incorrect argument in command: %s", argv[0]);
+			print_to_console(incomplete_command_phrases);
+			return RET_WARN_INTERACTIVE_COMMAND;
+		}			
 	}
 	else
 		strcpy(filepath, argv1_tmp);
