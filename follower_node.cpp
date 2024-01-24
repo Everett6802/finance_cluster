@@ -1102,25 +1102,32 @@ unsigned short FollowerNode::send_request_file_transfer(void* param1, void* para
    assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
 	if (file_transfer_param->session_id == -1)
 	{
-		WRITE_ERROR("tx_session_id should NOT be -1");
-		return RET_FAILURE_SYSTEM_API;
-	}			
+		WRITE_ERROR("file_transfer_param->session_id should NOT be -1");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	if (file_transfer_param->sender_token == NULL)
+	{
+		WRITE_ERROR("file_transfer_param->sender_token should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
 	if (file_transfer_param->filepath == NULL)
 	{
-		WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
+		WRITE_ERROR("file_transfer_param->filepath should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
 	}
+	int sender_token_len = strlen(file_transfer_param->sender_token);
 	int filepath_len = strlen(file_transfer_param->filepath);
-	int buf_size = PAYLOAD_SESSION_ID_DIGITS + filepath_len + 1;
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1 + filepath_len + 1;
 	char* buf = new char[buf_size];
 	if (buf == NULL)
 		throw bad_alloc();
 	// fprintf(stderr, "session_id: %d, filepath: %s\n", file_transfer_param->session_id, file_transfer_param->filepath);
 	memset(buf, 0x0, sizeof(char) * buf_size);
-	memcpy(buf, &file_transfer_param->session_id, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
 	// fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
-	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->filepath, sizeof(char) * filepath_len);
-	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->sender_token, sizeof(char) * sender_token_len);
+	// fprintf(stderr, "sender_token in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1), file_transfer_param->filepath, sizeof(char) * filepath_len);
+	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1]);
 	// fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
 
 	WRITE_DEBUG("Notify the receiver to establish the connection for file transfer");

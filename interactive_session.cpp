@@ -74,8 +74,8 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
-	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the follower  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
-	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the follower\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)\n Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute filepath in Follower"},
+	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the Receiver  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
+	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the Receiver\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)\n Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute filepath in Follower"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
 	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
 	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
@@ -1132,12 +1132,6 @@ unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, 
 unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **argv)
 {
 	assert(observer != NULL && "observer should NOT be NULL");
-	if (argc != 1 || argc != 2)
-	{
-		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
-		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_COMMAND;
-	}
 
 	unsigned short ret = RET_SUCCESS;
 	char folderpath[DEF_LONG_STRING_SIZE]; 
@@ -1159,14 +1153,20 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		}
 		else
 		{
-			WRITE_FORMAT_WARN("WANRING!! Incorrect argument in command: %s", argv[0]);
+			WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
 			print_to_console(incomplete_command_phrases);
 			return RET_WARN_INTERACTIVE_COMMAND;
 		}
 	}
-	else
+	else if (argc == 2)
 	{
 		sync_folderpath = string(argv[1]);
+	}
+	else
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
 	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
@@ -1223,7 +1223,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		}
 		else
 		{
-			WRITE_FORMAT_WARN("WANRING!! Incorrect argument in command: %s", argv[0]);
+			WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
 			print_to_console(incomplete_command_phrases);
 			return RET_WARN_INTERACTIVE_COMMAND;
 		}			

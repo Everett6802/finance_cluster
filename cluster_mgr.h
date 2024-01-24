@@ -63,7 +63,7 @@ private:
 	unsigned short become_leader();
 	unsigned short become_follower(bool need_rebuild_cluster=false);
 	unsigned short become_file_sender();
-	unsigned short become_file_receiver();
+	unsigned short become_file_receiver(const char* sender_token);
 	// unsigned short start_connection();
 	unsigned short stop_connection();
 	unsigned short rebuild_cluster(int new_leader_node_id=-1);

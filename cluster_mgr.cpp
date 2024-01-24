@@ -413,10 +413,12 @@ unsigned short ClusterMgr::become_file_sender()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::become_file_receiver()
+unsigned short ClusterMgr::become_file_receiver(const char* sender_token)
 {
 	assert(file_tx_type == TX_NONE && "file_tx_type shuold be TX_NONE");
-	file_tx = new FileReceiver(this, cluster_token, local_token);
+	assert(sender_token != NULL  && "sender_token should NOT be NULL");
+	WRITE_FORMAT_DEBUG("File Receiver[%s] sets File Sender Token: %s", local_token, sender_token);
+	file_tx = new FileReceiver(this, sender_token, local_token);
 	if (file_tx == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: file_tx (receiver)");
@@ -1069,10 +1071,17 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 // Start the file transfer sender
 			FileTransferParam file_transfer_param;
 			file_transfer_param.session_id = cluster_file_transfer_param->session_id;
-			file_transfer_param.filepath = new char[strlen(filepath) + 1];
+			int sender_token_len = strlen(local_token) + 1;
+			file_transfer_param.sender_token = new char[sender_token_len];
+			if (file_transfer_param.sender_token == NULL)
+				throw bad_alloc();
+			memset(file_transfer_param.sender_token, 0x0, sizeof(char) * sender_token_len);
+			strcpy(file_transfer_param.sender_token, local_token);
+			int filepath_len = strlen(filepath) + 1;
+			file_transfer_param.filepath = new char[filepath_len];
 			if (file_transfer_param.filepath == NULL)
 				throw bad_alloc();
-			memset(file_transfer_param.filepath, 0x0, sizeof(char) * (strlen(filepath) + 1));
+			memset(file_transfer_param.filepath, 0x0, sizeof(char) * filepath_len);
 			strcpy(file_transfer_param.filepath, filepath);
 			WRITE_FORMAT_DEBUG("Session[%d]: Transfer the file[%s] to %d node(s)", cluster_file_transfer_param->session_id, filepath, cluster_node_amount - 1);
 			ret = become_file_sender();
@@ -1086,7 +1095,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			interactive_session_param[cluster_file_transfer_param->session_id].follower_node_amount = cluster_node_amount - 1;
 			interactive_session_param[cluster_file_transfer_param->session_id].event_count = 0;
 			pthread_mutex_unlock(&interactive_session_param[cluster_file_transfer_param->session_id].mtx);
-// Nodify the remote Node
+// Nodify the remote Node to connect to
 			usleep(100000);
 			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
 			if (CHECK_FAILURE(ret))
@@ -2533,7 +2542,8 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	case NOTIFY_CONNECT_FILE_TRANSFER:
     	{
 			unsigned short ret = RET_SUCCESS;
-    		ret = become_file_receiver();
+			const char* sender_token = ((PNOTIFY_FILE_TRANSFER_CONNECT_CFG)notify_cfg)->get_sender_token();
+    		ret = become_file_receiver(sender_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
 			ret = file_tx->notify(NOTIFY_CONNECT_FILE_TRANSFER, (void*)notify_cfg);

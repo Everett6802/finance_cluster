@@ -18,7 +18,7 @@ private:
 	int tx_socketfd; // For file transfer
 	bool local_cluster;
 	char* local_token;
-	char* cluster_token;
+	char* sender_token;
 	PNOTIFY_THREAD notify_thread;
 	PFILE_CHANNEL file_channel;
 

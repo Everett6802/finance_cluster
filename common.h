@@ -231,8 +231,8 @@ enum MessageType{
 	MSG_CONTROL_FAKE_USREPT, // Uni-Direction, Leader -> Follower
 	MSG_GET_FAKE_ACSPT_STATE, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_GET_FAKE_ACSPT_DETAIL, // Bi-Direction, Leader -> Follower, then Follower -> Leader
-	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Leader -> Follower
-	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Leader -> Follower, then Follower -> Leader
+	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Sender -> Receiver
+	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
 	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
 };
@@ -725,6 +725,7 @@ class FileTransferParam
 {
 public:
 	int session_id;
+	char* sender_token;
 	char* filepath;
 
 	FileTransferParam();
@@ -1000,12 +1001,14 @@ class NotifyFileTransferConnectCfg : public NotifyCfgEx
 {
 private:
 	int get_cluster_id()const;
+	char* sender_token;
 	char* filepath;
 
 public:
 	NotifyFileTransferConnectCfg(const void* param, size_t param_size);
 	virtual ~NotifyFileTransferConnectCfg();
 
+	const char* get_sender_token()const;
 	const char* get_filepath()const;
 };
 typedef NotifyFileTransferConnectCfg* PNOTIFY_FILE_TRANSFER_CONNECT_CFG;

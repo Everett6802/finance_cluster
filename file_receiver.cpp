@@ -15,7 +15,7 @@ FileReceiver::FileReceiver(PIMANAGER parent, const char* server_token, const cha
 	observer(parent),
 	tx_socketfd(0),
 	local_token(NULL),
-	cluster_token(NULL),
+	sender_token(NULL),
 	notify_thread(NULL),
 	file_channel(NULL)
 {
@@ -26,7 +26,7 @@ FileReceiver::FileReceiver(PIMANAGER parent, const char* server_token, const cha
 	if (token != NULL)
 		local_token = strdup(token);
 	if (server_token != NULL)
-		cluster_token = strdup(server_token);
+		sender_token = strdup(server_token);
 }
 
 FileReceiver::~FileReceiver()
@@ -47,7 +47,7 @@ FileReceiver::~FileReceiver()
 
 unsigned short FileReceiver::connect_file_sender()
 {
-	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", cluster_token);
+	WRITE_FORMAT_DEBUG("Try to connect to File sender[%s]......", sender_token);
 
 // Create socket
 	int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -89,7 +89,7 @@ unsigned short FileReceiver::connect_file_sender()
 		memset(&client_address, 0x0, sizeof(struct sockaddr_in));
 		client_address.sin_family = AF_INET;
 		client_address.sin_port = htons(FILE_TRANSFER_PORT_NO);
-		client_address.sin_addr.s_addr = inet_addr(cluster_token);
+		client_address.sin_addr.s_addr = inet_addr(sender_token);
 		res = connect(sock_fd, (struct sockaddr*)&client_address, sizeof(struct sockaddr));
 	}
 	if (res < 0)
@@ -154,7 +154,7 @@ unsigned short FileReceiver::connect_file_sender()
 		return RET_FAILURE_SYSTEM_API;
 	}
 
-	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
+	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", sender_token);
 	tx_socketfd = sock_fd;
 
 	return RET_SUCCESS;
@@ -181,7 +181,7 @@ unsigned short FileReceiver::request_file_transfer(const char* tx_filepath)
 	}
 
 	WRITE_FORMAT_INFO("Initialize the File Channel in Receiver[%s]", local_token);
-	ret = file_channel->initialize(tx_filepath, local_token, cluster_token, tx_socketfd);
+	ret = file_channel->initialize(tx_filepath, local_token, sender_token, tx_socketfd);
 	if (CHECK_FAILURE(ret))
 		return ret;
 
@@ -238,10 +238,10 @@ unsigned short FileReceiver::deinitialize()
 		if (CHECK_FAILURE(ret))
 			WRITE_FORMAT_WARN("Fail to de-initialize the file channel worker thread[Node: %s]", local_token);
 	}
-	if (cluster_token != NULL)
+	if (sender_token != NULL)
 	{
-		free(cluster_token);
-		cluster_token = NULL;
+		free(sender_token);
+		sender_token = NULL;
 	}
 	if (local_token != NULL)
 	{
@@ -320,7 +320,7 @@ unsigned short FileReceiver::get(ParamType param_type, void* param1, void* param
     {
     	case PARAM_GET_SENDER_TOKEN:
     	{
-    		*(char**)param1 = strdup(cluster_token);
+    		*(char**)param1 = strdup(sender_token);
     	}
     	break;
     	default:

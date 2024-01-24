@@ -1122,6 +1122,7 @@ ClusterFakeAcsptDetailParam::~ClusterFakeAcsptDetailParam(){}
 
 FileTransferParam::FileTransferParam() :
 	session_id(-1),
+	sender_token(NULL),
 	filepath(NULL)
 {
 }
@@ -1132,6 +1133,11 @@ FileTransferParam::~FileTransferParam()
 	{
 		delete[] filepath;
 		filepath = NULL;
+	}
+	if (sender_token != NULL)
+	{
+		delete[] sender_token;
+		sender_token = NULL;
 	}
 	session_id = -1;
 }
@@ -1704,7 +1710,11 @@ NotifyFileTransferConnectCfg::NotifyFileTransferConnectCfg(const void* param, si
 	session_id = atoi(session_id_buf);
 
 	const char* param_char = (const char*)notify_param;
-	filepath = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+	sender_token = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS);
+	int sender_token_len = strlen(sender_token);
+	if (sender_token_len == 0)
+		sender_token = NULL;
+	filepath = (char*)(param_char + PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1);
 	if (strlen(filepath) == 0)
 		filepath = NULL;
 }
@@ -1712,6 +1722,12 @@ NotifyFileTransferConnectCfg::NotifyFileTransferConnectCfg(const void* param, si
 NotifyFileTransferConnectCfg::~NotifyFileTransferConnectCfg()
 {
 	filepath = NULL;
+	sender_token = NULL;
+}
+
+const char* NotifyFileTransferConnectCfg::get_sender_token()const
+{
+	return sender_token;
 }
 
 const char* NotifyFileTransferConnectCfg::get_filepath()const

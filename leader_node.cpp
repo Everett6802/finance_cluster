@@ -945,9 +945,9 @@ unsigned short LeaderNode::recv_request_file_transfer(const char* message_data, 
 	PNOTIFY_CFG notify_cfg = new NotifyFileTransferConnectCfg((void*)message_data, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
-    assert(observer != NULL && "observer should NOT be NULL");
+   assert(observer != NULL && "observer should NOT be NULL");
 // Asynchronous event
-    observer->notify(NOTIFY_CONNECT_FILE_TRANSFER, notify_cfg);
+   observer->notify(NOTIFY_CONNECT_FILE_TRANSFER, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
 
 	return RET_SUCCESS;
@@ -1273,9 +1273,9 @@ unsigned short LeaderNode::send_get_fake_acspt_detail(void* param1, void* param2
 unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: session id/filepath
+// param1: a pointer to an FILE_TRANSFER_PARAM object
 // Message format:
-// EventType | session id | filepath | EOD
+// EventType | session id | sender_token | filepath | EOD
 	if (param1 == NULL)
 	{
 		WRITE_ERROR("param1 should NOT be NULL");
@@ -1285,16 +1285,22 @@ unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2
    assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
 	if (file_transfer_param->session_id == -1)
 	{
-		WRITE_ERROR("tx_session_id should NOT be -1");
-		return RET_FAILURE_SYSTEM_API;
+		WRITE_ERROR("file_transfer_param->session_id should NOT be -1");
+		return RET_FAILURE_INVALID_ARGUMENT;
 	}			
+	if (file_transfer_param->sender_token == NULL)
+	{
+		WRITE_ERROR("file_transfer_param->sender_token should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
 	if (file_transfer_param->filepath == NULL)
 	{
-		WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));
-		return RET_FAILURE_SYSTEM_API;
+		WRITE_ERROR("file_transfer_param->filepath should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
 	}
+	int sender_token_len = strlen(file_transfer_param->sender_token);
 	int filepath_len = strlen(file_transfer_param->filepath);
-	int buf_size = PAYLOAD_SESSION_ID_DIGITS + filepath_len + 1;
+	int buf_size = PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1 + filepath_len + 1;
 	char* buf = new char[buf_size];
 	if (buf == NULL)
 		throw bad_alloc();
@@ -1302,8 +1308,10 @@ unsigned short LeaderNode::send_request_file_transfer(void* param1, void* param2
 	memset(buf, 0x0, sizeof(char) * buf_size);
 	memcpy(buf, &file_transfer_param->session_id, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
 	// fprintf(stderr, "session_id in buf: %d\n", atoi(buf));
-	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->filepath, sizeof(char) * filepath_len);
-	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS), file_transfer_param->sender_token, sizeof(char) * sender_token_len);
+	// fprintf(stderr, "sender_token in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS]);
+	memcpy((buf + PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1), file_transfer_param->filepath, sizeof(char) * filepath_len);
+	// fprintf(stderr, "filepath in buf: %s\n", &buf[PAYLOAD_SESSION_ID_DIGITS + sender_token_len + 1]);
 	// fprintf(stderr, "buf: %s, buf_size: %d\n", buf, buf_size);
 
 	WRITE_DEBUG("Notify the receiver to establish the connection for file transfer");
