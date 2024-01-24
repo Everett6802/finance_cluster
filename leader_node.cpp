@@ -992,8 +992,6 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 // 	}
 // 	else
 // 		WRITE_WARN("The file channel does NOT exist");
-// Synchronous event
-			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
 			// int session_id = atoi(message_data.c_str());
 			int session_id = atoi(message_data);
 			ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
@@ -1401,6 +1399,10 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 			char* sender_token = NULL;
 			observer->get(PARAM_GET_SENDER_TOKEN, (void*)&sender_token);
 			WRITE_FORMAT_DEBUG("The sender token in Leader: %s", sender_token);
+// Synchronous event
+// Notify to complete the file receiving...
+			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
+// Notify the remote sender that the recevier has closed the resource
 			ret = send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size, sender_token);
 		}
 		break;

@@ -780,8 +780,6 @@ unsigned short FollowerNode::recv_complete_file_transfer(const char* message_dat
 // 	}
 // 	else
 // 		WRITE_WARN("The file channel does NOT exist");
-// Synchronous event
-			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
 			// int session_id = atoi(message_data.c_str());
 			int session_id = atoi(message_data);
 			ret = send_complete_file_transfer((void*)&session_id, (void*)&ret);
@@ -1185,21 +1183,6 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 			static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
 			static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
 			static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
-//     // unsigned short ret = RET_SUCCESS;
-// // Serialize: convert the type of session id from integer to string  
-// 	char session_id_buf[SESSION_ID_BUF_SIZE];
-// 	memset(session_id_buf, 0x0, sizeof(session_id_buf) / sizeof(session_id_buf[0]));
-// 	snprintf(session_id_buf, SESSION_ID_BUF_SIZE, PAYLOAD_SESSION_ID_STRING_FORMAT, *(int*)param1);
-// // Serialize: convert the type of cluster id from integer to string  
-// 	char cluster_id_buf[CLUSTER_ID_BUF_SIZE];
-// 	memset(cluster_id_buf, 0x0, sizeof(cluster_id_buf) / sizeof(cluster_id_buf[0]));
-// 	snprintf(cluster_id_buf, CLUSTER_ID_BUF_SIZE, PAYLOAD_CLUSTER_ID_STRING_FORMAT, cluster_id);
-// // Serialize: convert the type of return code from integer to string  
-// 	char return_code_buf[RETURN_CODE_BUF_SIZE];
-// 	memset(return_code_buf, 0x0, sizeof(return_code_buf) / sizeof(return_code_buf[0]));
-// 	snprintf(return_code_buf, RETURN_CODE_BUF_SIZE, "%hu", *(int*)param2);
-
-// 	string file_transfer_data = string(session_id_buf) + string(cluster_id_buf) + string(return_code_buf) + string(local_token);
 			int buf_size = PAYLOAD_SESSION_ID_DIGITS + PAYLOAD_CLUSTER_ID_DIGITS + sizeof(unsigned short) + strlen(local_token) + 1;
 			char* buf = new char[buf_size];
 			if (buf == NULL)
@@ -1213,7 +1196,10 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 			memcpy(buf_ptr, param2, sizeof(unsigned short));
 			buf_ptr += sizeof(unsigned short);
 			memcpy(buf_ptr, local_token, strlen(local_token));
-
+// Synchronous event
+// Notify to complete the file receiving...
+			ret = observer->notify(NOTIFY_COMPLETE_FILE_TRANSFER);
+// Notify the remote sender that the recevier has closed the resource
 			ret = send_raw_data(MSG_COMPLETE_FILE_TRANSFER, buf, buf_size);
 		}
 		break;
