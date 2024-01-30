@@ -348,7 +348,8 @@ unsigned short create_folder_recursive(const char* full_folderpath)
 		// printf("Folderpath: %s\n", upper_folderpath.c_str());
 		if (access(upper_folderpath.c_str(), F_OK) != 0)
 		{
-			STATIC_WRITE_FORMAT_DEBUG("Create the folder: %s", upper_folderpath.c_str());
+			// printf("Create the folder: %s\n", upper_folderpath.c_str());
+			// // STATIC_WRITE_FORMAT_DEBUG("Create the folder: %s", upper_folderpath.c_str());
 			if(mkdir(upper_folderpath.c_str(), S_IRWXU) != 0)
 			{
 				STATIC_WRITE_FORMAT_ERROR("mkdir() fails, due to: %s", strerror(errno));

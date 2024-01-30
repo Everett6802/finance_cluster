@@ -321,7 +321,7 @@ int main(int argc, char** argv)
 	// exit(0);
 
 	// list<string> full_filepath_in_folder_list;
-	// get_filepath_in_folder_recursive(full_filepath_in_folder_list, string("/home/super/test1"));
+	// // get_filepath_in_folder_recursive(full_filepath_in_folder_list, string("/home/super/test1"));
 	// printf("\n============\n");
 	// list<string>::iterator iter = full_filepath_in_folder_list.begin();
 	// while (iter != full_filepath_in_folder_list.end())
@@ -330,6 +330,7 @@ int main(int argc, char** argv)
 	// 	printf("* %s\n", full_filepath.c_str());
 	// 	iter++;
 	// }
+	// create_folder_recursive("/home/super/test111/test222/test333/test444");
 	// exit(0);
 
 // Register the signals so that the process can exit gracefully
