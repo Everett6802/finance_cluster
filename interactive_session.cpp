@@ -1183,6 +1183,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 	// Start to transfer the file
 		cluster_file_transfer_param.session_id = session_id;
 	    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
+	    usleep(100000);
 	    // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
 	 	if (CHECK_FAILURE(ret))
 			return ret;
