@@ -795,8 +795,8 @@ unsigned short ClusterMgr::extract_interactive_session_data_list(int session_id,
 				break;
 			}
 			remove_index++;
-			iter++;
 		}
+		iter++;
 	}
 	std::list<int>::iterator iter_remove = remove_index_list.begin();
 	while (iter_remove != remove_index_list.end())
@@ -824,6 +824,7 @@ void ClusterMgr::dump_interactive_session_data_list(int session_id)const
 	{
 		PNOTIFY_CFG nodify_cfg = (PNOTIFY_CFG)*iter;
 		fprintf(stderr, "NotifyType: %d\n", nodify_cfg->get_notify_type());
+		nodify_cfg->dump_notify_info();
 		++iter;
 	}
 }
@@ -1353,7 +1354,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 					}
-					// // dump_interactive_session_data_list(session_id);
+					// dump_interactive_session_data_list(session_id);
 					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
 					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 					std::list<PNOTIFY_CFG> interactive_session_system_info_data;
@@ -2547,13 +2548,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_system_info_cfg);
 			interactive_session_param[session_id].event_count++;
+			// printf("event_count: %d, follower_node_amount: %d\n", interactive_session_param[session_id].event_count, interactive_session_param[session_id].follower_node_amount);
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
 			{
 // It's required to sleep for a while before notifying to accessing the list in another thread
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
 			}
-			pthread_cond_signal(&interactive_session_param[session_id].cond);
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
     	}
     	break;

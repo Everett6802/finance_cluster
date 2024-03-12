@@ -775,6 +775,7 @@ public:
 
 	NotifyType get_notify_type()const;
 	const void* get_notify_param()const;
+	virtual void dump_notify_info()const;
 };
 typedef NotifyCfg* PNOTIFY_CFG;
 
@@ -841,6 +842,7 @@ public:
 	// int get_session_id()const;
 	// int get_cluster_id()const;
 	const char* get_system_info()const;
+	void dump_notify_info()const;
 };
 typedef NotifySystemInfoCfg* PNOTIFY_SYSTEM_INFO_CFG;
 

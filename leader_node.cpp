@@ -857,6 +857,7 @@ unsigned short LeaderNode::recv_get_system_info(const char* message_data, int me
 		throw bad_alloc();
 // Asynchronous event
 	observer->notify(NOTIFY_GET_SYSTEM_INFO, notify_cfg);
+	// printf("recv_get_system_info()\n");
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }

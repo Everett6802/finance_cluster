@@ -1223,6 +1223,8 @@ NotifyType NotifyCfg::get_notify_type()const{return notify_type;}
 
 const void* NotifyCfg::get_notify_param()const{return notify_param;}
 
+void NotifyCfg::dump_notify_info()const{}
+
 ///////////////////////////
 
 NotifyCfgEx::NotifyCfgEx(NotifyType type, const void* param, size_t param_size) :
@@ -1367,6 +1369,12 @@ const char* NotifySystemInfoCfg::get_system_info()const
 {
 	return system_info;
 }
+
+void NotifySystemInfoCfg::dump_notify_info()const
+{
+	(system_info == NULL ? printf("No Data") : printf("%s\n", system_info));
+}
+
 
 ///////////////////////////
 
