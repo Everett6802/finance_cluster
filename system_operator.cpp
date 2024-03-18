@@ -368,13 +368,52 @@ unsigned short SystemOperator::get_system_info(string& system_info)
 
 unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sleep_time_in_millisec)
 {
-	static char *CMD = "grep 'cpu ' /proc/stat | awk '{print $2+$3+$4+$5+$6+$7+$8, $2+$3+$8}'";
 	static const int CMD_COUNT = 2;
+// $2+$3+$4+$5+$6+$7+$8: overflow
+	// static char *CMD = "grep 'cpu ' /proc/stat | awk '{print $2+$3+$4+$5+$6+$7+$8, $2+$3+$8}'";
+	// unsigned short ret = RET_SUCCESS;
+	// FILE *fp[CMD_COUNT];
+	// char* line[CMD_COUNT] = {NULL};
+	// unsigned long long jiffies_count[CMD_COUNT][2] = {0};
+	// char cpu_usage_value_str[DEF_SHORT_STRING_SIZE];
+	// float cpu_usage_value;
 
+	// fp[0] = popen(CMD, "r");
+	// usleep(sleep_time_in_millisec * 1000);
+	// fp[1] = popen(CMD, "r");
+	// for (int i = 0 ; i < CMD_COUNT; i++)
+	// {
+	// 	size_t line_len = 0;
+	// 	if (getline(&line[i], &line_len, fp[i]) == -1)
+	// 	{
+	// 		WRITE_FORMAT_ERROR("getline(%d) fails, due to: %s", i, strerror(errno));
+	// 		ret = RET_FAILURE_SYSTEM_API;
+	// 		goto OUT;
+	// 	}
+	// 	char* line_tmp = line[i];
+	//     char* rest = NULL;
+	// 	char* token1 = strtok_r(line_tmp, " ", &rest);
+	// 	char* token2 = strtok_r(NULL, " ", &rest);
+	// 	if (token1 == NULL || token2 == NULL)
+	// 	{
+	// 		WRITE_FORMAT_ERROR("Fail to parse the line: %s", line);
+	// 		ret = RET_FAILURE_RUNTIME;
+	// 		goto OUT;		
+	// 	}
+	// 	fprintf(stderr, "%d, token1: %s, %llu, token2: %s, %llu\n", i, token1, atoll(token1), token2, atoll(token2));
+	// 	jiffies_count[i][0] = atoll(token1);
+	// 	jiffies_count[i][1] = atoll(token2);
+	// 	fprintf(stderr, "%d, %llu, %llu\n", i, jiffies_count[i][0], jiffies_count[i][1]);
+	// }
+	// cpu_usage_value = (float)(jiffies_count[1][1] - jiffies_count[0][1]) * 100.0 / (jiffies_count[1][0] - jiffies_count[0][0]);
+
+	static char *CMD = "grep 'cpu ' /proc/stat | awk '{print $2, $3, $4, $5, $6, $7, $8}'";
+	// static char *CMD = "grep 'cpu ' /proc/stat | awk '{printf \"%d %d\", $2+$3+$4+$5+$6+$7+$8, $2+$3+$8}'";
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp[CMD_COUNT];
 	char* line[CMD_COUNT] = {NULL};
-	int jiffies_count[CMD_COUNT][2] = {0};
+	unsigned long long jiffies_count[CMD_COUNT][7] = {0};
+	unsigned long long jiffies_count_sum[CMD_COUNT][2] = {0};
 	char cpu_usage_value_str[DEF_SHORT_STRING_SIZE];
 	float cpu_usage_value;
 
@@ -391,19 +430,20 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 			goto OUT;
 		}
 		char* line_tmp = line[i];
+		int elem_ptr_cnt = 0;
+		char* elem = NULL;
 	    char* rest = NULL;
-		char* token1 = strtok_r(line_tmp, " ", &rest);
-		char* token2 = strtok_r(NULL, " ", &rest);
-		if (token1 == NULL || token2 == NULL)
+		while((elem = strtok_r(line_tmp, " ", &rest)) != NULL)
 		{
-			WRITE_FORMAT_ERROR("Fail to parse the line: %s", line);
-			ret = RET_FAILURE_RUNTIME;
-			goto OUT;		
+			jiffies_count[i][elem_ptr_cnt++] = atoll(elem);
+			if (line_tmp != NULL)
+				line_tmp = NULL;
 		}
-		jiffies_count[i][0] = atoi(token1);
-		jiffies_count[i][1] = atoi(token2);
+		// fprintf(stderr, "%d, %llu, %llu, %llu, %llu, %llu, %llu, %llu\n", i, jiffies_count[i][0], jiffies_count[i][1], jiffies_count[i][2], jiffies_count[i][3], jiffies_count[i][4], jiffies_count[i][5], jiffies_count[i][6]);
+		jiffies_count_sum[i][0] = jiffies_count[i][0] + jiffies_count[i][1] + jiffies_count[i][2] + jiffies_count[i][3] + jiffies_count[i][4] + jiffies_count[i][5] + jiffies_count[i][6];
+		jiffies_count_sum[i][1] = jiffies_count[i][0] + jiffies_count[i][1] + jiffies_count[i][6];
 	}
-	cpu_usage_value = (float)(jiffies_count[1][1] - jiffies_count[0][1]) * 100.0 / (jiffies_count[1][0] - jiffies_count[0][0]);
+	cpu_usage_value = (float)(jiffies_count_sum[1][1] - jiffies_count_sum[0][1]) * 100.0 / (jiffies_count_sum[1][0] - jiffies_count_sum[0][0]);
 	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, " cpu usage: %.2f % \n", cpu_usage_value);
 	cpu_usage = cpu_usage_value_str;
 OUT:
