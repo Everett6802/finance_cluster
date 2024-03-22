@@ -2693,6 +2693,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			    ret = cluster_map.get_node_token(leader_candidate_node_id, leader_candidate_node_token);
 				if (CHECK_FAILURE(ret))
 					return ret;
+				WRITE_FORMAT_DEBUG("New Leader: %d after switching leader", leader_candidate_node_id);
 // Notify the Followers to rebuild the cluster
 				ret = cluster_node->send(MSG_SWITCH_LEADER, (void*)&leader_candidate_node_id);
 				if (CHECK_FAILURE(ret))

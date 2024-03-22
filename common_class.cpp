@@ -1281,7 +1281,7 @@ NotifySessionExitCfg::NotifySessionExitCfg(const void* param, size_t param_size)
 {
 	// fprintf(stderr, "NotifySessionExitCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
-	session_id = *(int*)notify_param;
+	session_id = *(int*)notify_param;  // Check if better: session_id = atoi((char*)notify_param); 
 }
 
 NotifySessionExitCfg::~NotifySessionExitCfg()
@@ -1542,7 +1542,7 @@ NotifyFakeAcsptControlCfg::NotifyFakeAcsptControlCfg(const void* param, size_t p
 	// fprintf(stderr, "NotifyFakeAcsptControlCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
 // De-Serialize: convert the type of session id from string to integer  
-	fake_acspt_control_type = *(FakeAcsptControlType*)notify_param;
+	fake_acspt_control_type = *(FakeAcsptControlType*)notify_param;   // Check if better: fake_acspt_control_type = (FakeAcsptControlType)atoi((char*)notify_param);
 	// printf("NotifyFakeAcsptControlCfg::fake_acspt_control_type: %d\n", fake_acspt_control_type);
 }
 
@@ -1572,7 +1572,7 @@ NotifyFakeUsreptControlCfg::NotifyFakeUsreptControlCfg(const void* param, size_t
 	// fprintf(stderr, "NotifyFakeAcsptControlCfg: param:%s, param_size: %d\n", (char*)param, param_size);
 	assert(param != NULL && "param should NOT be NULL");
 // De-Serialize: convert the type of session id from string to integer  
-	fake_usrept_control_type = *(FakeUsreptControlType*)notify_param;
+	fake_usrept_control_type = *(FakeUsreptControlType*)notify_param;   // Check if better: fake_acspt_control_type = (FakeAcsptControlType)atoi((char*)notify_param);
 	// printf("NotifyFakeAcsptControlCfg::fake_acspt_control_type: %d\n", fake_acspt_control_type);
 }
 
@@ -1936,9 +1936,10 @@ const char* NotifySendFileDoneCfg::get_remote_token()const
 NotifySwitchLeaderCfg::NotifySwitchLeaderCfg(const void* param, size_t param_size) :
 	NotifyCfg(NOTIFY_SWITCH_LEADER, param, param_size)
 {
-	// printf("NotifyFileTransferAbortCfg()\n");
-	// fprintf(stderr, "NotifyFileTransferAbortCfg: param:%s, param_size: %d\n", (char*)param, param_size);
-	node_id = *(int*)notify_param;
+	// printf("NotifySwitchLeaderCfg()\n");
+	// fprintf(stderr, "NotifySwitchLeaderCfg: param:%s, param_size: %d\n", (char*)param, param_size);
+	// node_id = *(int*)notify_param;
+	node_id = atoi((char*)notify_param);
 }
 
 NotifySwitchLeaderCfg::~NotifySwitchLeaderCfg(){}

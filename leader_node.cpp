@@ -1433,6 +1433,7 @@ unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* 
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
 	snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
+	// printf("[LeaderNode::send_switch_leader]  leader_candidate_node_id: %d\n", leader_candidate_node_id);
 
 	return send_string_data(MSG_SWITCH_LEADER, buf);
 }
