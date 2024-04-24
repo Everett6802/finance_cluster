@@ -195,7 +195,23 @@ int main(int argc, char** argv)
     // char *extension = strchr(filename, '.');  // Find the last dot in the filename
     // int res = strcmp(extension, ".tar.xz1");
     // printf("extension: %s, res: %d\n", extension, res);    
-    // exit(0);
+
+	// int my_value = 4;
+	// int my_bufsize = sizeof(int);
+	// char* my_buf = new char[my_bufsize];
+	// memset(my_buf, 0x0, sizeof(char) * my_bufsize);
+	// memcpy(my_buf, &my_value, sizeof(int));
+	// int my_value1;
+	// memcpy(&my_value1, my_buf, sizeof(int));
+	// printf("value[%d]: %s, %d\n", my_value, my_buf, atoi(my_buf));
+	// printf("value1[%d]\n", my_value1);
+	// FakeAcsptControlType fake_acspt_control_type = FAKE_ACSPT_STOP;
+	// size_t notify_param_size = sizeof(FakeAcsptControlType);
+	// NotifyFakeAcsptControlCfg* notify_cfg = new NotifyFakeAcsptControlCfg((void*)&fake_acspt_control_type, notify_param_size);
+	// printf("fake_acspt_control_type: %d, notify_param_size: %d\n", notify_cfg->get_fake_acspt_control_type(), notify_param_size);
+	// char* test = "Test";
+	// printf("len: %d\n", strlen(test));
+ //    exit(0);
 
 	// char* my_mac = "04:2A:4D:AE:53:D7";
 	// unsigned int my_mac_int[6];

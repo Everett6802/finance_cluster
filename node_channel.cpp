@@ -12,6 +12,7 @@ const char* NodeChannel::thread_tag = "Node Channel Thread";
 const int NodeChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 
 NodeChannel::NodeChannel(PINODE node) :
+	action_freeze(0),
 	exit(0),
 //	node_token(NULL),
 	send_tid(0),
@@ -68,14 +69,21 @@ unsigned short NodeChannel::initialize(int channel_socket, const char* channel_t
 
 unsigned short NodeChannel::deinitialize()
 {
-	WRITE_DEBUG("Release resource in NodeChannel......");
+	if (exit > 0)
+	{
+		WRITE_FORMAT_DEBUG("The NodeChannel::deinitialize() has already been invoked...... %s", remote_token.c_str());
+		return RET_SUCCESS;	
+	}
+
+	WRITE_FORMAT_DEBUG("Release resource in NodeChannel...... %s", remote_token.c_str());
 	unsigned short ret = RET_SUCCESS;
 	// int kill_ret;
 	__sync_fetch_and_add(&exit, 1);
 	// sleep(1);
 	usleep(100000);
 
-	bool thread_alive = false;
+	bool send_thread_alive = false;
+	bool recv_thread_alive = false;
 // Check send thread alive
 	// bool send_thread_alive = false;
 	if (send_tid != 0)
@@ -95,11 +103,11 @@ unsigned short NodeChannel::deinitialize()
 		}
 		else
 		{
-			WRITE_DEBUG("The signal to the worker thread of sending message is STILL alive");
+			WRITE_FORMAT_DEBUG("The signal to the worker thread of sending message is STILL alive...... %s", remote_token.c_str());
 // Kill the thread
 		    if (pthread_cancel(send_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of sending message, due to: %s", strerror(errno));
-			thread_alive = true;
+			send_thread_alive = true;
 		}
 	}
 // Check recv thread alive
@@ -121,55 +129,62 @@ unsigned short NodeChannel::deinitialize()
 		}		
 		else
 		{
-			WRITE_DEBUG("The signal to the worker thread of receiving message is STILL alive");
+			WRITE_FORMAT_DEBUG("The signal to the worker thread of receiving message is STILL alive...... %s", remote_token.c_str());
 		    if (pthread_cancel(recv_tid) != 0)
 		        WRITE_FORMAT_ERROR("Error occur while deletinng the worker thread of receving message, due to: %s", strerror(errno));
-			thread_alive = true;
+			recv_thread_alive = true;
 		}
 	}
 	// if (thread_alive) sleep(1);
-	if (thread_alive) usleep(100000);
+	if (send_thread_alive || recv_thread_alive) usleep(100000);
 // Wait for send thread's death
-	WRITE_DEBUG("Wait for the worker thread of sending message's death...");
+	if (send_thread_alive)
+	{
+		WRITE_FORMAT_DEBUG("Wait for the worker thread of sending message's death...... %s", remote_token.c_str());
+		// fprintf(stderr, "Wait for the worker thread of sending message's death...");
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'send_status' variable accesses the illegal address
-	// void* send_status;
-	// pthread_join(send_tid, &send_status);
-	// if (send_status == NULL)
-	// 	WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
-	// else
-	// {
-	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)send_status);
-	// 	ret = send_thread_ret;
-	// }
-	pthread_join(send_tid, NULL);
-	if (CHECK_SUCCESS(send_thread_ret))
-		WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", GetErrorDescription(send_thread_ret));
-		ret = send_thread_ret;
+		// void* send_status;
+		// pthread_join(send_tid, &send_status);
+		// if (send_status == NULL)
+		// 	WRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+		// else
+		// {
+		// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)send_status);
+		// 	ret = send_thread_ret;
+		// }
+		pthread_join(send_tid, NULL);
+		if (CHECK_SUCCESS(send_thread_ret))
+			WRITE_FORMAT_DEBUG("Wait for the worker thread of sending message's death Successfully...... %s", remote_token.c_str());
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", GetErrorDescription(send_thread_ret));
+			ret = send_thread_ret;
+		}
 	}
 // Wait for recv thread's death
-	WRITE_DEBUG("Wait for the worker thread of receiving message's death...");
+	if (recv_thread_alive)
+	{
+		WRITE_FORMAT_DEBUG("Wait for the worker thread of receiving message's death...... %s", remote_token.c_str());
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'recv_status' variable accesses the illegal address
-	// void* recv_status;
-	// pthread_join(recv_tid, &recv_status);
-	// if (recv_status == NULL)
-	// 	WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
-	// else
-	// {
-	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)recv_status);
-	// 	ret = recv_thread_ret;
-	// }
-	pthread_join(recv_tid, NULL);
-	if (CHECK_SUCCESS(recv_thread_ret))
-		WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", GetErrorDescription(recv_thread_ret));
-		ret = recv_thread_ret;
+		// void* recv_status;
+		// pthread_join(recv_tid, &recv_status);
+		// if (recv_status == NULL)
+		// 	WRITE_DEBUG("Wait for the worker thread of receiving message's death Successfully !!!");
+		// else
+		// {
+		// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", (char*)recv_status);
+		// 	ret = recv_thread_ret;
+		// }
+		pthread_join(recv_tid, NULL);
+		if (CHECK_SUCCESS(recv_thread_ret))
+			WRITE_FORMAT_DEBUG("Wait for the worker thread of receiving message's death Successfully...... %s", remote_token.c_str());
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", GetErrorDescription(recv_thread_ret));
+			ret = recv_thread_ret;
+		}
 	}
 
 	if (node_socket != 0)
@@ -204,6 +219,15 @@ const char* NodeChannel::get_token()const
 const char* NodeChannel::get_remote_token()const
 {
 	return remote_token.c_str();
+}
+
+void NodeChannel::freeze_action()
+{
+    if (action_freeze == 0)
+    {
+    	WRITE_FORMAT_DEBUG("Freeze the action in NodeChannel[%s]...", remote_token);
+		__sync_fetch_and_add(&action_freeze, 1);
+	}
 }
 
 unsigned short NodeChannel::send_msg(const char* msg_data, int msg_data_size)
@@ -262,7 +286,7 @@ void* NodeChannel::send_thread_handler(void* pvoid)
 
 unsigned short NodeChannel::send_thread_handler_internal()
 {
-	WRITE_FORMAT_INFO("[%s] The worker thread of sending message is running", thread_tag);
+	WRITE_FORMAT_INFO("[%s] The worker thread of sending message[%s] is running", thread_tag, remote_token.c_str());
 	unsigned short ret = RET_SUCCESS;
 
 	while(exit == 0)
@@ -344,7 +368,7 @@ void NodeChannel::send_thread_cleanup_handler(void* pvoid)
 
 void NodeChannel::send_thread_cleanup_handler_internal()
 {
-	WRITE_FORMAT_INFO("[%s] Cleanup the resource in the send thread......", thread_tag);
+	WRITE_FORMAT_INFO("[%s] Cleanup the resource[%s] in the send thread......", thread_tag, remote_token.c_str());
 	list<char*>::iterator iter_buffer = send_buffer_list.begin();
 	while (iter_buffer != send_buffer_list.end())
 	{
@@ -397,7 +421,7 @@ void* NodeChannel::recv_thread_handler(void* pvoid)
 unsigned short NodeChannel::recv_thread_handler_internal()
 {
 	static int MAX_RECV_COUNT = 50;
-	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message in Node[%s] is running", thread_tag, node_token.c_str());
+	WRITE_FORMAT_INFO("[%s] The worker thread of receiving message [%s] is running", thread_tag, remote_token.c_str());
 
 	char buf[RECV_BUF_SIZE];
 	unsigned short ret = RET_SUCCESS;
@@ -429,15 +453,18 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				if (recv_ret == 0) // if recv() returns zero, that means the connection has been closed
 				{
 // Allocate the nofity event parameter
-					// const char* notify_param = remote_token.c_str();
-					size_t notify_param_size = strlen(remote_token.c_str()) + 1;
-					PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_token.c_str(), notify_param_size);
-					if (notify_cfg == NULL)
-						throw bad_alloc();
+					if (!action_freeze)
+					{
+						// const char* notify_param = remote_token.c_str();
+						size_t notify_param_size = strlen(remote_token.c_str()) + 1;
+						PNOTIFY_CFG notify_cfg = new NotifyNodeDieCfg(remote_token.c_str(), notify_param_size);
+						if (notify_cfg == NULL)
+							throw bad_alloc();
 // Notify the event
-					WRITE_FORMAT_WARN("[%s] The connection is closed......", thread_tag);
-					observer->notify(NOTIFY_NODE_DIE, notify_cfg);
-					return RET_FAILURE_CONNECTION_CLOSE;
+						WRITE_FORMAT_WARN("[%s] The connection [%s] is closed......", thread_tag, remote_token.c_str());
+						observer->notify(NOTIFY_NODE_DIE, notify_cfg);
+						return RET_FAILURE_CONNECTION_CLOSE;
+					}
 				}
 				else if (recv_ret > 0) // Success
 				{
@@ -500,7 +527,7 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 				        // Everything else is a hard error.
 				        // Do something with it in the caller.
 						WRITE_FORMAT_ERROR("[%s] recv() fails, due to: %s", thread_tag, strerror(errno));
-						return RET_FAILURE_CONNECTION_CLOSE;
+						return RET_FAILURE_CONNECTION_ERROR;
 				    }
 			    }
 			}while(true);

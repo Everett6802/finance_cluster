@@ -318,7 +318,7 @@ unsigned short FileReceiver::get(ParamType param_type, void* param1, void* param
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
-    	case PARAM_GET_SENDER_TOKEN:
+    	case PARAM_SENDER_TOKEN:
     	{
     		*(char**)param1 = strdup(sender_token);
     	}

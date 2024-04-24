@@ -2128,7 +2128,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
-    	case PARAM_GET_FILE_TX_TYPE:
+    	case PARAM_FILE_TX_TYPE:
     	{
         	if (param1 == NULL)
     		{
@@ -2138,7 +2138,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		*(FileTxType*)param1 = file_tx_type;
     	}
     	break;
-    	case PARAM_GET_SENDER_TOKEN:
+    	case PARAM_SENDER_TOKEN:
     	{
         	if (param1 == NULL)
     		{
@@ -2146,7 +2146,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		assert(file_tx != NULL && "file_tx should NOT be NULL");
-    		ret = file_tx->get(PARAM_GET_SENDER_TOKEN, &param1);
+    		ret = file_tx->get(PARAM_SENDER_TOKEN, &param1);
     	}
     	break;
     	default:
@@ -2683,6 +2683,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	{
     		PNOTIFY_SWITCH_LEADER_CFG notify_switch_leader_cfg = (PNOTIFY_SWITCH_LEADER_CFG)notify_cfg;
     		int leader_candidate_node_id = notify_switch_leader_cfg->get_node_id();
+    		// printf("[ClusterMgr::async_handle NOTIFY_SWITCH_LEADER] leader_candidate_node_id: %d\n", leader_candidate_node_id);
     		if (node_type == LEADER)
     		{
 				ClusterMap cluster_map;
@@ -2693,9 +2694,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			    ret = cluster_map.get_node_token(leader_candidate_node_id, leader_candidate_node_token);
 				if (CHECK_FAILURE(ret))
 					return ret;
-				WRITE_FORMAT_DEBUG("New Leader: %d after switching leader", leader_candidate_node_id);
+				WRITE_FORMAT_DEBUG("Notify new Leader: %d after switching leader", leader_candidate_node_id);
 // Notify the Followers to rebuild the cluster
 				ret = cluster_node->send(MSG_SWITCH_LEADER, (void*)&leader_candidate_node_id);
+				if (CHECK_FAILURE(ret))
+					return ret;
+// Leader freeze action for stopping connection
+			    ret = cluster_node->set(PARAM_ACTION_FREEZE);
 				if (CHECK_FAILURE(ret))
 					return ret;
 // Leader stop connection

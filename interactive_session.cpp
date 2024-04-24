@@ -1812,6 +1812,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 // Before switching leader, check if the node exists
 	ClusterMap cluster_map;
 	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	// printf("[InteractiveSession::handle_switch_leader_command] Check1: ret: %s\n", GetErrorDescription(ret));
 	if (CHECK_FAILURE(ret))
 		return ret;
 	if (cluster_map.size() == 1)
@@ -1821,6 +1822,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 	}
 	bool found = false;
 	ret = cluster_map.check_exist_by_node_id(node_id, found);
+	// printf("[InteractiveSession::handle_switch_leader_command] Check2: node_id: %d, ret: %s\n", node_id, GetErrorDescription(ret));
 	if (CHECK_FAILURE(ret))
 		return ret;
 	if (!found)
@@ -1832,7 +1834,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
 
-	size_t notify_param_size = sizeof(int);
+	size_t notify_param_size = sizeof(int) + 1;
 	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&node_id , notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();

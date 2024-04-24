@@ -31,6 +31,7 @@ private:
 	ClusterMap cluster_map;
 	PNOTIFY_THREAD notify_thread;
 
+	volatile int action_freeze;
 	volatile int listen_exit;
 	pthread_t listen_tid;
 	volatile unsigned short listen_thread_ret;

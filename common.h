@@ -139,6 +139,7 @@ extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
 extern const unsigned short RET_FAILURE_INCORRECT_VALUE;
 ///// Connection Related /////
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
+extern const unsigned short RET_FAILURE_CONNECTION_ERROR;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_TIMEOUT;
 extern const unsigned short RET_FAILURE_CONNECTION_TRY_FAIL;
 extern const unsigned short RET_FAILURE_CONNECTION_CLOSE;
@@ -260,9 +261,10 @@ enum ParamType{
 	PARAM_FILE_TRANSFER_DONE,
 	PARAM_REMOVE_FILE_CHANNEL,
 	// PARAM_NODE_FILE_TRANSFER_DONE,
-	PARAM_GET_FILE_TX_TYPE,
+	PARAM_FILE_TX_TYPE,
 	// PARAM_GET_LOCAL_TOKEN,
-	PARAM_GET_SENDER_TOKEN,
+	PARAM_SENDER_TOKEN,
+	PARAM_ACTION_FREEZE,
 	PARAM_SIZE
 };
 

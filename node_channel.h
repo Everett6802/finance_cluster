@@ -21,6 +21,7 @@ class NodeChannel
 
 private:
 	PINODE observer;
+	volatile int action_freeze;
 	volatile int exit;
     std::string node_token;
     std::string remote_token;
@@ -53,6 +54,7 @@ private:
 	void notify_exit();
 	const char* get_token()const;
 	const char* get_remote_token()const;
+	void freeze_action();
 
 // Don't treat the data content as string. It's required to know the data size
 	unsigned short send_msg(const char* msg_data, int msg_data_size);

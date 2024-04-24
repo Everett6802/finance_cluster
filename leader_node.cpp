@@ -31,6 +31,7 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 	cluster_id(0),
 	cluster_node_cnt(0),
 	notify_thread(NULL),
+	action_freeze(0),
 	listen_exit(0),
 	listen_tid(0),
 	listen_thread_ret(RET_SUCCESS)
@@ -958,7 +959,7 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 {
 	assert(observer != NULL && "observer should NOT be NULL");
 	FileTxType file_tx_type;
-	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	observer->get(PARAM_FILE_TX_TYPE, (void*)&file_tx_type);
 	unsigned short ret = RET_SUCCESS;
 	switch(file_tx_type)
 	{
@@ -1327,7 +1328,7 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 {
 	assert(observer != NULL && "observer should NOT be NULL");
 	FileTxType file_tx_type;
-	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	observer->get(PARAM_FILE_TX_TYPE, (void*)&file_tx_type);
 	unsigned short ret = RET_SUCCESS;
 	switch(file_tx_type)
 	{
@@ -1398,7 +1399,7 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 			memcpy(buf_ptr, local_token, strlen(local_token));
 
 			char* sender_token = NULL;
-			observer->get(PARAM_GET_SENDER_TOKEN, (void*)&sender_token);
+			observer->get(PARAM_SENDER_TOKEN, (void*)&sender_token);
 			WRITE_FORMAT_DEBUG("The sender token in Leader: %s", sender_token);
 // Synchronous event
 // Notify to complete the file receiving...
@@ -1428,14 +1429,15 @@ unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* 
 		WRITE_ERROR("param1 should NOT be NULL");
 		return RET_FAILURE_INVALID_ARGUMENT;
 	}
-	static const int BUF_SIZE = sizeof(int) + 1;
+	static const int BUF_SIZE = sizeof(int); // + 1;
 	int leader_candidate_node_id = *(int*)param1;
 	char buf[BUF_SIZE];
-	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
-	snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
+	memset(buf, 0x0, BUF_SIZE);
+	// snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
+	memcpy(buf, &leader_candidate_node_id, BUF_SIZE);
 	// printf("[LeaderNode::send_switch_leader]  leader_candidate_node_id: %d\n", leader_candidate_node_id);
-
-	return send_string_data(MSG_SWITCH_LEADER, buf);
+	// return send_string_data(MSG_SWITCH_LEADER, buf);
+	return send_raw_data(MSG_SWITCH_LEADER, buf, BUF_SIZE);
 }
 
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
@@ -1500,6 +1502,23 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 // //     			WRITE_FORMAT_ERROR("Fails to remove file channel to follower[%s], due to: %s", node_file_transfer_done_param->node_token, GetErrorDescription(ret));
 // //     	}
 // //     	break;
+    	case PARAM_ACTION_FREEZE:
+    	{
+    		if (action_freeze == 0)
+    		{
+    			WRITE_DEBUG("Freeze the action in Leader...");
+				__sync_fetch_and_add(&action_freeze, 1);
+				map<std::string, PNODE_CHANNEL>::iterator iter = node_channel_map.begin();
+				while (iter != node_channel_map.end())
+				{
+					PNODE_CHANNEL node_channel = (PNODE_CHANNEL)(iter->second);
+					iter++;
+					if (node_channel != NULL)
+						node_channel->freeze_action();
+				}
+			}
+    	}
+    	break;
     	default:
     	{
     		static const int BUF_SIZE = 256;

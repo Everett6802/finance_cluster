@@ -745,7 +745,7 @@ unsigned short FollowerNode::recv_complete_file_transfer(const char* message_dat
 {
 	assert(observer != NULL && "observer should NOT be NULL");
 	FileTxType file_tx_type;
-	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	observer->get(PARAM_FILE_TX_TYPE, (void*)&file_tx_type);
 	unsigned short ret = RET_SUCCESS;
 	switch(file_tx_type)
 	{
@@ -1142,7 +1142,7 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 {
 	assert(observer != NULL && "observer should NOT be NULL");
 	FileTxType file_tx_type;
-	observer->get(PARAM_GET_FILE_TX_TYPE, (void*)&file_tx_type);
+	observer->get(PARAM_FILE_TX_TYPE, (void*)&file_tx_type);
 	unsigned short ret = RET_SUCCESS;
 	switch(file_tx_type)
 	{
