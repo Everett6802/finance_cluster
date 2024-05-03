@@ -803,7 +803,9 @@ unsigned short FollowerNode::recv_switch_leader(const char* message_data, int me
 	// int leader_candidate_node_id = atoi(message_data.c_str());
 	// size_t notify_param_size = sizeof(int);
 	// PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, notify_param_size);
-	int leader_candidate_node_id = atoi(message_data);
+	int leader_candidate_node_id; //  = atoi(message_data);
+	memcpy(&leader_candidate_node_id, message_data, message_size);
+	// printf("[FollowerNode::recv_switch_leader] leader_candidate_node_id: %d, message_size: %d", leader_candidate_node_id, message_size);
 	PNOTIFY_CFG notify_cfg = new NotifySwitchLeaderCfg((void*)&leader_candidate_node_id, message_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();

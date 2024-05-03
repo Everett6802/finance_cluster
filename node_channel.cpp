@@ -443,12 +443,12 @@ unsigned short NodeChannel::recv_thread_handler_internal()
 		else if (ret > 0) // if result > 0, this means that there is either data available on the socket, or the socket has been closed
 		{
 			int recv_count = 0;
-			size_t recv_ret;
+			int recv_ret;
 			do{
 // Read the data from the remote
 				memset(buf, 0x0, sizeof(char) * RECV_BUF_SIZE);
 				recv_ret = recv(node_socket, buf, sizeof(char) * RECV_BUF_SIZE, /*MSG_PEEK |*/ MSG_DONTWAIT);
-				// fprintf(stderr, "===> recv: %s, %d\n", buf, ret);
+				// fprintf(stderr, "===> recv: %s, recv_ret: %d\n", buf, recv_ret);
 				// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "recv() return value: %d", ret);
 				if (recv_ret == 0) // if recv() returns zero, that means the connection has been closed
 				{
