@@ -142,7 +142,7 @@ unsigned short FollowerNode::connect_leader()
 				if (error)
 				{
 					WRITE_FORMAT_ERROR("Error in delayed connection(), due to: %s", strerror(error));
-					return RET_FAILURE_SYSTEM_API;
+					return RET_FAILURE_CONNECTION_NO_SERVER;  // RET_FAILURE_SYSTEM_API;
 				}
 			}
 			else
@@ -181,19 +181,31 @@ unsigned short FollowerNode::become_follower()
 {
 // Try to connect to the designated server
 	unsigned short ret = connect_leader();
-	if (IS_TRY_CONNECTION_TIMEOUT(ret))
+	// if (IS_TRY_CONNECTION_TIMEOUT_EX(ret))
+	// {
+	// 	WRITE_FORMAT_DEBUG("Node[%s] fails to connect to server...", cluster_token);
+	// 	return ret;
+	// }
+	// else
+	// {
+	// 	if (CHECK_FAILURE(ret))
+	// 		return ret;
+	// }
+
+	// WRITE_FORMAT_INFO("Node[%s] is Follower", local_token);
+	// printf("Node[%s] is Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
+	if (CHECK_SUCCESS(ret))
 	{
-		WRITE_FORMAT_DEBUG("Node[%s] is NOT a server", cluster_token);
-		return RET_FAILURE_CONNECTION_TRY_TIMEOUT;
+		WRITE_FORMAT_INFO("Node[%s] is Follower", local_token);
+		printf("Node[%s] is Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);		
 	}
 	else
 	{
-		if (CHECK_FAILURE(ret))
-			return ret;
+		if (IS_TRY_CONNECTION_TIMEOUT_EX(ret))
+			WRITE_FORMAT_DEBUG("Node[%s] fails to connect to server..., due to: %s", local_token, cluster_token, GetErrorDescription(ret));
+		else
+			WRITE_FORMAT_DEBUG("Node[%s] fails to connect to server[%s]", local_token, cluster_token);
 	}
-
-	WRITE_FORMAT_INFO("Node[%s] is Follower", local_token);
-	printf("Node[%s] is Follower, connect to Leader[%s] !!!\n", local_token, cluster_token);
 
 	return ret;
 }
@@ -366,9 +378,9 @@ unsigned short FollowerNode::initialize()
 		else
 		{
 // Check if time-out occurs while trying to connect to the remote node
-			if (IS_TRY_CONNECTION_TIMEOUT(ret) && connection_retry)
+			if (IS_TRY_CONNECTION_TIMEOUT_EX(ret) && connection_retry)
 			{
-				WRITE_FORMAT_DEBUG("Re-build the cluster. Node[%s] try to connect to Leader[%s], but no response... %d", local_token, cluster_token, i);
+				WRITE_FORMAT_DEBUG("Re-build the cluster. Node[%s] try to connect to Leader[%s], but fails... %d", local_token, cluster_token, i);
 				sleep(TRY_CONNECTION_SLEEP_TIMES);
 			}
 			else
