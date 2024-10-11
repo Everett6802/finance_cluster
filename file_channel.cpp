@@ -12,7 +12,7 @@ const char* FileChannel::thread_tag = "File Channel Thread";
 const int FileChannel::WAIT_DATA_TIMEOUT = 60 * 1000;
 const long FileChannel::MAX_BUF_SIZE = 1024 * 100;
 
-FileChannel::FileChannel(PIFILETX file_tx) :
+FileChannel::FileChannel(PIFILE_TX file_tx) :
 	exit(0),
 //	node_token(NULL),
 	is_sender(false),
@@ -28,12 +28,14 @@ FileChannel::FileChannel(PIFILETX file_tx) :
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	observer = file_tx;
 	assert(observer != NULL && "observer should NOT be NULL");
 }
 
 FileChannel::~FileChannel()
 {
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

@@ -14,6 +14,7 @@
 class LeaderNode : public INode
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 private:
 	static const char* listen_thread_tag;

@@ -14,6 +14,7 @@
 #include <map>
 #include <vector>
 #include <stdexcept>
+#include <ctime>
 #include "msg_dumper_wrapper.h"
 
 
@@ -113,6 +114,32 @@ if (x != NULL)\
 #define GET_BUF(x) ((char*)x+MESSAGE_TYPE_LEN+MESSAGE_SIZE_LEN)
 #endif
 
+// Event Recorder
+#define DECLARE_EVT_RECORDER()\
+EventRecorder* event_recorder;
+
+#define IMPLEMENT_EVT_RECORDER()\
+event_recorder = EventRecorder::get_instance();\
+
+// Can be used for functions
+#define DECLARE_AND_IMPLEMENT_STATIC_EVT_RECORDER()\
+static EventRecorder* event_recorder = EventRecorder::get_instance();\
+
+#define RELEASE_EVT_RECORDER()\
+if (event_recorder != NULL)\
+{\
+	event_recorder->release();\
+	event_recorder = NULL;\
+}
+
+#define WRITE_EVT_RECORDER(EventCfgType,...)\
+do{\
+	EventCfgType* event_cfg = NULL;\
+	EventCfgType::generate_obj(&event_cfg,__VA_ARGS__);\
+	event_recorder->write(event_cfg);\
+}while(0);
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 
@@ -162,8 +189,6 @@ extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
 extern const unsigned short RET_WARN_END;
-
-const char* GetErrorDescription(unsigned short ret);
 
 extern bool SHOW_CONSOLE;
 
@@ -295,6 +320,7 @@ enum NotifyType{
 	NOTIFY_SEND_FILE_DONE,
 	NOTIFY_RECEIVE_FILE_DONE,
 	NOTIFY_SWITCH_LEADER,
+	NOTIFY_ADD_EVENT,
 	NOTIFY_SIZE
 };
 
@@ -314,6 +340,32 @@ enum UsreptConfigType{
 	NORMAL, 
 	PKT_PROFILE, 
 	WLAN_PROFILE
+};
+
+enum EventType{
+	EVENT_REBUILD_CLUSTER,
+	EVENT_TELENT_CONSOLE,
+	EVENT_SIZE
+};
+
+enum EventSeverity{
+	EVENT_SEVERITY_CRITICAL,
+	EVENT_SEVERITY_WARNING,
+	EVENT_SEVERITY_INFORMATIONAL,
+	EVENT_SEVERITY_SIZE
+};
+
+enum EventCategory{
+	EVENT_CATEGORY_CLUSTER,
+	EVENT_CATEGORY_CONSOLE,
+	EVENT_CATEGORY_SIZE
+};
+
+enum EventDevice{
+	EVENT_DEVICE_FILE,
+	EVENT_DEVICE_SHM,
+	EVENT_DEVICE_DB,
+	EVENT_DEVICE_SIZE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -337,6 +389,12 @@ typedef CHAR_LIST* PCHAR_LIST;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
+
+const char* GetErrorDescription(unsigned short ret);
+const char* GetEventTypeDescription(EventType event_type);
+const char* GetEventSeverityDescription(EventSeverity event_severity);
+const char* GetEventCategoryDescription(EventCategory event_category);
+const char* GetEventDeviceDescription(EventDevice event_device);
 
 unsigned short get_local_interface_ip(std::map<std::string, std::string>& interface_ip_map);
 bool check_file_exist(const char* filepath); // folder or file
@@ -408,8 +466,22 @@ public:
 	virtual unsigned short initialize()=0;
 	virtual unsigned short deinitialize()=0;
 };
-typedef IFileTx* PIFILETX;
+typedef IFileTx* PIFILE_TX;
 
+class EventCfg;
+
+class IEventDeviceAccess
+{
+public:
+	virtual ~IEventDeviceAccess(){}
+
+	virtual unsigned short initialize()=0;
+	virtual unsigned short deinitialize()=0;
+	virtual EventDevice get_type()const=0;
+	virtual unsigned short write(const EventCfg* event_cfg)=0;
+	virtual unsigned short read()=0;
+};
+typedef IEventDeviceAccess* PIEVENT_DEVICE_ACCESS;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class
@@ -767,9 +839,9 @@ typedef FakeAcsptConfigValueParam* PFAKE_ACSPT_CONFIG_VALUE_PARAM;
 class NotifyCfg
 {
 protected:
+	int ref_count;
 	NotifyType notify_type;
 	void* notify_param;
-	int ref_count;
 
 public:
 	NotifyCfg(NotifyType type, const void* param=NULL, size_t param_size=0);
@@ -1110,6 +1182,79 @@ public:
 };
 typedef NotifySwitchLeaderCfg* PNOTIFY_SWITCH_LEADER_CFG;
 
+///////////////////////////
+// A wrapper class for data transition in the NotifyThread class
+class EventCfg;
+class NotifyEventCfg : public NotifyCfg
+{
+private:
+	EventCfg* event_param;
+
+public:
+	NotifyEventCfg(EventCfg* param);
+	virtual ~NotifyEventCfg();
+
+	EventCfg* get_event_cfg();
+};
+typedef NotifyEventCfg* PNOTIFY_EVENT_CFG;
+
+
+///////////////////////////////////////////////////
+
+class EventCfg
+{
+protected:
+	static const int PARAM_HEADER_TIME_OFFSET;
+	static const int PARAM_HEADER_TYPE_OFFSET;
+	static const int PARAM_HEADER_SEVERITY_CATEGORY_OFFSET;
+	static const int PARAM_HEADER_OFFSET;
+
+	int ref_count;
+	void* param;
+	int param_size;
+	mutable std::string event_description;
+
+	void generate_content_base_description();
+
+
+	EventCfg(EventType type, EventSeverity severity, EventCategory category, const void* param=NULL, size_t param_size=0);
+	virtual ~EventCfg();
+
+public:
+	int addref(const char* callable_file_name, unsigned long callable_line_no);
+	int release(const char* callable_file_name, unsigned long callable_line_no);
+	int getref()const;
+
+	const char* get_time()const;
+	EventType get_type()const;
+	EventSeverity get_severity()const;
+	EventCategory get_category()const;
+	const void* get_data()const;
+	const char* get_str()const;
+};
+typedef EventCfg* PEVENT_CFG;
+
+///////////////////////////////////////////////////
+
+struct TelnetConsoleEventData
+{
+	char login_address[DEF_VERY_SHORT_STRING_SIZE];
+	int session_id;
+	char exit;
+}__attribute__ ((packed));
+typedef TelnetConsoleEventData* PTELNET_CONSOLE_EVENT_DATA;
+
+class TelnetConsoleEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	TelnetConsoleEventCfg(const void* param, size_t param_size);
+	virtual ~TelnetConsoleEventCfg();
+
+public:
+	static unsigned short generate_obj(TelnetConsoleEventCfg **obj, const char* login_address, int session_id, char exit);
+};
+typedef TelnetConsoleEventCfg* PTELNET_CONSOLE_EVENT_CFG;
+
 ///////////////////////////////////////////////////
 
 class NotifyThread
@@ -1117,7 +1262,7 @@ class NotifyThread
 	DECLARE_MSG_DUMPER()
 	static const char* default_notify_thread_tag;
 
-private:
+protected:
 	PINOTIFY notify_observer;
 
 	volatile int notify_exit;
@@ -1189,5 +1334,78 @@ public:
 	// unsigned short SetDuration();
 };
 typedef MonitorSystemTimerThread* PMONITOR_SYSTEM_TIMER_THREAD;
+
+///////////////////////////////////////////////////
+
+class EventFileAccess : public IEventDeviceAccess
+{
+	DECLARE_MSG_DUMPER()
+	static char* EVENT_FOLDERNAME;
+	static char* EVENT_FILENAME;
+
+private:
+	FILE* event_log_fp;
+
+public:
+	EventFileAccess();
+	~EventFileAccess();
+
+	virtual unsigned short initialize();
+	virtual unsigned short deinitialize();
+	virtual EventDevice get_type()const;
+	virtual unsigned short write(const EventCfg* event_cfg);
+	virtual unsigned short read();
+};
+
+///////////////////////////////////////////////////
+
+// class EventSharedMemoryAccess : public IEventDeviceAccess
+// {
+// 	DECLARE_MSG_DUMPER()
+
+// public:
+// 	EventFileAccess();
+// 	~EventFileAccess();
+
+// 	virtual unsigned short initialize();
+// 	virtual unsigned short deinitialize();
+// 	virtual unsigned short write(const PEVENT_CFG event_cfg);
+// 	virtual unsigned short read();
+// };
+
+///////////////////////////////////////////////////
+
+class EventRecorder : private INotify
+{
+	friend class NotifyThread;
+	DECLARE_MSG_DUMPER()
+
+private:
+	static EventRecorder* instance;
+
+	int ref_count;
+	PIEVENT_DEVICE_ACCESS event_device_access;
+	PNOTIFY_THREAD notify_thread;
+
+	EventRecorder();
+	~EventRecorder();
+
+	unsigned short initialize();
+	void deinitialize();
+
+// INotify
+	virtual unsigned short notify(NotifyType notify_type, void* param=NULL);
+	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
+
+public:
+	static EventRecorder* get_instance();
+
+	int addref();
+	int release();
+
+	unsigned short write(const PEVENT_CFG event_cfg);
+	unsigned short read();
+};
+typedef EventRecorder* PIEVENT_RECORDER;
 
 #endif

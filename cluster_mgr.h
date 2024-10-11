@@ -43,7 +43,7 @@ private:
 	NodeType node_type;
 	PINODE cluster_node;
 	FileTxType file_tx_type;
-	PIFILETX file_tx;
+	PIFILE_TX file_tx;
 
 // parameters related to session
 	InteractiveServer* interactive_server;

@@ -13,6 +13,121 @@
 
 using namespace std;
 
+const char *GetErrorDescription(unsigned short ret)
+{
+	static const char *ret_failure_description[] =
+	{
+		"Success",
+		"Failure Unknown",
+		"Failure Runtime",
+		"Failure Invalid Argument",
+		"Failure Invalid Pointer",
+		"Failure Insufficient Memory",
+		"Failure Incorrect Operation",
+		"Failure Open File",
+		"Failure Not Found",
+		"Failure Incorrect Config",
+		"Failure Incorrect Path",
+		"Failure IO Operation",
+		"Failure Handle Thread",
+		"Failure System API",
+		"Failure Internal Error",
+		"Failure Incorrect Value"
+	};
+	static const char *connection_ret_failure_description[] =
+	{
+		// "ConnectionFailure Base",
+		"ConnectionFailure Error",
+		"ConnectionFailure Try Timeout",
+		"ConnectionFailure Try Fail",
+		"ConnectionFailure Close",
+		"ConnectionFailure Keepalive Timeout",
+		"ConnectionFailure No Server",
+		"ConnectionFailure Already in Use",
+		"ConnectionFailure Message Incomplete",
+		"ConnectionFailure Message Timeout"
+	};
+	static const char *ret_warn_description[] =
+	{
+		// "Warn Base",
+		"Warn Interactive Command",
+		"Warn Simulator Not Installed",
+		"Warn Simulator Package Not Found",
+		"Warn File Transfer in Process"
+	};
+	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
+	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);
+	static int ret_warn_description_len = sizeof(ret_warn_description) / sizeof(ret_warn_description[0]);
+
+	unsigned short orig_ret = ret;
+	if (ret >= RET_WARN_BASE)
+	{
+		ret -= RET_WARN_BASE;
+		if (ret >= 0 && ret < ret_warn_description_len)
+			return ret_warn_description[ret];
+	}
+	else if (ret >= RET_FAILURE_CONNECTION_BASE)
+	{
+		ret -= RET_FAILURE_CONNECTION_BASE;
+		if (ret >= 0 && ret < connection_ret_failure_description_len)
+			return connection_ret_failure_description[ret];
+	}
+	else if (ret >= RET_FAILURE_BASE)
+	{
+		if (ret >= 0 && ret < ret_failure_description_len)
+			return ret_failure_description[ret];
+	}
+	else if (ret == RET_SUCCESS)
+		return ret_failure_description[ret];
+
+	char buf[STRING_SIZE + 1];
+	memset(buf, 0x0, sizeof(buf) / sizeof(buf[0]));
+	snprintf(buf, STRING_SIZE, "Unsupported Error Description: %d", orig_ret);
+	throw runtime_error(buf);
+}
+
+const char* GetEventTypeDescription(EventType event_type)
+{
+	static char* event_type_description[] = {
+		"Telnet Console"
+	};
+	assert(event_type >= 0 && event_type < EVENT_SIZE && "event type is out of range");
+	return event_type_description[event_type];
+}
+
+const char* GetEventSeverityDescription(EventSeverity event_severity)
+{
+	static char* event_severity_description[] = {
+		"Critical",
+		"Warning",
+		"Informational"
+	};
+	assert(event_severity >= 0 && event_severity < EVENT_SEVERITY_SIZE && "event severity is out of range");
+	return event_severity_description[event_severity];
+}
+
+const char* GetEventCategoryDescription(EventCategory event_category)
+{
+	static char* event_category_description[] = {
+		"Cluter",
+		"Console"
+	};
+	// printf("Event Category: %d\n", (int)event_category);
+	assert(event_category >= 0 && event_category < EVENT_CATEGORY_SIZE && "event category is out of range");
+	return event_category_description[event_category];
+}
+
+const char* GetEventDeviceDescription(EventDevice event_device)
+{
+	static char* event_device_description[] = {
+		"File",
+		"Shared Memory",
+		"Database"
+	};
+	assert(event_device >= 0 && event_device < EVENT_DEVICE_SIZE && "event device is out of range");
+	return event_device_description[event_device];
+}
+
 unsigned short get_local_interface_ip(map<string, string>& interface_ip_map)
 {
 	struct ifaddrs* ifAddrStruct = NULL;

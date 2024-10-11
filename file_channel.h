@@ -15,13 +15,14 @@ class FileChannel
 	friend class FileReceiver;
 
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 	static const char* thread_tag;
 	static const int WAIT_DATA_TIMEOUT;
 	static const long MAX_BUF_SIZE;
 
 private:
-	PIFILETX observer;
+	PIFILE_TX observer;
 	volatile int exit;
     std::string node_token;
     std::string remote_token;
@@ -53,7 +54,7 @@ private:
 	void recv_thread_cleanup_handler_internal();
 	void clearall();
 
-	FileChannel(PIFILETX file_tx);
+	FileChannel(PIFILE_TX file_tx);
 	~FileChannel();
 	unsigned short initialize(const char* filepath, const char* channel_token, const char* channel_remote_token, int channel_socket, bool sender=false, bool session_id=-1/*Only for sender*/);
 	unsigned short deinitialize();

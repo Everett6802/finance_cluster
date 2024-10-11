@@ -16,6 +16,7 @@ typedef std::map<int, InteractiveSession*>::const_iterator INTERACTIVE_SESSION_C
 class InteractiveServer : public INotify
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 	class InteractiveSessionIDAssigner
 	{

@@ -10,6 +10,7 @@
 class FileReceiver : public IFileTx
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 private:
 	static const int WAIT_CONNECTION_TIMEOUT;

@@ -15,6 +15,7 @@ class NodeChannel
 	friend class FollowerNode;
 
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 	static const char* thread_tag;
 	static const int WAIT_DATA_TIMEOUT;

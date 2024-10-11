@@ -17,6 +17,8 @@
 class InteractiveSession : public INotify
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
+
 private:
 	static const int REQ_BUF_SIZE;
 	static const int RSP_BUF_VERY_SHORT_SIZE;

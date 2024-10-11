@@ -11,6 +11,7 @@ SystemOperator::SystemOperator(PINOTIFY notify) :
 	observer(notify)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 }
 
 SystemOperator::~SystemOperator()
@@ -23,6 +24,7 @@ SystemOperator::~SystemOperator()
 		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in SystemOperator::deinitialize(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 
@@ -187,7 +189,7 @@ unsigned short SystemOperator::get_disk_info(std::string& disk_info)
 		goto OUT;
 	}
 	data_info = string(line);
-	// printf("line: %s", line);
+	printf("line: %s", line);
 	disk_info += (data_info /*+ string("\n")*/);
 OUT:
 	if (line != NULL)
@@ -498,6 +500,68 @@ OUT:
 	return ret;
 }
 
+
+unsigned short SystemOperator::get_disk_usage(string& disk_usage)
+{
+	static char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
+	static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
+	// static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | cut -d '%' -F 1";  Doesn't work 
+	unsigned short ret = RET_SUCCESS;
+// Find the partition which is mounted to /
+	FILE* fp1 = popen(CMD1, "r");
+	FILE* fp2 = NULL;
+	char *line1 = NULL;
+	char *line2 = NULL;
+	size_t line1_len = 0;
+	size_t line2_len = 0;
+	int root_partition_index;
+	char CMD2[DEF_LONG_STRING_SIZE];
+	char disk_usage_value_str[DEF_SHORT_STRING_SIZE];
+	int disk_usage_value;
+
+	if (getline(&line1, &line1_len, fp1) == -1)
+	{
+		WRITE_FORMAT_ERROR("getline(1) fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	root_partition_index = atoi(line1);
+	snprintf(CMD2, DEF_LONG_STRING_SIZE, CMD2_FORMAT, root_partition_index);
+	fp2 = popen(CMD2, "r");
+	if (getline(&line2, &line2_len, fp2) == -1)
+	{
+		WRITE_FORMAT_ERROR("getline(2) fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	disk_usage_value = atoi(line2);
+	snprintf(disk_usage_value_str, DEF_SHORT_STRING_SIZE, " disk usage: %d % \n", disk_usage_value);
+	disk_usage = disk_usage_value_str;
+OUT:
+	if (line2 != NULL)
+	{
+		free(line2);
+		line2 = NULL;
+	}
+	if (line1 != NULL)
+	{
+		free(line1);
+		line1 = NULL;
+	}
+	if (fp2 != NULL)
+	{
+		pclose(fp2);
+		fp2 = NULL;
+	}
+	if (fp1 != NULL)
+	{
+		pclose(fp1);
+		fp1 = NULL;
+	}
+
+	return ret;
+}
+
 unsigned short SystemOperator::get_system_monitor_data(std::string& system_monitor_data)
 {
 	unsigned short ret = RET_SUCCESS;
@@ -513,6 +577,12 @@ unsigned short SystemOperator::get_system_monitor_data(std::string& system_monit
 	if (CHECK_FAILURE(ret))
 		return ret;
 	system_monitor_data += memory_usage;
+// Get disk usage
+	string disk_usage;
+	ret = get_disk_usage(disk_usage);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	system_monitor_data += disk_usage;
 	// system_monitor_data = string("This is only a test\n");
 	return ret;
 }

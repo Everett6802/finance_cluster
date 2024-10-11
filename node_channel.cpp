@@ -23,12 +23,14 @@ NodeChannel::NodeChannel(PINODE node) :
 	send_msg_trigger(false)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	observer = node;
 	assert(observer != NULL && "observer should NOT be NULL");
 }
 
 NodeChannel::~NodeChannel()
 {
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

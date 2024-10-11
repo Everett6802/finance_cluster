@@ -120,6 +120,7 @@ InteractiveServer::InteractiveServer(PIMANAGER mgr) :
 	listen_thread_ret(RET_SUCCESS)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	interactive_session_id_assigner = new InteractiveSessionIDAssigner(MAX_INTERACTIVE_SESSION);
 	if (interactive_session_id_assigner == NULL)
 		throw bad_alloc();
@@ -140,6 +141,7 @@ InteractiveServer::~InteractiveServer()
 		delete interactive_session_id_assigner;
 		interactive_session_id_assigner = NULL;
 	}
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

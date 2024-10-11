@@ -29,6 +29,7 @@ SimulatorHandler::SimulatorHandler(PINOTIFY notify) :
 	observer(notify)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	script_filepath_array = new char*[SCRIPT_FILE_TYPE_SIZE];
 	if (script_filepath_array == NULL)
 		throw bad_alloc();
@@ -69,6 +70,7 @@ SimulatorHandler::~SimulatorHandler()
 	// 	delete[] fake_usrept_control_script_filepath;
 	// 	fake_usrept_control_script_filepath = NULL;
 	// }
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

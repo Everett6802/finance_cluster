@@ -31,6 +31,7 @@ FollowerNode::FollowerNode(PIMANAGER parent, const char* server_token, const cha
 	notify_thread(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	observer = parent;
 	assert(observer != NULL && "observer should NOT be NULL");
 
@@ -53,6 +54,7 @@ FollowerNode::~FollowerNode()
 	if (observer != NULL)
 		observer = NULL;
 
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

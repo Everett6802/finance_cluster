@@ -184,6 +184,7 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	system_monitor_period(0)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	init_command_map();
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
 	memset(session_tag, 0x0, sizeof(char) * 64);
@@ -206,6 +207,7 @@ InteractiveSession::~InteractiveSession()
 	if (manager != NULL)
 		manager = NULL;
 
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 
@@ -233,6 +235,7 @@ unsigned short InteractiveSession::initialize(int system_monitor_period_value)
 		WRITE_FORMAT_ERROR("Fail to create a handler thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
+	WRITE_EVT_RECORDER(TelnetConsoleEventCfg, inet_ntoa(sock_addr.sin_addr), session_id, 0);
 	return RET_SUCCESS;
 }
 
@@ -288,6 +291,7 @@ unsigned short InteractiveSession::deinitialize()
 	// 	return session_thread_ret;
 	// }
 // Wait for interactive session thread's death
+	WRITE_EVT_RECORDER(TelnetConsoleEventCfg, inet_ntoa(sock_addr.sin_addr), session_id, 1);
 	pthread_join(session_tid, NULL);
 	if (CHECK_SUCCESS(session_thread_ret))
 		WRITE_FORMAT_DEBUG("Wait for the worker thread of interactive session[%s]'s death Successfully !!!", session_tag);

@@ -7,6 +7,7 @@
 class SystemOperator : public INotify
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 	static unsigned int DEFAULT_SLEEP_TIME_IN_MILLISEC;
 
 private:
@@ -24,6 +25,7 @@ private:
 // For system monitor
 	unsigned short get_cpu_usage(std::string& cpu_usage, unsigned int sleep_time_in_millisec);
 	unsigned short get_memory_usage(std::string& memory_usage);
+	unsigned short get_disk_usage(std::string& disk_usage);
 
 public:
 	SystemOperator(PINOTIFY notify);

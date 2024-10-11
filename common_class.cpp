@@ -1157,9 +1157,9 @@ FakeAcsptConfigValueParam::~FakeAcsptConfigValueParam(){}
 //////////////////////////////////////////////////////////
 
 NotifyCfg::NotifyCfg(NotifyType type, const void* param, size_t param_size) :
+	ref_count(0),
 	notify_type(type),
-	notify_param(NULL),
-	ref_count(0)
+	notify_param(NULL)
 {
 	// printf("NotifyCfg()\n");
 	addref(__FILE__, __LINE__);
@@ -1954,6 +1954,228 @@ int NotifySwitchLeaderCfg::get_node_id()const
 	return node_id;
 }
 
+///////////////////////////
+
+NotifyEventCfg::NotifyEventCfg(EventCfg* param) :
+	NotifyCfg(NOTIFY_ADD_EVENT)
+{
+	event_param = (EventCfg*)param;
+}
+
+NotifyEventCfg::~NotifyEventCfg()
+{
+// Only a wrapper, don't handle the memory release of EvnetCfg
+	event_param = NULL;
+}
+
+EventCfg* NotifyEventCfg::get_event_cfg()
+{
+	return event_param;
+}
+
+//////////////////////////////////////////////////////////
+
+const int EventCfg::PARAM_HEADER_TIME_OFFSET = 20;
+const int EventCfg::PARAM_HEADER_TYPE_OFFSET = 1;
+const int EventCfg::PARAM_HEADER_SEVERITY_CATEGORY_OFFSET = 1;
+const int EventCfg::PARAM_HEADER_OFFSET = EventCfg::PARAM_HEADER_TIME_OFFSET + EventCfg::PARAM_HEADER_TYPE_OFFSET + EventCfg::PARAM_HEADER_SEVERITY_CATEGORY_OFFSET;
+
+EventCfg::EventCfg(EventType event_type, EventSeverity event_severity, EventCategory event_category, const void* event_param, size_t event_param_size) :
+	ref_count(0),
+	param_size(event_param_size)
+{
+	int total_param_size = PARAM_HEADER_OFFSET + param_size;
+	param = new char[total_param_size];
+	if (param == NULL)
+		throw bad_alloc();
+	memset(param, 0x0, sizeof(char) * total_param_size);
+	char* param_char = (char*)param;
+	string event_time_str;
+	get_curtime_str(event_time_str);
+	if (event_time_str.length() != PARAM_HEADER_TIME_OFFSET - 1)
+	{
+		char err_buf[DEF_STRING_SIZE];
+ 		memset(err_buf, 0x0, sizeof(char) * DEF_STRING_SIZE);
+   		snprintf(err_buf, DEF_SHORT_STRING_SIZE, "Incorrect time string length: %s, %d", event_time_str.c_str(), event_time_str.length());
+ 		throw runtime_error(err_buf);
+	}
+// Event Time
+	strcpy(param_char, event_time_str.c_str());
+// Event Type
+	*(param_char + PARAM_HEADER_TIME_OFFSET) = (char)event_type;
+// Event Severity and Event Category
+	// printf("EventCfg()  data: %d\n", (char)(((char)event_severity) << 4) | ((char)event_category));
+	*(param_char + PARAM_HEADER_TIME_OFFSET + PARAM_HEADER_TYPE_OFFSET) = (char)((event_severity << 4) | event_category);
+	if (event_param != NULL)
+		memcpy((param_char + PARAM_HEADER_OFFSET), event_param, sizeof(char) * param_size);
+#if 1
+// Debug
+	printf("Input Data:\n");
+	printf("Time: %s\n", event_time_str.c_str());
+	printf("Type: %d\n", (int)event_type);
+	printf("Severity: %d\n", (int)event_severity);
+	printf("Category: %d\n", (int)event_category);
+
+	printf("Event Header:\n");
+	printf("Time: %s\n", get_time());
+	printf("Type: %d\n", (int)get_type());
+	printf("Severity: %d\n", (int)get_severity());
+	printf("Category: %d\n", (int)get_category());
+#endif
+}
+
+EventCfg::~EventCfg()
+{
+	if (param != NULL)
+	{
+		delete[] param;
+		param = NULL;
+	}
+}
+
+void EventCfg::generate_content_base_description()
+{
+	printf("EventCfg::generate_content_base_description\n");
+	printf("EventTime(Raw) %s", (char*)param);
+	printf("EventTime %s", get_time());
+	printf("EventType: %d", get_type());
+	printf("EventTypeDescription: %s", GetEventTypeDescription(get_type()));
+	printf("EventSeverity: %d", get_severity());
+	printf("EventSeverityDescription: %s", GetEventSeverityDescription(get_severity()));
+	printf("EventCategory: %d", get_category());
+	printf("EventCategoryDescription: %s", GetEventCategoryDescription(get_category()));
+	// event_description = GetEventTypeDescription(get_type()) + string("  ") 
+	// 				  + GetEventSeverityDescription(get_severity()) + string("  ")
+	// 				  + GetEventCategoryDescription(get_category()) + string("    ");
+}
+
+
+int EventCfg::addref(const char* callable_file_name, unsigned long callable_line_no)
+{
+	__sync_fetch_and_add(&ref_count, 1);
+	// printf("addref() in [%s:%ld %d], ref_count: %d\n", callable_file_name, callable_line_no, notify_type, ref_count);
+	return ref_count;
+}
+
+int EventCfg::release(const char* callable_file_name, unsigned long callable_line_no)
+{
+	__sync_fetch_and_sub(&ref_count, 1);
+	// printf("release() in [%s:%ld %d], ref_count: %d\n", callable_file_name, callable_line_no, notify_type, ref_count);
+	assert(ref_count >= 0 && "ref_count should NOT be smaller than 0");
+	if (ref_count == 0)
+	{
+		delete this;
+		return 0;
+	}
+
+	return ref_count;
+}
+
+int EventCfg::getref()const
+{
+	return ref_count;
+}
+
+const char* EventCfg::get_time()const
+{
+	assert(param != NULL && "param should NOT be NULL");
+	return (char*)param;
+}
+
+EventType EventCfg::get_type()const
+{
+	return (EventType)(*((char*)param + PARAM_HEADER_TIME_OFFSET));
+}
+
+EventSeverity EventCfg::get_severity()const
+{
+	static const unsigned char SEVERITY_MASK = 0xF0;
+	char data = *((char*)param + PARAM_HEADER_TIME_OFFSET + PARAM_HEADER_TYPE_OFFSET);
+	// printf("get_severity()  data: %d\n", data);
+	return (EventSeverity)((SEVERITY_MASK & data) >> 4);
+}
+
+EventCategory EventCfg::get_category()const
+{
+	static const unsigned char CATEGORY_MASK = 0xF;
+	char data = *((char*)param + PARAM_HEADER_TIME_OFFSET + PARAM_HEADER_TYPE_OFFSET);
+	// printf("get_category()  data: %d\n", data);
+	return (EventCategory)(CATEGORY_MASK & data);
+}
+
+const void* EventCfg::get_data()const
+{
+	return (void*)((char*)param + PARAM_HEADER_OFFSET);
+}
+
+const char* EventCfg::get_str()const
+{
+// 	if (event_description.length() == 0)
+// 	{
+// 		string content_description;
+// // get_content_description() is virtual and need to be overrided, should use 'const' as a const 'this' pointer
+// 		get_content_description(content_description);
+// 		event_description = GetEventTypeDescription(get_type()) + string("  ") 
+// 						  + GetEventSeverityDescription(get_severity()) + string("  ")
+// 						  + GetEventCategoryDescription(get_category()) + string("    ")
+// 						  + content_description;
+// 	}
+	return event_description.c_str();
+}
+//////////////////////////////////////////////////////////
+
+const int TelnetConsoleEventCfg::EVENT_DATA_SIZE = sizeof(TelnetConsoleEventData);
+
+unsigned short TelnetConsoleEventCfg::generate_obj(TelnetConsoleEventCfg **obj, const char* login_address, int session_id, char exit)
+{
+	assert(obj != NULL && "obj should NOT be NULL");
+	assert(login_address != NULL && "login_address should NOT be NULL");
+	TelnetConsoleEventData data;
+	memset(data.login_address, 0x0, sizeof(char) * DEF_VERY_SHORT_STRING_SIZE);
+	strcpy(data.login_address, login_address);
+	data.session_id = session_id;
+	data.exit = exit;
+	TelnetConsoleEventCfg *obj_tmp = new TelnetConsoleEventCfg((void*)&data, EVENT_DATA_SIZE);
+	if (obj_tmp == NULL)
+		throw bad_alloc();
+	*obj = obj_tmp;
+	return RET_SUCCESS;
+}
+
+// void TelnetConsoleEventCfg::get_content_description(string& content_description)
+// {
+// 	char buf[LONG_STRING_SIZE];
+// 	PTELNET_CONSOLE_EVENT_DATA event_data = (PTELNET_CONSOLE_EVENT_DATA)get_data();
+// 	assert(event_data != NULL && "event_data should NOT be NULL");
+// 	snprintf(buf, LONG_STRING_SIZE, "%s: %s console %d", event_data->login_address, (event_data->exit != 0 ? "Login" : "Logout"), event_data->session_id);
+// 	content_description = string(buf);
+// 	return RET_SUCCESS;
+// }
+
+TelnetConsoleEventCfg::TelnetConsoleEventCfg(const void* param, size_t param_size) :
+	EventCfg(EVENT_TELENT_CONSOLE, EVENT_SEVERITY_INFORMATIONAL, EVENT_CATEGORY_CONSOLE, param, param_size)
+{
+	printf("Check0\n");
+	printf("EventTime(Raw)1 %s\n", (char*)param);
+	printf("EventTime1 %s\n", get_time());
+	generate_content_base_description();
+	printf("Check1\n");
+	char buf[LONG_STRING_SIZE];
+	PTELNET_CONSOLE_EVENT_DATA event_data = (PTELNET_CONSOLE_EVENT_DATA)get_data();
+	printf("Check2\n");
+	assert(event_data != NULL && "event_data should NOT be NULL");
+	snprintf(buf, LONG_STRING_SIZE, "%s: %s console %d", event_data->login_address, (event_data->exit != 0 ? "Login" : "Logout"), event_data->session_id);
+	printf("Check3\n");
+	string content_description = string(buf);
+	printf("Check4\n");
+	event_description += content_description;
+# if 1
+	printf("event_description: %s\n", event_description.c_str());
+#endif
+}
+
+TelnetConsoleEventCfg::~TelnetConsoleEventCfg(){}
+
 //////////////////////////////////////////////////////////
 
 const char* NotifyThread::default_notify_thread_tag = "Notify Thread";
@@ -2483,3 +2705,251 @@ unsigned short MonitorSystemTimerThread::set_period(int period)
 	return RET_SUCCESS;
 }
 
+//////////////////////////////////////////////////////////
+
+char* EventFileAccess::EVENT_FOLDERNAME = "log";
+char* EventFileAccess::EVENT_FILENAME = "event.log";
+
+
+EventFileAccess::EventFileAccess() :
+	event_log_fp(NULL)
+{
+	IMPLEMENT_MSG_DUMPER()
+}
+	
+EventFileAccess::~EventFileAccess()
+{
+	RELEASE_MSG_DUMPER()
+}
+
+unsigned short EventFileAccess::initialize()
+{
+    char current_working_directory[DEF_LONG_STRING_SIZE];
+  	getcwd(current_working_directory, sizeof(current_working_directory));
+    char event_log_filepath[DEF_LONG_STRING_SIZE];
+    snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
+
+ 	WRITE_FORMAT_ERROR("Open the event log file: %s", event_log_filepath);
+	event_log_fp = fopen(event_log_filepath, "a+");
+ 	if (event_log_fp == NULL)
+ 	{
+ 		WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
+  		return RET_FAILURE_SYSTEM_API;	
+  	}
+}
+
+unsigned short EventFileAccess::deinitialize()
+{
+	if (event_log_fp != NULL)
+	{
+		fclose(event_log_fp);
+		event_log_fp = NULL;
+	}
+}
+
+EventDevice EventFileAccess::get_type()const{return EVENT_DEVICE_FILE;}
+
+unsigned short EventFileAccess::write(const EventCfg* event_cfg)
+{
+	assert(event_cfg != NULL && "event_cfg should NOT be NULL");
+	assert(event_log_fp != NULL && "event_log_fp should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	event_cfg->get_type();
+	const char* event_description = event_cfg->get_str();
+	int event_description_len = strlen(event_description);
+// event description
+	size_t write_bytes = fwrite(event_description, sizeof(char), event_description_len, event_log_fp);
+	if (write_bytes != event_description_len)
+	{
+		WRITE_FORMAT_ERROR("Incorrect data size while writing log, expected: %d, actual: %d", event_description_len, write_bytes);
+		return RET_FAILURE_SYSTEM_API;
+	}
+// newline
+	fwrite("\n", sizeof(char), 1, event_log_fp);
+	return ret;
+}
+
+unsigned short EventFileAccess::read()
+{
+	unsigned short ret = RET_SUCCESS;
+	return ret;
+}
+
+//////////////////////////////////////////////////////////
+
+EventRecorder* EventRecorder::instance = NULL;
+
+EventRecorder* EventRecorder::get_instance()
+{
+	if (instance == NULL)
+	{
+// If the instance is NOT created...
+		instance = new EventRecorder();
+		if (instance == NULL)
+		{
+			assert(0 || "Fail to get the instance of EventRecorder");
+			return NULL;
+		}
+// Initialize the instance
+		unsigned short ret = instance->initialize();
+		if(CHECK_FAILURE(ret))
+		{
+			assert(0 || "Fail to get the instance of EventRecorder");
+			return NULL;
+		}
+	}
+// Add the reference count
+	instance->addref();
+	return instance;
+}
+
+EventRecorder::EventRecorder() :
+	event_device_access(NULL),
+	notify_thread(NULL),
+	ref_count(0)
+{
+	IMPLEMENT_MSG_DUMPER()
+}
+
+EventRecorder::~EventRecorder()
+{
+	deinitialize();
+	RELEASE_MSG_DUMPER()
+}
+
+unsigned short EventRecorder::initialize()
+{
+	unsigned short ret = MSG_DUMPER_SUCCESS;
+// Initialize the worker thread for handling events
+	notify_thread = new NotifyThread(this, "EventRecorder Notify Thread");
+	if (notify_thread == NULL)
+		throw bad_alloc();
+	ret = notify_thread->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+	// sleep(1);
+	usleep(100000);
+	event_device_access = new EventFileAccess();
+	if (event_device_access == NULL)
+		throw bad_alloc();
+	ret = event_device_access->initialize();
+	if (CHECK_FAILURE(ret))
+		return ret;
+	return ret;
+}
+
+void EventRecorder::deinitialize()
+{
+	if (event_device_access != NULL)
+	{
+		event_device_access->deinitialize();
+		delete event_device_access;
+		event_device_access = NULL;
+	}
+// Stop the event thread
+	if (notify_thread != NULL)
+	{
+		notify_thread->deinitialize();
+		delete notify_thread;
+		notify_thread = NULL;
+	}
+	if (instance != NULL)
+		instance = NULL;
+}
+
+unsigned short EventRecorder::notify(NotifyType notify_type, void* notify_param)
+{
+    unsigned short ret = RET_SUCCESS;
+    switch(notify_type)
+    {
+// Synchronous event:
+// Asynchronous event:
+    	case NOTIFY_ADD_EVENT:
+    	{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		ret = notify_thread->add_event(notify_cfg);
+    	}
+    	break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+unsigned short EventRecorder::async_handle(NotifyCfg* notify_cfg)
+{
+	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+    unsigned short ret = RET_SUCCESS;
+    NotifyType notify_type = notify_cfg->get_notify_type();
+    switch(notify_type)
+    {
+    	case NOTIFY_ADD_EVENT:
+    	{
+    		assert(event_device_access != NULL && "event_device_access should NOT be NULL");
+    		PNOTIFY_EVENT_CFG notify_event_cfg = (PNOTIFY_EVENT_CFG)notify_cfg;
+    		PEVENT_CFG event_cfg = (PEVENT_CFG)notify_event_cfg->get_event_cfg();
+    		assert(event_cfg != NULL && "event_cfg should NOT be NULL");
+    		WRITE_FORMAT_DEBUG("Write event[%s] into device[%s]...", GetEventTypeDescription(event_cfg->get_type()), GetEventDeviceDescription(event_device_access->get_type()));
+    		ret = event_device_access->write(event_cfg);
+			SAFE_RELEASE(event_cfg);
+    	}
+    	break;
+    	default:
+    	{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+    		throw std::invalid_argument(buf);
+    	}
+    	break;
+    }
+    return ret;
+}
+
+int EventRecorder::addref()
+{
+	__sync_fetch_and_add(&ref_count, 1);
+	return ref_count;
+}
+
+int EventRecorder::release()
+{
+	__sync_fetch_and_sub(&ref_count, 1);
+	if (ref_count == 0)
+	{
+		delete this;
+		return 0;
+	}
+
+	return ref_count;
+}
+
+unsigned short EventRecorder::write(const PEVENT_CFG event_cfg)
+{
+	unsigned short ret = RET_SUCCESS;
+	assert(event_cfg != NULL && "event_cfg should NOT be NULL");
+	event_cfg->addref(__FILE__, __LINE__);
+	PNOTIFY_CFG notify_cfg = new NotifyEventCfg(event_cfg);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	ret = notify(NOTIFY_ADD_EVENT, notify_cfg);
+	return ret;
+}
+
+unsigned short EventRecorder::read()
+{
+	unsigned short ret = RET_SUCCESS;
+	return ret;
+}

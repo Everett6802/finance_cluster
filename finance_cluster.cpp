@@ -64,7 +64,7 @@ void show_usage_and_exit()
 {
 	PRINT("====================== Usage ======================\n");
 	PRINT("-h|--help\n Description: The usage\n Caution: Other flags are ignored\n");
-	PRINT("-j|--join\n Description: Join a cluster\n Caution: Only for TCP connection");
+	PRINT("-j|--join\n Description: Join a cluster\n Caution: Only for TCP connection\n");
 	// PRINT("-d|--detach\n Description: Detach from the terminal\n");
 	PRINT("===================================================\n");
 	exit(EXIT_SUCCESS);
@@ -189,8 +189,165 @@ using namespace std;
 //     (unsigned int*)&(a)[4], (unsigned int*)&(a)[5]
 // #endif
 
+typedef enum {
+    SM_IPC_MSG_GET_UE_CONTEXT =1,
+    SM_IPC_MSG_UE_CONTEXT_RSP,
+    SM_IPC_MSG_UE_CONTEXT_UPDATE,
+    SM_IPC_MSG_UE_ASSOCIATE,
+    SM_IPC_MSG_AUTHORIZED,
+    SM_IPC_MSG_AUTH_FAIL,
+    SM_IPC_MSG_DEAUTH,
+    SM_IPC_MSG_DEAUTH_ACK,
+    SM_IPC_MSG_DISCONNECT,
+    SM_IPC_MSG_ROAMING_DISCONNECT,
+    SM_IPC_MSG_DPSK_BOUNDING_RESULT,
+    SM_IPC_MSG_SESSION_TIMEOUT,
+    SM_IPC_MSG_ROAM_DATA,
+    SM_IPC_MSG_ROAM_TIMEOUT,
+    SM_IPC_MSG_MAX
+}sm_ipc_msg_type;
+
+struct sm_ipc_msg {
+    sm_ipc_msg_type type;
+    unsigned int len;
+    unsigned char mac[6];
+    char data[0];
+};
+
+struct sm_ipc_roam_data
+{
+    unsigned long     roamedRecvdBytes;
+    unsigned long     roamedTransBytes;
+    unsigned long     roamedRecvdPackets;
+    unsigned long     roamedTransPackets;
+}__attribute__((packed));
+
+unsigned short get_disk_usage(std::string& disk_usage)
+{
+	static char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
+	static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
+	// static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | cut -d '%' -F 1";  Doesn't work 
+	unsigned short ret = RET_SUCCESS;
+// Find the partition which is mounted to /
+	FILE* fp1 = popen(CMD1, "r");
+	FILE* fp2 = NULL;
+	char *line1 = NULL;
+	char *line2 = NULL;
+	size_t line1_len = 0;
+	size_t line2_len = 0;
+	int root_partition_index;
+	char CMD2[DEF_LONG_STRING_SIZE];
+	char disk_usage_value_str[DEF_SHORT_STRING_SIZE];
+	int disk_usage_value;
+
+	if (getline(&line1, &line1_len, fp1) == -1)
+	{
+		printf("getline(1) fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	printf("line1: %s\n", line1);
+	root_partition_index = atoi(line1);
+	snprintf(CMD2, DEF_LONG_STRING_SIZE, CMD2_FORMAT, root_partition_index);
+	printf("CMD2 : %s\n", CMD2);
+	fp2 = popen(CMD2, "r");
+	if (getline(&line2, &line2_len, fp2) == -1)
+	{
+		printf("getline(2) fails, due to: %s", strerror(errno));
+		ret = RET_FAILURE_SYSTEM_API;
+		goto OUT;
+	}
+	disk_usage_value = atoi(line2);
+	snprintf(disk_usage_value_str, DEF_SHORT_STRING_SIZE, " disk usage: %d % \n", disk_usage_value);
+	disk_usage = disk_usage_value_str;
+OUT:
+	if (line2 != NULL)
+	{
+		free(line2);
+		line2 = NULL;
+	}
+	if (line1 != NULL)
+	{
+		free(line1);
+		line1 = NULL;
+	}
+	if (fp2 != NULL)
+	{
+		pclose(fp2);
+		fp2 = NULL;
+	}
+	if (fp1 != NULL)
+	{
+		pclose(fp1);
+		fp1 = NULL;
+	}
+
+	return ret;
+}
+
+#include <ctime>
+#include <iostream>
+
 int main(int argc, char** argv)
 {
+    // std::time_t t = std::time(0);   // get time now
+    // std::tm* now = std::localtime(&t);
+    // std::cout << (now->tm_year + 1900) << '-' 
+    //      << (now->tm_mon + 1) << '-'
+    //      <<  now->tm_mday << " "
+    //      <<  now->tm_hour << ":"
+    //      <<  now->tm_min << ":"
+    //      <<  now->tm_sec
+    //      << "\n";
+    // char datetime_str[DEF_STRING_SIZE];
+    // snprintf(datetime_str, DEF_STRING_SIZE, "%d/%02d/%02d %02d:%02d:%02d", 
+    // 	now->tm_year + 1900,
+    // 	now->tm_mon + 1,
+    // 	now->tm_mday,
+    //     now->tm_hour,
+    //     now->tm_min,
+    //     now->tm_sec
+    //     );
+    // printf("Time: %s\n", datetime_str);
+    // exit(0);
+	
+	// const int sm_ipc_msg_size = sizeof(struct sm_ipc_msg);
+	// char* buf = new char[sm_ipc_msg_size];
+	// int mac[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+	// struct sm_ipc_msg msg_data;
+	// msg_data.type = SM_IPC_MSG_UE_CONTEXT_UPDATE;
+	// msg_data.len = sm_ipc_msg_size;
+	// memcpy(msg_data.mac, mac, sizeof(unsigned char) * 6);
+
+	// char* msg_data_ptr = new char[sm_ipc_msg_size];
+	// memcpy(msg_data_ptr, &msg_data, sm_ipc_msg_size);
+	// printf("sizeof sm_ipc_msg: %d\n", sizeof(struct sm_ipc_msg));
+	// printf("type: %d\n", ((struct sm_ipc_msg*)msg_data_ptr)->type);
+	// printf("len: %d\n", ((struct sm_ipc_msg*)msg_data_ptr)->len);
+	// // printf("type: %d\n", ((struct sm_ipc_msg*)msg_data_ptr)->type);
+
+	// int mac[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+	// const int sm_ipc_msg_size = sizeof(struct sm_ipc_msg) + sizeof(struct sm_ipc_roam_data);
+	// char* buf = new char[sm_ipc_msg_size];
+	// struct sm_ipc_msg* msg_data = (struct sm_ipc_msg*)buf;
+	// msg_data->type = SM_IPC_MSG_UE_CONTEXT_UPDATE;
+	// msg_data->len = sm_ipc_msg_size;
+	// memcpy(msg_data->mac, mac, sizeof(unsigned char) * 6);
+	// struct sm_ipc_roam_data* msg_roam_data = (struct sm_ipc_roam_data*)msg_data->data;
+	// msg_roam_data->roamedRecvdBytes = 1234;
+	// msg_roam_data->roamedTransBytes = 4321;
+	// msg_roam_data->roamedRecvdPackets = 588;
+	// msg_roam_data->roamedTransPackets = 885;
+
+	// struct sm_ipc_msg* msg_data_ptr = (struct sm_ipc_msg*)buf;
+	// printf("type: %d\n", msg_data_ptr->type);
+	// printf("len: %d\n", msg_data_ptr->len);
+	// struct sm_ipc_roam_data* msg_roam_data_ptr = (struct sm_ipc_roam_data*)msg_data_ptr->data;
+	// printf("roamedRecvdBytes: %d\n", msg_roam_data_ptr->roamedRecvdBytes);
+	// printf("roamedTransBytes: %d\n", msg_roam_data_ptr->roamedTransBytes);
+	// printf("roamedRecvdPackets: %d\n", msg_roam_data_ptr->roamedRecvdPackets);
+	// printf("roamedTransPackets: %d\n", msg_roam_data_ptr->roamedTransPackets);
+
     // char *filename = "/home/super/simulator.tar.xz";
     // char *extension = strchr(filename, '.');  // Find the last dot in the filename
     // int res = strcmp(extension, ".tar.xz1");
@@ -211,7 +368,7 @@ int main(int argc, char** argv)
 	// printf("fake_acspt_control_type: %d, notify_param_size: %d\n", notify_cfg->get_fake_acspt_control_type(), notify_param_size);
 	// char* test = "Test";
 	// printf("len: %d\n", strlen(test));
- //    exit(0);
+    // exit(0);
 
 	// char* my_mac = "04:2A:4D:AE:53:D7";
 	// unsigned int my_mac_int[6];
@@ -294,6 +451,9 @@ int main(int argc, char** argv)
 	// printf("token: %s, rest: %s\n", token, rest);
 	// token = strtok_r(NULL, ":", &rest);
 	// printf("token: %s, rest: %s\n", token, rest);
+	// string time_str;
+	// get_curtime_str(time_str);
+	// printf("Time: %s, %d\n", time_str.c_str(), strlen(time_str.c_str()));
 	// exit(0);
 
 // 	const char* LOCAL_CLUSTER_SHM_FILENAME = "cluster_shm_file";
@@ -347,6 +507,16 @@ int main(int argc, char** argv)
 	// 	iter++;
 	// }
 	// create_folder_recursive("/home/super/test111/test222/test333/test444");
+	// string disk_usage;
+	// get_disk_usage(disk_usage);
+	// printf("%s\n", disk_usage.c_str());
+	// EventSeverity severity = EVENT_SEVERITY_INFORMATIONAL;
+	// EventCategory category = EVENT_CATEGORY_CONSOLE;
+	// printf("severity: %d\n", severity);
+	// printf("category: %d\n", category);
+	// printf("severity1: %d\n", (char)(severity << 4));
+	// printf("category1: %d\n", (char)(category));
+	// printf("severity/category: %d\n", (char)((severity << 4) | category));
 	// exit(0);
 
 // Register the signals so that the process can exit gracefully

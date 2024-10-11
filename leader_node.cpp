@@ -42,6 +42,7 @@ LeaderNode::LeaderNode(PIMANAGER parent, const char* token) :
 	// tx_filepath(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	assert(observer != NULL && "observer should NOT be NULL");
 	if (token != NULL)
 		local_token = strdup(token);
@@ -66,6 +67,7 @@ LeaderNode::~LeaderNode()
 		local_token = NULL;
 	}
 
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

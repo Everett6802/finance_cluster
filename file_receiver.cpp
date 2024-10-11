@@ -20,6 +20,7 @@ FileReceiver::FileReceiver(PIMANAGER parent, const char* server_token, const cha
 	file_channel(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	observer = parent;
 	assert(observer != NULL && "observer should NOT be NULL");
 
@@ -42,6 +43,7 @@ FileReceiver::~FileReceiver()
 	if (observer != NULL)
 		observer = NULL;
 
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 

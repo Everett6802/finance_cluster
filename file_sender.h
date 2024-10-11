@@ -10,6 +10,7 @@
 class FileSender : public IFileTx
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 private:
 	static const char* tx_listen_thread_tag;
