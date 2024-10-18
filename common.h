@@ -119,16 +119,16 @@ if (x != NULL)\
 EventRecorder* event_recorder;
 
 #define IMPLEMENT_EVT_RECORDER()\
-event_recorder = EventRecorder::get_instance();\
+event_recorder = EventRecorder::get_instance(__FILE__, __LINE__);\
 
 // Can be used for functions
 #define DECLARE_AND_IMPLEMENT_STATIC_EVT_RECORDER()\
-static EventRecorder* event_recorder = EventRecorder::get_instance();\
+static EventRecorder* event_recorder = EventRecorder::get_instance(__FILE__, __LINE__);\
 
 #define RELEASE_EVT_RECORDER()\
 if (event_recorder != NULL)\
 {\
-	event_recorder->release();\
+	event_recorder->release(__FILE__, __LINE__);\
 	event_recorder = NULL;\
 }
 
@@ -1398,10 +1398,10 @@ private:
 	virtual unsigned short async_handle(NotifyCfg* notify_cfg);
 
 public:
-	static EventRecorder* get_instance();
+	static EventRecorder* get_instance(const char* callable_file_name, unsigned long callable_line_no);
 
-	int addref();
-	int release();
+	int addref(const char* callable_file_name, unsigned long callable_line_no);
+	int release(const char* callable_file_name, unsigned long callable_line_no);
 
 	unsigned short write(const PEVENT_CFG event_cfg);
 	unsigned short read();

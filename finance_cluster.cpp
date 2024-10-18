@@ -517,6 +517,11 @@ int main(int argc, char** argv)
 	// printf("severity1: %d\n", (char)(severity << 4));
 	// printf("category1: %d\n", (char)(category));
 	// printf("severity/category: %d\n", (char)((severity << 4) | category));
+	// char* event_type_description[] = {
+	// 	"Rebuild Cluster",
+	// 	"Telnet Console"
+	// };
+	// printf("Number: %d\n", sizeof(event_type_description) / sizeof(event_type_description[0]));
 	// exit(0);
 
 // Register the signals so that the process can exit gracefully

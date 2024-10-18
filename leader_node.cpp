@@ -55,7 +55,7 @@ LeaderNode::~LeaderNode()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in LeaderNode::deinitialize(), due to :%s", GetErrorDescription(ret));
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in LeaderNode::~LeaderNode(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
 	if (observer != NULL)
@@ -659,6 +659,27 @@ unsigned short LeaderNode::deinitialize()
 			// sleep(1);
 			usleep(100000);
 		}
+		WRITE_DEBUG("Wait for the worker thread of listening's death...");
+// Should NOT check the thread status in this way.
+// Segmentation fault occurs sometimes, seems the 'status' variable accesses the illegal address
+	// pthread_join(listen_tid, &status);
+	// if (status == NULL)
+	// 	sWRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
+	// else
+	// {
+	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
+	// 	return listen_thread_ret;
+	// }
+// Wait for listen thread's death
+		pthread_join(listen_tid, NULL);
+		if (CHECK_SUCCESS(listen_thread_ret))
+			WRITE_DEBUG("Wait for the worker thread of listening's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of listening's death, due to: %s", GetErrorDescription(listen_thread_ret));
+			ret = listen_thread_ret;
+		}
+		listen_tid = 0;
 	}
 
 // No need to check return value
@@ -681,27 +702,6 @@ unsigned short LeaderNode::deinitialize()
 			// printf("shm_unlink: %s\n", LOCAL_CLUSTER_SHM_FILENAME);
 			shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
 		}
-	}
-
-	WRITE_DEBUG("Wait for the worker thread of listening's death...");
-// Should NOT check the thread status in this way.
-// Segmentation fault occurs sometimes, seems the 'status' variable accesses the illegal address
-	// pthread_join(listen_tid, &status);
-	// if (status == NULL)
-	// 	sWRITE_DEBUG("Wait for the worker thread of sending message's death Successfully !!!");
-	// else
-	// {
-	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
-	// 	return listen_thread_ret;
-	// }
-// Wait for listen thread's death
-	pthread_join(listen_tid, NULL);
-	if (CHECK_SUCCESS(listen_thread_ret))
-		WRITE_DEBUG("Wait for the worker thread of listening's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of listening's death, due to: %s", GetErrorDescription(listen_thread_ret));
-		ret = listen_thread_ret;
 	}
 	// }
 // No need

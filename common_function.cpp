@@ -89,9 +89,12 @@ const char *GetErrorDescription(unsigned short ret)
 const char* GetEventTypeDescription(EventType event_type)
 {
 	static char* event_type_description[] = {
+		"Rebuild Cluster",
 		"Telnet Console"
 	};
+	static int event_type_description_size = sizeof(event_type_description) / sizeof(event_type_description[0]);
 	assert(event_type >= 0 && event_type < EVENT_SIZE && "event type is out of range");
+	assert(event_type_description_size == EVENT_SIZE && "event_type_description_size != EVENT_SIZE");
 	return event_type_description[event_type];
 }
 
@@ -102,7 +105,9 @@ const char* GetEventSeverityDescription(EventSeverity event_severity)
 		"Warning",
 		"Informational"
 	};
+	static int event_severity_description_size = sizeof(event_severity_description) / sizeof(event_severity_description[0]);
 	assert(event_severity >= 0 && event_severity < EVENT_SEVERITY_SIZE && "event severity is out of range");
+	assert(event_severity_description_size == EVENT_SEVERITY_SIZE && "event_severity_description_size != EVENT_SEVERITY_SIZE");
 	return event_severity_description[event_severity];
 }
 
@@ -112,8 +117,10 @@ const char* GetEventCategoryDescription(EventCategory event_category)
 		"Cluter",
 		"Console"
 	};
+	static int event_category_description_size = sizeof(event_category_description) / sizeof(event_category_description[0]);
 	// printf("Event Category: %d\n", (int)event_category);
 	assert(event_category >= 0 && event_category < EVENT_CATEGORY_SIZE && "event category is out of range");
+	assert(event_category_description_size == EVENT_CATEGORY_SIZE && "event_category_description_size != EVENT_CATEGORY_SIZE");
 	return event_category_description[event_category];
 }
 
@@ -124,7 +131,9 @@ const char* GetEventDeviceDescription(EventDevice event_device)
 		"Shared Memory",
 		"Database"
 	};
+	static int event_device_description_size = sizeof(event_device_description) / sizeof(event_device_description[0]);
 	assert(event_device >= 0 && event_device < EVENT_DEVICE_SIZE && "event device is out of range");
+	assert(event_device_description_size == EVENT_DEVICE_SIZE && "event_device_description_size != EVENT_DEVICE_SIZE");
 	return event_device_description[event_device];
 }
 

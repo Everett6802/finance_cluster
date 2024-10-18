@@ -2008,7 +2008,7 @@ EventCfg::EventCfg(EventType event_type, EventSeverity event_severity, EventCate
 	*(param_char + PARAM_HEADER_TIME_OFFSET + PARAM_HEADER_TYPE_OFFSET) = (char)((event_severity << 4) | event_category);
 	if (event_param != NULL)
 		memcpy((param_char + PARAM_HEADER_OFFSET), event_param, sizeof(char) * param_size);
-#if 1
+#if 0
 // Debug
 	printf("Input Data:\n");
 	printf("Time: %s\n", event_time_str.c_str());
@@ -2035,18 +2035,21 @@ EventCfg::~EventCfg()
 
 void EventCfg::generate_content_base_description()
 {
+# if 0
 	printf("EventCfg::generate_content_base_description\n");
-	printf("EventTime(Raw) %s", (char*)param);
-	printf("EventTime %s", get_time());
-	printf("EventType: %d", get_type());
-	printf("EventTypeDescription: %s", GetEventTypeDescription(get_type()));
-	printf("EventSeverity: %d", get_severity());
-	printf("EventSeverityDescription: %s", GetEventSeverityDescription(get_severity()));
-	printf("EventCategory: %d", get_category());
-	printf("EventCategoryDescription: %s", GetEventCategoryDescription(get_category()));
-	// event_description = GetEventTypeDescription(get_type()) + string("  ") 
-	// 				  + GetEventSeverityDescription(get_severity()) + string("  ")
-	// 				  + GetEventCategoryDescription(get_category()) + string("    ");
+	printf("EventTime(Raw) %s\n", (char*)param);
+	printf("EventTime %s\n", get_time());
+	printf("EventType: %d\n", get_type());
+	printf("EventTypeDescription: %s\n", GetEventTypeDescription(get_type()));
+	printf("EventSeverity: %d\n", get_severity());
+	printf("EventSeverityDescription: %s\n", GetEventSeverityDescription(get_severity()));
+	printf("EventCategory: %d\n", get_category());
+	printf("EventCategoryDescription: %s\n", GetEventCategoryDescription(get_category()));
+#endif
+	event_description = string(get_time()) + string("  |  ")
+					  + string(GetEventTypeDescription(get_type())) + string("  |  ") 
+					  + string(GetEventSeverityDescription(get_severity())) + string("  |  ")
+					  + string(GetEventCategoryDescription(get_category())) + string("  |  ");
 }
 
 
@@ -2155,23 +2158,13 @@ unsigned short TelnetConsoleEventCfg::generate_obj(TelnetConsoleEventCfg **obj, 
 TelnetConsoleEventCfg::TelnetConsoleEventCfg(const void* param, size_t param_size) :
 	EventCfg(EVENT_TELENT_CONSOLE, EVENT_SEVERITY_INFORMATIONAL, EVENT_CATEGORY_CONSOLE, param, param_size)
 {
-	printf("Check0\n");
-	printf("EventTime(Raw)1 %s\n", (char*)param);
-	printf("EventTime1 %s\n", get_time());
 	generate_content_base_description();
-	printf("Check1\n");
 	char buf[LONG_STRING_SIZE];
 	PTELNET_CONSOLE_EVENT_DATA event_data = (PTELNET_CONSOLE_EVENT_DATA)get_data();
-	printf("Check2\n");
 	assert(event_data != NULL && "event_data should NOT be NULL");
-	snprintf(buf, LONG_STRING_SIZE, "%s: %s console %d", event_data->login_address, (event_data->exit != 0 ? "Login" : "Logout"), event_data->session_id);
-	printf("Check3\n");
+	snprintf(buf, LONG_STRING_SIZE, "%s: %s console[%d]", event_data->login_address, (event_data->exit == 0 ? "Login" : "Logout"), event_data->session_id);
 	string content_description = string(buf);
-	printf("Check4\n");
 	event_description += content_description;
-# if 1
-	printf("event_description: %s\n", event_description.c_str());
-#endif
 }
 
 TelnetConsoleEventCfg::~TelnetConsoleEventCfg(){}
@@ -2391,17 +2384,17 @@ unsigned short NotifyThread::deinitialize()
 			// sleep(1);
 			usleep(100000);
 		}
-	}
-
-	WRITE_DEBUG("Wait for the worker thread of notifying's death...");
+		WRITE_DEBUG("Wait for the worker thread of notifying's death...");
 // Wait for notify thread's death
-	pthread_join(notify_tid, NULL);
-	if (CHECK_SUCCESS(notify_thread_ret))
-		WRITE_DEBUG("Wait for the worker thread of notifying's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of notifying's death, due to: %s", GetErrorDescription(notify_thread_ret));
-		ret = notify_thread_ret;
+		pthread_join(notify_tid, NULL);
+		if (CHECK_SUCCESS(notify_thread_ret))
+			WRITE_DEBUG("Wait for the worker thread of notifying's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of notifying's death, due to: %s", GetErrorDescription(notify_thread_ret));
+			ret = notify_thread_ret;
+		}
+		notify_tid = 0;
 	}
 
 	return ret;
@@ -2683,17 +2676,17 @@ unsigned short MonitorSystemTimerThread::deinitialize()
 			// sleep(1);
 			usleep(50000);
 		}
-	}
-
 // Wait for notify thread's death
-	WRITE_DEBUG("Wait for the worker timer thread of system monitor's death...");
-	pthread_join(monitor_system_tid, NULL);
-	if (CHECK_SUCCESS(monitor_system_timer_thread_ret))
-		WRITE_DEBUG("Wait for the worker timer thread of system monitor's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker timer thread of system monitor's death, due to: %s", GetErrorDescription(monitor_system_timer_thread_ret));
-		ret = monitor_system_timer_thread_ret;
+		WRITE_DEBUG("Wait for the worker timer thread of system monitor's death...");
+		pthread_join(monitor_system_tid, NULL);
+		if (CHECK_SUCCESS(monitor_system_timer_thread_ret))
+			WRITE_DEBUG("Wait for the worker timer thread of system monitor's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker timer thread of system monitor's death, due to: %s", GetErrorDescription(monitor_system_timer_thread_ret));
+			ret = monitor_system_timer_thread_ret;
+		}
+		monitor_system_tid = 0;
 	}
 
 	return ret;
@@ -2740,6 +2733,7 @@ unsigned short EventFileAccess::initialize()
 
 unsigned short EventFileAccess::deinitialize()
 {
+	// fprintf(stderr, "EventFileAccess::deinitialize()\n");
 	if (event_log_fp != NULL)
 	{
 		fclose(event_log_fp);
@@ -2758,6 +2752,8 @@ unsigned short EventFileAccess::write(const EventCfg* event_cfg)
 	const char* event_description = event_cfg->get_str();
 	int event_description_len = strlen(event_description);
 // event description
+	// fprintf(stderr, "Write event to file: %s", event_description);
+	WRITE_FORMAT_DEBUG("Write event to file: %s", event_description);
 	size_t write_bytes = fwrite(event_description, sizeof(char), event_description_len, event_log_fp);
 	if (write_bytes != event_description_len)
 	{
@@ -2766,6 +2762,14 @@ unsigned short EventFileAccess::write(const EventCfg* event_cfg)
 	}
 // newline
 	fwrite("\n", sizeof(char), 1, event_log_fp);
+/*
+Buffering works in such a way that the contents of an output buffer are only written to the stdout stream or FILE object once the buffer is full, 
+or there is a new line character at the end of it. This may result in unexpected behavior. 
+For instance, the user may not see the string passed in the printf function on their terminal as it is not large enough to fill the buffer completely, 
+nor is there a new line character at the end of it.
+Here, the programmer can use the fflush function to make sure that the current state of the buffer is immediately printed to the console and written to the stdout stream
+*/
+	fflush(event_log_fp);
 	return ret;
 }
 
@@ -2779,7 +2783,7 @@ unsigned short EventFileAccess::read()
 
 EventRecorder* EventRecorder::instance = NULL;
 
-EventRecorder* EventRecorder::get_instance()
+EventRecorder* EventRecorder::get_instance(const char* callable_file_name, unsigned long callable_line_no)
 {
 	if (instance == NULL)
 	{
@@ -2799,7 +2803,7 @@ EventRecorder* EventRecorder::get_instance()
 		}
 	}
 // Add the reference count
-	instance->addref();
+	instance->addref(callable_file_name, callable_line_no);
 	return instance;
 }
 
@@ -2917,17 +2921,23 @@ unsigned short EventRecorder::async_handle(NotifyCfg* notify_cfg)
     return ret;
 }
 
-int EventRecorder::addref()
+int EventRecorder::addref(const char* callable_file_name, unsigned long callable_line_no)
 {
 	__sync_fetch_and_add(&ref_count, 1);
+	// fprintf(stderr, "EventRecorder::addref -> %d\n", ref_count);
+	// printf("EventRecorder::addref() in [%s:%ld], ref_count: %d\n", callable_file_name, callable_line_no, ref_count);
 	return ref_count;
 }
 
-int EventRecorder::release()
+int EventRecorder::release(const char* callable_file_name, unsigned long callable_line_no)
 {
 	__sync_fetch_and_sub(&ref_count, 1);
+	// printf("EventRecorder::release() in [%s:%ld], ref_count: %d\n", callable_file_name, callable_line_no, ref_count);
+	// fprintf(stderr, "EventRecorder::release -> %d\n", ref_count);
+	assert(ref_count >= 0 && "ref_count should NOT be smaller than 0");
 	if (ref_count == 0)
 	{
+		// fprintf(stderr, "Call EventRecorder::~EventRecorder()......\n");
 		delete this;
 		return 0;
 	}

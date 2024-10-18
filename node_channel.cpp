@@ -163,6 +163,7 @@ unsigned short NodeChannel::deinitialize()
 			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", GetErrorDescription(send_thread_ret));
 			ret = send_thread_ret;
 		}
+		send_tid = 0;
 	}
 // Wait for recv thread's death
 	if (recv_thread_alive)
@@ -187,6 +188,7 @@ unsigned short NodeChannel::deinitialize()
 			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of receiving message's death, due to: %s", GetErrorDescription(recv_thread_ret));
 			ret = recv_thread_ret;
 		}
+		recv_tid = 0;
 	}
 
 	if (node_socket != 0)

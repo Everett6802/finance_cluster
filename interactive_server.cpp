@@ -133,7 +133,7 @@ InteractiveServer::~InteractiveServer()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in InteractiveServer::deinitialize(), due to :%s", GetErrorDescription(ret));
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in InteractiveServer::~InteractiveServer(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
 	if (interactive_session_id_assigner != NULL)
@@ -351,9 +351,7 @@ unsigned short InteractiveServer::deinitialize()
 			// sleep(1);
 			usleep(100000);
 		}
-	}
-
-	WRITE_DEBUG("Wait for the worker thread of listening's death...");
+		WRITE_DEBUG("Wait for the worker thread of listening's death...");
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'status' variable accesses the illegal address
 	// pthread_join(listen_tid, &status);
@@ -365,13 +363,15 @@ unsigned short InteractiveServer::deinitialize()
 	// 	return listen_thread_ret;
 	// }
 // Wait for listen thread's death
-	pthread_join(listen_tid, NULL);
-	if (CHECK_SUCCESS(listen_thread_ret))
-		WRITE_DEBUG("Wait for the worker thread of listening's death Successfully !!!");
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of listening's death, due to: %s", GetErrorDescription(listen_thread_ret));
-		ret = listen_thread_ret;
+		pthread_join(listen_tid, NULL);
+		if (CHECK_SUCCESS(listen_thread_ret))
+			WRITE_DEBUG("Wait for the worker thread of listening's death Successfully !!!");
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of listening's death, due to: %s", GetErrorDescription(listen_thread_ret));
+			ret = listen_thread_ret;
+		}
+		listen_tid = 0;
 	}
 // Notify each session to exit and Delete all the sessions
 // Implemented in listen cleanup thread handler 

@@ -199,7 +199,7 @@ InteractiveSession::~InteractiveSession()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "%s Error occurs in InteractiveSession::deinitialize(), due to :%s", session_tag, GetErrorDescription(ret));
+		snprintf(errmsg, ERRMSG_SIZE, "%s Error occurs in InteractiveSession::~InteractiveSession(), due to :%s", session_tag, GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
 	if (observer != NULL)
@@ -277,9 +277,21 @@ unsigned short InteractiveSession::deinitialize()
 			// sleep(1);
 			usleep(100000);
 		}
-	}
+		WRITE_FORMAT_DEBUG("Wait for the worker thread of interactive session[%s]'s death...", session_tag);
+		pthread_join(session_tid, NULL);
+		WRITE_EVT_RECORDER(TelnetConsoleEventCfg, inet_ntoa(sock_addr.sin_addr), session_id, 1);
+		session_tid = 0;
 
-	WRITE_FORMAT_DEBUG("Wait for the worker thread of interactive session[%s]'s death...", session_tag);
+// Wait for interactive session thread's death
+		// printf("Session Exit\n");
+		if (CHECK_SUCCESS(session_thread_ret))
+			WRITE_FORMAT_DEBUG("Wait for the worker thread of interactive session[%s]'s death Successfully !!!", session_tag);
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of interactive session[%s]'s death, due to: %s", session_tag, GetErrorDescription(session_thread_ret));
+			ret = session_thread_ret;
+		}
+	}
 // Should NOT check the thread status in this way.
 // Segmentation fault occurs sometimes, seems the 'status' variable accesses the illegal address
 	// pthread_join(session_tid, &status);
@@ -290,16 +302,6 @@ unsigned short InteractiveSession::deinitialize()
 	// 	WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of sending message's death, due to: %s", (char*)status);
 	// 	return session_thread_ret;
 	// }
-// Wait for interactive session thread's death
-	WRITE_EVT_RECORDER(TelnetConsoleEventCfg, inet_ntoa(sock_addr.sin_addr), session_id, 1);
-	pthread_join(session_tid, NULL);
-	if (CHECK_SUCCESS(session_thread_ret))
-		WRITE_FORMAT_DEBUG("Wait for the worker thread of interactive session[%s]'s death Successfully !!!", session_tag);
-	else
-	{
-		WRITE_FORMAT_ERROR("Error occur while waiting for the worker thread of interactive session[%s]'s death, due to: %s", session_tag, GetErrorDescription(session_thread_ret));
-		ret = session_thread_ret;
-	}
 // Notify each session to exit and Delete all the sessions
 // Implemented in listen cleanup thread handler 
 	// INTERACTIVE_SESSION_ITER iter = interactive_session_deque.begin();

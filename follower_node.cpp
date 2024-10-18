@@ -48,7 +48,7 @@ FollowerNode::~FollowerNode()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::deinitialize(), due to :%s", GetErrorDescription(ret));
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in FollowerNode::~FollowerNode(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
 	if (observer != NULL)

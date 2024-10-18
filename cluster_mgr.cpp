@@ -287,7 +287,7 @@ ClusterMgr::~ClusterMgr()
 	{
 		static const int ERRMSG_SIZE = 256;
 		char errmsg[ERRMSG_SIZE];
-		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in ClusterMgr::deinitialize(), due to :%s", GetErrorDescription(ret));
+		snprintf(errmsg, ERRMSG_SIZE, "Error occurs in ClusterMgr::~ClusterMgr(), due to :%s", GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
 	if (file_tx != NULL)
@@ -700,16 +700,13 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 			simulator_handler = NULL;	
 		}	
 	}
-	if (system_operator == NULL)
-	{
 // DeInitialize the system operater
-		WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
-		if (system_operator != NULL)
-		{
-			system_operator->deinitialize();
-			delete system_operator;
-			system_operator = NULL;	
-		}
+	WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
+	if (system_operator != NULL)
+	{
+		system_operator->deinitialize();
+		delete system_operator;
+		system_operator = NULL;	
 	}
 	return ret;
 }
