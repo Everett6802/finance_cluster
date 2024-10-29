@@ -174,6 +174,7 @@ unsigned short FollowerNode::connect_leader()
 	}
 
 	WRITE_FORMAT_DEBUG("Try to connect to %s......Successfully", cluster_token);
+	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_JOIN, FOLLOWER, cluster_token);
 	socketfd = sock_fd;
 
 	return RET_SUCCESS;

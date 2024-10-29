@@ -13,6 +13,7 @@
 class ClusterMgr : public IManager
 {
 	DECLARE_MSG_DUMPER()
+	DECLARE_EVT_RECORDER()
 
 	static const char* SERVER_LIST_CONF_FILENAME;
 	static const int WAIT_RETRY_CONNECTION_TIME;

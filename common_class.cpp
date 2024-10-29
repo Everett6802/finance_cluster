@@ -2125,6 +2125,89 @@ const char* EventCfg::get_str()const
 // 	}
 	return event_description.c_str();
 }
+
+//////////////////////////////////////////////////////////
+
+const int OperateNodeEventCfg::EVENT_DATA_SIZE = sizeof(OperateNodeEventData);
+
+unsigned short OperateNodeEventCfg::generate_obj(OperateNodeEventCfg **obj, EventOperateNodeType event_operate_node_type, NodeType node_type, const char* node_token)
+{
+	assert(obj != NULL && "obj should NOT be NULL");
+	assert(node_token != NULL && "node_token should NOT be NULL");
+	OperateNodeEventData data;
+	data.event_operate_node_type = event_operate_node_type;
+	data.node_type = node_type;
+	memset(data.node_token, 0x0, sizeof(char) * DEF_LONG_STRING_SIZE);
+	strcpy(data.node_token, node_token);
+	OperateNodeEventCfg *obj_tmp = new OperateNodeEventCfg((void*)&data, EVENT_DATA_SIZE);
+	if (obj_tmp == NULL)
+		throw bad_alloc();
+	*obj = obj_tmp;
+	return RET_SUCCESS;
+}
+
+OperateNodeEventCfg::OperateNodeEventCfg(const void* param, size_t param_size) :
+	EventCfg(EVENT_OPERATE_NODE, EVENT_SEVERITY_INFORMATIONAL, EVENT_CATEGORY_CLUSTER, param, param_size)
+{
+	generate_content_base_description();
+	char buf[LONG_STRING_SIZE];
+	POPERATE_NODE_EVENT_DATA event_data = (POPERATE_NODE_EVENT_DATA)get_data();
+	assert(event_data != NULL && "event_data should NOT be NULL");
+	switch (event_data->event_operate_node_type)
+	{
+		case EVENT_OPERATE_NODE_START:
+		{
+			snprintf(buf, LONG_STRING_SIZE, "Start %s: %s ", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
+		}
+		break;
+		case EVENT_OPERATE_NODE_STOP:
+		{
+			snprintf(buf, LONG_STRING_SIZE, "Stop %s: %s ", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
+		}
+		break;
+		case EVENT_OPERATE_NODE_JOIN:
+		{
+			switch (event_data->node_type)
+			{
+				case LEADER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "New FOLLOWER[%s] join", event_data->node_token);
+				}
+				break;
+				case FOLLOWER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "FOLLOWER join cluster[%s]", event_data->node_token);
+				}
+				break;
+				default:
+				{
+					static const int BUF_SIZE = 256;
+					char buf[BUF_SIZE];
+					snprintf(buf, BUF_SIZE, "Unknown node type: %d", event_data->node_type);
+					fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+					throw std::invalid_argument(buf);
+				}
+				break;
+			}
+			
+		}
+		break;
+		default:
+		{
+    		static const int BUF_SIZE = 256;
+    		char buf[BUF_SIZE];
+    		snprintf(buf, BUF_SIZE, "Unknown operate node event type: %d", event_data->event_operate_node_type);
+    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+    		throw std::invalid_argument(buf);
+		}
+		break;
+	}
+	string content_description = string(buf);
+	event_description += content_description;
+}
+
+OperateNodeEventCfg::~OperateNodeEventCfg(){}
+
 //////////////////////////////////////////////////////////
 
 const int TelnetConsoleEventCfg::EVENT_DATA_SIZE = sizeof(TelnetConsoleEventData);
@@ -2899,7 +2982,7 @@ unsigned short EventRecorder::async_handle(NotifyCfg* notify_cfg)
     {
     	case NOTIFY_ADD_EVENT:
     	{
-    		assert(event_device_access != NULL && "event_device_access should NOT be NULL");
+    		// assert(event_device_access != NULL && "event_device_access should NOT be NULL");
     		PNOTIFY_EVENT_CFG notify_event_cfg = (PNOTIFY_EVENT_CFG)notify_cfg;
     		PEVENT_CFG event_cfg = (PEVENT_CFG)notify_event_cfg->get_event_cfg();
     		assert(event_cfg != NULL && "event_cfg should NOT be NULL");

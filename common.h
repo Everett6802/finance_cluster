@@ -343,6 +343,7 @@ enum UsreptConfigType{
 };
 
 enum EventType{
+	EVENT_OPERATE_NODE,
 	EVENT_REBUILD_CLUSTER,
 	EVENT_TELENT_CONSOLE,
 	EVENT_SIZE
@@ -366,6 +367,13 @@ enum EventDevice{
 	EVENT_DEVICE_SHM,
 	EVENT_DEVICE_DB,
 	EVENT_DEVICE_SIZE
+};
+
+enum EventOperateNodeType{
+	EVENT_OPERATE_NODE_START,
+	EVENT_OPERATE_NODE_STOP,
+	EVENT_OPERATE_NODE_JOIN,
+	EVENT_OPERATE_NODE_SIZE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1233,6 +1241,27 @@ public:
 	const char* get_str()const;
 };
 typedef EventCfg* PEVENT_CFG;
+
+///////////////////////////////////////////////////
+
+struct OperateNodeEventData
+{
+	EventOperateNodeType event_operate_node_type;
+	NodeType node_type;
+	char node_token[DEF_LONG_STRING_SIZE];
+}__attribute__ ((packed));
+typedef OperateNodeEventData* POPERATE_NODE_EVENT_DATA;
+
+class OperateNodeEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	OperateNodeEventCfg(const void* param, size_t param_size);
+	virtual ~OperateNodeEventCfg();
+
+public:
+	static unsigned short generate_obj(OperateNodeEventCfg **obj, EventOperateNodeType event_operate_node_type, NodeType node_type, const char* node_token);
+};
+typedef OperateNodeEventCfg* POPERATE_NODE_EVENT_CFG;
 
 ///////////////////////////////////////////////////
 

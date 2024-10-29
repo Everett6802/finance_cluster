@@ -272,6 +272,7 @@ ClusterMgr::ClusterMgr() :
 	simulator_installed(false)
 {
 	IMPLEMENT_MSG_DUMPER()
+	IMPLEMENT_EVT_RECORDER()
 	// memset(interactive_session_event_count, 0x0, sizeof(int) / MAX_INTERACTIVE_SESSION);
 	for (int i = 0 ; i < MAX_INTERACTIVE_SESSION ; i++)
 	{
@@ -314,6 +315,7 @@ ClusterMgr::~ClusterMgr()
 		local_token = NULL;
 	}
 
+	RELEASE_EVT_RECORDER()
 	RELEASE_MSG_DUMPER()
 }
 
@@ -882,7 +884,9 @@ unsigned short ClusterMgr::initialize()
 		if (local_follower)
 		{
 			// printf("shm_open: %s, read only !!!\n", LOCAL_CLUSTER_SHM_FILENAME);
-			int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_RDONLY, 0666);
+			char shm_filename[DEF_SHORT_STRING_SIZE];
+			snprintf(shm_filename, DEF_SHORT_STRING_SIZE, "%s-%s", LOCAL_CLUSTER_SHM_FILENAME, get_username());
+			int shm_fd = shm_open(shm_filename, O_RDONLY, 0666);
 		  	if (shm_fd < 0) 
 		  	{
 		    	WRITE_FORMAT_ERROR("shm_open() fails, due to: %s", strerror(errno));
@@ -928,12 +932,14 @@ unsigned short ClusterMgr::initialize()
 	ret = initialize_components(component_mask);
 	if (CHECK_FAILURE(ret))
 		return ret;
+	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_START, node_type, local_token);
 	return ret;
 }
 
 unsigned short ClusterMgr::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
+	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, local_token);
 	ret = deinitialize_components(COMPONENT_MASK_ALL);
 // // Deinitialize the system operator
 // 	if (system_operator != NULL)

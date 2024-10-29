@@ -575,19 +575,25 @@ unsigned short LeaderNode::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 
+	char shm_filename[DEF_SHORT_STRING_SIZE];
+	snprintf(shm_filename, DEF_SHORT_STRING_SIZE, "%s-%s", LOCAL_CLUSTER_SHM_FILENAME, get_username());
 	char shm_filepath[DEF_STRING_SIZE];
-	snprintf(shm_filepath, DEF_STRING_SIZE, "/dev/shm/%s", LOCAL_CLUSTER_SHM_FILENAME);
+	snprintf(shm_filepath, DEF_STRING_SIZE, "/dev/shm/%s", shm_filename);
 	if (access(shm_filepath, F_OK) == 0)
 	{
 		WRITE_FORMAT_WARN("LeaderNode::initialize(%s)=> The old SHM file[%s] still exists. Remove it !!!", local_token, shm_filepath);
 // Remove the old token if required
 		// printf("shm_unlink: %s\n", LOCAL_CLUSTER_SHM_FILENAME);
-		shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
+		if (shm_unlink(shm_filename) != 0)
+		{
+			WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
 	}
 
 // The /dev/shm/finance_cluster_cluster_token file is created
 	// printf("shm_open: %s, create !!!\n", LOCAL_CLUSTER_SHM_FILENAME);
-  	int shm_fd = shm_open(LOCAL_CLUSTER_SHM_FILENAME, O_CREAT | O_EXCL | O_RDWR, 0600);
+  	int shm_fd = shm_open(shm_filename, O_CREAT | O_EXCL | O_RDWR, 0600);
   	if (shm_fd < 0) 
   	{
 
@@ -688,8 +694,10 @@ unsigned short LeaderNode::deinitialize()
  //    	WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
  //    	// return RET_FAILURE_SYSTEM_API;
  //  	}
+	char shm_filename[DEF_SHORT_STRING_SIZE];
+	snprintf(shm_filename, DEF_SHORT_STRING_SIZE, "%s-%s", LOCAL_CLUSTER_SHM_FILENAME, get_username());
 	char shm_filepath[DEF_STRING_SIZE];
-	snprintf(shm_filepath, DEF_STRING_SIZE, "/dev/shm/%s", LOCAL_CLUSTER_SHM_FILENAME);
+	snprintf(shm_filepath, DEF_STRING_SIZE, "/dev/shm/%s", shm_filename);
 	if (access(shm_filepath, F_OK) == 0)
 	{
 		int process_count;
@@ -700,7 +708,11 @@ unsigned short LeaderNode::deinitialize()
 			WRITE_FORMAT_WARN("LeaderNode::deinitialize(%s)=> The old SHM file[%s] still exists. Remove it !!!", local_token, shm_filepath);
 // Remove the old token if required
 			// printf("shm_unlink: %s\n", LOCAL_CLUSTER_SHM_FILENAME);
-			shm_unlink(LOCAL_CLUSTER_SHM_FILENAME);
+			if (shm_unlink(shm_filename) != 0)
+			{
+				WRITE_FORMAT_ERROR("shm_unlink() fails, due to: %s", strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
 		}
 	}
 	// }
@@ -1872,7 +1884,8 @@ unsigned short LeaderNode::listen_thread_handler_internal()
 		string cluster_map_msg(cluster_map.to_string());
 		// fprintf(stderr, "New Cluster Map: %s\n", cluster_map_msg.c_str());
 		pthread_mutex_unlock(&node_channel_mtx);
-		PRINT("[%s] The Channel between Follower[%s] and Leader is Established......\n", listen_thread_tag, client_token);
+		PRINT("The Channel between Follower[%s] and Leader is Established......\n", client_token);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_JOIN, LEADER, client_token);
 // Update the cluster map to Followers
 		// fprintf(stderr, "LeaderNode::listen_thread_handler_internal %s, %d\n", cluster_map.to_string(), strlen(cluster_map.to_string()));
 		ret = send_string_data(MSG_UPDATE_CLUSTER_MAP, cluster_map_msg.c_str());
