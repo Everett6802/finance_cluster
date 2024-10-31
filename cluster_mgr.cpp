@@ -940,6 +940,7 @@ unsigned short ClusterMgr::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
 	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, local_token);
+	usleep(10000);
 	ret = deinitialize_components(COMPONENT_MASK_ALL);
 // // Deinitialize the system operator
 // 	if (system_operator != NULL)
