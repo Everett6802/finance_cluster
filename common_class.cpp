@@ -2157,12 +2157,56 @@ OperateNodeEventCfg::OperateNodeEventCfg(const void* param, size_t param_size) :
 	{
 		case EVENT_OPERATE_NODE_START:
 		{
-			snprintf(buf, LONG_STRING_SIZE, "Start %s: %s ", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
+			switch (event_data->node_type)
+			{
+				case LEADER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "Start LEADER[%s]", event_data->node_token);
+				}
+				break;
+				case FOLLOWER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "Start FOLLOWER[%s]", event_data->node_token);
+				}
+				break;
+				default:
+				{
+					static const int BUF_SIZE = 256;
+					char buf[BUF_SIZE];
+					snprintf(buf, BUF_SIZE, "Incorrect node type: %d", event_data->node_type);
+					fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+					throw std::invalid_argument(buf);
+				}
+				break;
+			}
+			// snprintf(buf, LONG_STRING_SIZE, "Start %s[%s]", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
 		}
 		break;
 		case EVENT_OPERATE_NODE_STOP:
 		{
-			snprintf(buf, LONG_STRING_SIZE, "Stop %s: %s ", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
+			switch (event_data->node_type)
+			{
+				case LEADER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "Stop LEADER[%s]", event_data->node_token);
+				}
+				break;
+				case FOLLOWER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "Stop FOLLOWER[%s]", event_data->node_token);
+				}
+				break;
+				default:
+				{
+					static const int BUF_SIZE = 256;
+					char buf[BUF_SIZE];
+					snprintf(buf, BUF_SIZE, "Incorrect node type: %d", event_data->node_type);
+					fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+					throw std::invalid_argument(buf);
+				}
+				break;
+			}
+			// snprintf(buf, LONG_STRING_SIZE, "Stop %s[%s]", (event_data->node_type == LEADER ? "LEADER" : "FOLLOWER"), event_data->node_token);
 		}
 		break;
 		case EVENT_OPERATE_NODE_JOIN:
@@ -2183,13 +2227,33 @@ OperateNodeEventCfg::OperateNodeEventCfg(const void* param, size_t param_size) :
 				{
 					static const int BUF_SIZE = 256;
 					char buf[BUF_SIZE];
-					snprintf(buf, BUF_SIZE, "Unknown node type: %d", event_data->node_type);
+					snprintf(buf, BUF_SIZE, "Incorrect node type: %d", event_data->node_type);
 					fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
 					throw std::invalid_argument(buf);
 				}
 				break;
 			}
-			
+		}
+		break;
+		case EVENT_OPERATE_NODE_LEAVE:
+		{
+			switch (event_data->node_type)
+			{
+				case LEADER:
+				{
+					snprintf(buf, LONG_STRING_SIZE, "FOLLOWER[%s] leave", event_data->node_token);
+				}
+				break;
+				default:
+				{
+					static const int BUF_SIZE = 256;
+					char buf[BUF_SIZE];
+					snprintf(buf, BUF_SIZE, "Incorrect node type: %d", event_data->node_type);
+					fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+					throw std::invalid_argument(buf);
+				}
+				break;
+			}
 		}
 		break;
 		default:

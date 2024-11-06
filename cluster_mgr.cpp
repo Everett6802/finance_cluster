@@ -612,7 +612,6 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 			deinitialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
 		else
     		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
-
     }
 
 	// // fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
@@ -683,9 +682,9 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 	if (component_mask & COMPONENT_MASK_INTERACTIVE_SESSION)
 	{
 // Deinitialize the session server
-		WRITE_FORMAT_DEBUG("[%s] De-Initialize the session server......", local_token);
 		if (interactive_server != NULL)
 		{
+			WRITE_FORMAT_DEBUG("[%s] De-Initialize the session server......", local_token);
 			interactive_server->deinitialize();
 			delete interactive_server;
 			interactive_server = NULL;	
@@ -694,18 +693,18 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 	if (component_mask & COMPONENT_MASK_SIMULATOR_HANDLER)
 	{
 // Deinitialize the simulator handler
-		WRITE_FORMAT_DEBUG("[%s] De-Initialize the simulator handler......", local_token);
 		if (simulator_handler != NULL)
 		{
+			WRITE_FORMAT_DEBUG("[%s] De-Initialize the simulator handler......", local_token);
 			simulator_handler->deinitialize();
 			delete simulator_handler;
 			simulator_handler = NULL;	
 		}	
 	}
 // DeInitialize the system operater
-	WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
 	if (system_operator != NULL)
 	{
+		WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
 		system_operator->deinitialize();
 		delete system_operator;
 		system_operator = NULL;	
@@ -857,7 +856,11 @@ unsigned short ClusterMgr::initialize()
 		      	IPv4Addr ipv4_addr(cluster_token);
 		      	if (!ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
 		      	{
-		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%s]", local_token, cluster_token, cluster_network.c_str(), cluster_netmask_digits);
+					// fprintf(stderr, "local_token: %s\n", local_token);
+					// fprintf(stderr, "cluster_token: %s\n", cluster_token);
+					// fprintf(stderr, "cluster_network: %s\n", cluster_network.c_str());
+					// fprintf(stderr, "cluster_netmask_digits: %d\n", cluster_netmask_digits);
+		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%d]", local_token, cluster_token, cluster_network.c_str(), cluster_netmask_digits);
 		      		return RET_FAILURE_INCORRECT_CONFIG;
 		      	}
 			}
@@ -939,8 +942,12 @@ unsigned short ClusterMgr::initialize()
 unsigned short ClusterMgr::deinitialize()
 {
 	unsigned short ret = RET_SUCCESS;
-	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, local_token);
-	usleep(10000);
+	// fprintf(stderr, "EVENT_OPERATE_NODE_STOP  node_type: %d, local_token: %s\n", node_type, local_token);
+	if (node_type != NONE)
+	{
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, local_token);
+		usleep(10000);
+	}
 	ret = deinitialize_components(COMPONENT_MASK_ALL);
 // // Deinitialize the system operator
 // 	if (system_operator != NULL)

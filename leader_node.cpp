@@ -1686,6 +1686,8 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     		ret = remove_follower(follower_token);
     		if (CHECK_FAILURE(ret))
     			WRITE_FORMAT_ERROR("Fails to remove follower[%s], due to: %s", follower_token.c_str(), GetErrorDescription(ret));
+			WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_LEAVE, LEADER, follower_token.c_str());
+			PRINT("The Channel between Follower[%s] and Leader is Removed......\n", follower_token.c_str());
     	}
     	break;
    //    case NOTIFY_SEND_FILE_DONE:

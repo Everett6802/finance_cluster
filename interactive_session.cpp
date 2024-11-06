@@ -252,7 +252,7 @@ unsigned short InteractiveSession::deinitialize()
 // Notify the worker thread it's time to exit
 	__sync_fetch_and_add(&session_exit, 1);
 	// sleep(1);
-	usleep(100000);
+	usleep(10000);
 // Check interactive session thread alive
 	// bool session_thread_alive = false;
 	if (session_tid != 0)
