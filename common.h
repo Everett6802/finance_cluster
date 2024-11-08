@@ -273,6 +273,7 @@ enum ParamType{
 	PARAM_CLUSTER_ID2TOKEN,
 	PARAM_NODE_TYPE,
 	PARAM_NODE_ID,
+	PARAM_NODE_TOKEN,
 	PARAM_CLUSTER_MAP,
 	PARAM_CONNECTION_RETRY,
 	PARAM_LOCAL_CLUSTER,
@@ -346,6 +347,7 @@ enum EventType{
 	EVENT_OPERATE_NODE,
 	EVENT_REBUILD_CLUSTER,
 	EVENT_TELENT_CONSOLE,
+	EVENT_SYNC_DATA,
 	EVENT_SIZE
 };
 
@@ -374,7 +376,13 @@ enum EventOperateNodeType{
 	EVENT_OPERATE_NODE_STOP,
 	EVENT_OPERATE_NODE_JOIN,
 	EVENT_OPERATE_NODE_LEAVE,
+	EVENT_OPERATE_NODE_SWITCH,
 	EVENT_OPERATE_NODE_SIZE
+};
+
+enum EventOperateNodeFailType{
+	EVENT_OPERATE_NODE_FAIL_NO_SERVER,
+	EVENT_OPERATE_NODE_FAIL_SIZE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1207,7 +1215,6 @@ public:
 };
 typedef NotifyEventCfg* PNOTIFY_EVENT_CFG;
 
-
 ///////////////////////////////////////////////////
 
 class EventCfg
@@ -1266,6 +1273,27 @@ typedef OperateNodeEventCfg* POPERATE_NODE_EVENT_CFG;
 
 ///////////////////////////////////////////////////
 
+struct OperateNodeFailEventData
+{
+	EventOperateNodeFailType event_operate_node_fail_type;
+	NodeType node_type;
+	char node_token[DEF_LONG_STRING_SIZE];
+}__attribute__ ((packed));
+typedef OperateNodeFailEventData* POPERATE_NODE_FAIL_EVENT_DATA;
+
+class OperateNodeFailEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	OperateNodeFailEventCfg(const void* param, size_t param_size);
+	virtual ~OperateNodeFailEventCfg();
+
+public:
+	static unsigned short generate_obj(OperateNodeFailEventCfg **obj, EventOperateNodeFailType event_operate_node_type, NodeType node_type, const char* node_token);
+};
+typedef OperateNodeFailEventCfg* POPERATE_NODE_FAIL_EVENT_CFG;
+
+///////////////////////////////////////////////////
+
 struct TelnetConsoleEventData
 {
 	char login_address[DEF_VERY_SHORT_STRING_SIZE];
@@ -1284,6 +1312,28 @@ public:
 	static unsigned short generate_obj(TelnetConsoleEventCfg **obj, const char* login_address, int session_id, char exit);
 };
 typedef TelnetConsoleEventCfg* PTELNET_CONSOLE_EVENT_CFG;
+
+///////////////////////////////////////////////////
+
+struct SyncDataEventData
+{
+	char data_path[DEF_LONG_STRING_SIZE];
+	NodeType node_type;
+	char node_token[DEF_LONG_STRING_SIZE];
+	char is_folder;
+}__attribute__ ((packed));
+typedef SyncDataEventData* PSYNC_DATA_EVENT_DATA;
+
+class SyncDataEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	SyncDataEventCfg(const void* param, size_t param_size);
+	virtual ~SyncDataEventCfg();
+
+public:
+	static unsigned short generate_obj(SyncDataEventCfg **obj, const char* data_path, NodeType note_type, const char* node_token, char is_folder);
+};
+typedef SyncDataEventCfg* PSYNC_DATA_EVENT_CFG;
 
 ///////////////////////////////////////////////////
 

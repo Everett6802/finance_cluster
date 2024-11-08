@@ -91,7 +91,8 @@ const char* GetEventTypeDescription(EventType event_type)
 	static char* event_type_description[] = {
 		"Operate Node",
 		"Rebuild Cluster",
-		"Telnet Console"
+		"Telnet Console",
+		"Sync Data"
 	};
 	static int event_type_description_size = sizeof(event_type_description) / sizeof(event_type_description[0]);
 	assert(event_type >= 0 && event_type < EVENT_SIZE && "event type is out of range");

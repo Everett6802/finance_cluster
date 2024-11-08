@@ -242,9 +242,9 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
       	}
       	if (found)
       	{
-	      	local_token = strdup(ip.c_str());
+	      	node_token = strdup(ip.c_str());
 	      	char* local_interface = strdup(interface.c_str());
-	      	WRITE_FORMAT_DEBUG("The local IP: %s, local interface: %s", local_token, local_interface);
+	      	WRITE_FORMAT_DEBUG("The local IP: %s, local interface: %s", node_token, local_interface);
 	      	break;
       	}
 		iter++;
@@ -261,7 +261,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 ClusterMgr::ClusterMgr() :
 	notify_thread(NULL),
 	local_cluster(true),
-	local_token(NULL),
+	node_token(NULL),
 	cluster_token(NULL),
 	node_type(NONE),
 	file_tx_type(TX_NONE),
@@ -308,11 +308,11 @@ ClusterMgr::~ClusterMgr()
 		cluster_token = NULL;
 	}
 
-	if (local_token != NULL)
+	if (node_token != NULL)
 	{
 		// delete[] local_token;
-		free(local_token);
-		local_token = NULL;
+		free(node_token);
+		node_token = NULL;
 	}
 
 	RELEASE_EVT_RECORDER()
@@ -351,7 +351,7 @@ void ClusterMgr::stop_keepalive_timer()
 
 unsigned short ClusterMgr::become_leader()
 {
-	cluster_node = new LeaderNode(this, local_token);
+	cluster_node = new LeaderNode(this, node_token);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Leader)");
@@ -366,13 +366,13 @@ unsigned short ClusterMgr::become_leader()
 		return ret;
 
 	node_type = LEADER;
-	WRITE_FORMAT_DEBUG("This Node[%s] is a Leader !!!", local_token);
+	WRITE_FORMAT_DEBUG("This Node[%s] is a Leader !!!", node_token);
 	return RET_SUCCESS;
 }
 
 unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 {
-	cluster_node = new FollowerNode(this, cluster_token, local_token);
+	cluster_node = new FollowerNode(this, cluster_token, node_token);
 	if (cluster_node == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: cluster_node (Follower)");
@@ -389,14 +389,14 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 	if (CHECK_FAILURE(ret))
 		return ret;
 	node_type = FOLLOWER;
-	WRITE_FORMAT_DEBUG("This Node[%s] is Follower !!!", local_token);
+	WRITE_FORMAT_DEBUG("This Node[%s] is Follower !!!", node_token);
 	return ret;
 }
 
 unsigned short ClusterMgr::become_file_sender()
 {
 	assert(file_tx_type == TX_NONE && "file_tx_type shuold be TX_NONE");
-	file_tx = new FileSender(this, local_token);
+	file_tx = new FileSender(this, node_token);
 	if (file_tx == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: file_tx (sender)");
@@ -411,7 +411,7 @@ unsigned short ClusterMgr::become_file_sender()
 		return ret;
 
 	file_tx_type = TX_SENDER;
-	WRITE_FORMAT_DEBUG("This Node[%s] is a File Sender !!!", local_token);
+	WRITE_FORMAT_DEBUG("This Node[%s] is a File Sender !!!", node_token);
 	return RET_SUCCESS;
 }
 
@@ -419,8 +419,8 @@ unsigned short ClusterMgr::become_file_receiver(const char* sender_token)
 {
 	assert(file_tx_type == TX_NONE && "file_tx_type shuold be TX_NONE");
 	assert(sender_token != NULL  && "sender_token should NOT be NULL");
-	WRITE_FORMAT_DEBUG("File Receiver[%s] sets File Sender Token: %s", local_token, sender_token);
-	file_tx = new FileReceiver(this, sender_token, local_token);
+	WRITE_FORMAT_DEBUG("File Receiver[%s] sets File Sender Token: %s", node_token, sender_token);
+	file_tx = new FileReceiver(this, sender_token, node_token);
 	if (file_tx == NULL)
 	{
 		WRITE_ERROR("Fail to allocate memory: file_tx (receiver)");
@@ -435,7 +435,7 @@ unsigned short ClusterMgr::become_file_receiver(const char* sender_token)
 		return ret;
 
 	file_tx_type = TX_RECEIVER;
-	WRITE_FORMAT_DEBUG("This Node[%s] is a File Receiver !!!", local_token);
+	WRITE_FORMAT_DEBUG("This Node[%s] is a File Receiver !!!", node_token);
 	return RET_SUCCESS;
 }
 
@@ -474,7 +474,7 @@ unsigned short ClusterMgr::stop_connection()
 		unsigned short ret = cluster_node->deinitialize();
 		if (CHECK_FAILURE(ret))
 		{
-			WRITE_FORMAT_ERROR("Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), local_token);
+			WRITE_FORMAT_ERROR("Error occur while closing the %s[%s]", (is_leader() ? "Leader" : "Follower"), node_token);
 			return ret;
 		}
 		delete cluster_node;
@@ -494,7 +494,7 @@ unsigned short ClusterMgr::close_console()
 	{
 		static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
 		assert(interactive_server != NULL && "interactive_server should NOT be NULL");
-		WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", local_token);
+		WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", node_token);
 		interactive_server->print_console(close_console_message);
 		usleep(300000);
 		// interactive_server->deinitialize();
@@ -509,7 +509,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 {
 	if (node_type == LEADER)
 	{
-		WRITE_FORMAT_ERROR("Leader [%s] NEVER tries to re-connect", local_token);
+		WRITE_FORMAT_ERROR("Leader [%s] NEVER tries to re-connect", node_token);
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
 	assert(cluster_token != NULL && "cluster_token should NOT be NULL");
@@ -521,7 +521,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		return ret;
 	if (cluster_map.is_empty())
 	{
-		WRITE_FORMAT_ERROR("The cluster map in Follower[%s] is empty", local_token);
+		WRITE_FORMAT_ERROR("The cluster map in Follower[%s] is empty", node_token);
 		return RET_FAILURE_RUNTIME;
 	}
 // Get the node ID from the follower
@@ -533,7 +533,6 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 	ret = stop_connection();
 	if (CHECK_FAILURE(ret))
 		return ret;
-
 // Pops up the first node: Leader
 	int first_node_id;
 	std::string first_node_token;
@@ -564,13 +563,12 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
        	WRITE_ERROR("Fails to get the candidate of the Leader in the cluster map");
         return ret;
     }
-
 // Try to re-establish the cluster from the cluster map
         // fprintf(stderr, "ID: %d candidate: id: %d, ip: %s\n", node_id, leader_candidate_node_id, leader_candidate_node_ip.c_str());
     if (leader_candidate_node_id == node_id)
     {
 // Leader
-		WRITE_FORMAT_DEBUG("Node[%s] try to becomme the Leader in the Cluster......", local_token);
+		WRITE_FORMAT_DEBUG("Node[%s] try to becomme the Leader in the Cluster......", node_token);
 		if (cluster_token != NULL)
 		{
         	free(cluster_token);
@@ -594,11 +592,12 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		// 		return ret;
 		// }
 		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, node_token);
     }
     else
     {
 // Follower
-	    WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", local_token, cluster_token);
+	    WRITE_FORMAT_DEBUG("Node[%s] try to join the Cluster[%s]......", node_token, cluster_token);
 		srand((unsigned)time(NULL));
 		int rand_num = rand() % 13 + 1;
 		usleep(rand_num * 100000);
@@ -612,6 +611,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 			deinitialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
 		else
     		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, cluster_token);
     }
 
 	// // fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
@@ -622,7 +622,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 	// 		return ret;
 	// }
     if (CHECK_FAILURE(ret))
-    	WRITE_FORMAT_ERROR("Node[%s] fails to rebuild the cluster, due to: %s", local_token, GetErrorDescription(ret));
+    	WRITE_FORMAT_ERROR("Node[%s] fails to rebuild the cluster, due to: %s", node_token, GetErrorDescription(ret));
 	return ret;
 }
 
@@ -632,7 +632,7 @@ unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 	if (component_mask & COMPONENT_MASK_INTERACTIVE_SESSION)
 	{
 // Initialize the session server
-		WRITE_FORMAT_DEBUG("[%s] Initialize the session server......", local_token);
+		WRITE_FORMAT_DEBUG("[%s] Initialize the session server......", node_token);
 		// assert(interactive_server == NULL && "interactive_server should be NULL");
 		if (interactive_server != NULL)
 			deinitialize_components(COMPONENT_MASK_INTERACTIVE_SESSION);
@@ -646,7 +646,7 @@ unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 	if (component_mask & COMPONENT_MASK_SIMULATOR_HANDLER)
 	{
 // Initialize the simulator handler
-		WRITE_FORMAT_DEBUG("[%s] Initialize the simulator handler......", local_token);
+		WRITE_FORMAT_DEBUG("[%s] Initialize the simulator handler......", node_token);
 		// assert(simulator_handler == NULL && "simulator_handler should be NULL");
 		if (simulator_handler != NULL)
 			deinitialize_components(COMPONENT_MASK_SIMULATOR_HANDLER);
@@ -662,7 +662,7 @@ unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 // Initialize the system operater
 	if (component_mask & COMPONENT_MASK_SYSTEM_OPERATOR)
 	{
-		WRITE_FORMAT_DEBUG("[%s] Initialize the system operater......", local_token);
+		WRITE_FORMAT_DEBUG("[%s] Initialize the system operater......", node_token);
 		// assert(system_operator == NULL && "system_operator should be NULL");
 		if (system_operator != NULL)
 			deinitialize_components(COMPONENT_MASK_SYSTEM_OPERATOR);
@@ -684,7 +684,7 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 // Deinitialize the session server
 		if (interactive_server != NULL)
 		{
-			WRITE_FORMAT_DEBUG("[%s] De-Initialize the session server......", local_token);
+			WRITE_FORMAT_DEBUG("[%s] De-Initialize the session server......", node_token);
 			interactive_server->deinitialize();
 			delete interactive_server;
 			interactive_server = NULL;	
@@ -695,7 +695,7 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 // Deinitialize the simulator handler
 		if (simulator_handler != NULL)
 		{
-			WRITE_FORMAT_DEBUG("[%s] De-Initialize the simulator handler......", local_token);
+			WRITE_FORMAT_DEBUG("[%s] De-Initialize the simulator handler......", node_token);
 			simulator_handler->deinitialize();
 			delete simulator_handler;
 			simulator_handler = NULL;	
@@ -704,7 +704,7 @@ unsigned short ClusterMgr::deinitialize_components(unsigned short component_mask
 // DeInitialize the system operater
 	if (system_operator != NULL)
 	{
-		WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", local_token);
+		WRITE_FORMAT_DEBUG("[%s] De-Initialize the system operater......", node_token);
 		system_operator->deinitialize();
 		delete system_operator;
 		system_operator = NULL;	
@@ -728,7 +728,7 @@ void ClusterMgr::check_keepalive()
 					WRITE_FORMAT_ERROR("Error occurs while checking keep-alive on the client side, due to: %s", GetErrorDescription(ret));
 					// notify_exit(ret);
 					// return;
-					FPRINT_ERROR("Follower[%s] keep-alive time-out, due to: %s\n", local_token, GetErrorDescription(ret));
+					FPRINT_ERROR("Follower[%s] keep-alive time-out, due to: %s\n", node_token, GetErrorDescription(ret));
 					raise(SIGTERM);
 				}
 				else
@@ -741,7 +741,7 @@ void ClusterMgr::check_keepalive()
 					{
 						// notify_exit(ret);
 						// return;
-						FPRINT_ERROR("Node[%s] fails to re-connect, due to: %s\n", local_token, GetErrorDescription(ret));
+						FPRINT_ERROR("Node[%s] fails to re-connect, due to: %s\n", node_token, GetErrorDescription(ret));
 						raise(SIGTERM);
 					}
 // Start a keep-alive timer
@@ -750,7 +750,7 @@ void ClusterMgr::check_keepalive()
 					{
 						// notify_exit(ret);
 						// return;
-						FPRINT_ERROR("Node[%s] fails to start keep-alive timer, due to: %s\n", local_token, GetErrorDescription(ret));
+						FPRINT_ERROR("Node[%s] fails to start keep-alive timer, due to: %s\n", node_token, GetErrorDescription(ret));
 						raise(SIGTERM);
 					}
 				}
@@ -761,10 +761,10 @@ void ClusterMgr::check_keepalive()
 // Leader
 			if (CHECK_FAILURE(ret))
 			{
-				WRITE_FORMAT_ERROR("Termiate the Leader[%s] due to: %s", local_token, GetErrorDescription(ret));
+				WRITE_FORMAT_ERROR("Termiate the Leader[%s] due to: %s", node_token, GetErrorDescription(ret));
 				// notify_exit(ret);
 				// return;
-				FPRINT_ERROR("Leader[%s] fails to check keep-alive, due to: %s\n", local_token, GetErrorDescription(ret));
+				FPRINT_ERROR("Leader[%s] fails to check keep-alive, due to: %s\n", node_token, GetErrorDescription(ret));
 				raise(SIGTERM);
 			}
 		}
@@ -834,7 +834,7 @@ unsigned short ClusterMgr::initialize()
 	if (CHECK_FAILURE(ret))
 		return ret;
 // Find local token
-	if (local_token == NULL)
+	if (node_token == NULL)
 	{
 		if (local_cluster)
 		{
@@ -842,7 +842,7 @@ unsigned short ClusterMgr::initialize()
 			// srand(time(NULL));   // Initialization, should only be called once.
 			// snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, rand() % 100000);
 			snprintf(local_token_tmp, LOCAL_CLUSTER_SHM_BUFSIZE, LOCAL_CLUSTER_TOKEN_SHM_FORMOAT, getpid());
-			local_token = strdup(local_token_tmp);
+			node_token = strdup(local_token_tmp);
 		}
 		else
 		{
@@ -860,7 +860,7 @@ unsigned short ClusterMgr::initialize()
 					// fprintf(stderr, "cluster_token: %s\n", cluster_token);
 					// fprintf(stderr, "cluster_network: %s\n", cluster_network.c_str());
 					// fprintf(stderr, "cluster_netmask_digits: %d\n", cluster_netmask_digits);
-		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%d]", local_token, cluster_token, cluster_network.c_str(), cluster_netmask_digits);
+		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%d]", node_token, cluster_token, cluster_network.c_str(), cluster_netmask_digits);
 		      		return RET_FAILURE_INCORRECT_CONFIG;
 		      	}
 			}
@@ -915,12 +915,12 @@ unsigned short ClusterMgr::initialize()
 	{
 		if (cluster_token != NULL)
 		{
-			WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", local_token, cluster_token);
+			WRITE_FORMAT_DEBUG("Node[%s] Try to become follower of cluster[%s]...", node_token, cluster_token);
 			ret = become_follower();
 		}
 		else
 		{
-			WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", local_token);
+			WRITE_FORMAT_DEBUG("Node[%s] Try to become leader...", node_token);
 			ret = become_leader();	
 		}
 	}
@@ -935,7 +935,7 @@ unsigned short ClusterMgr::initialize()
 	ret = initialize_components(component_mask);
 	if (CHECK_FAILURE(ret))
 		return ret;
-	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_START, node_type, local_token);
+	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_START, node_type, node_token);
 	return ret;
 }
 
@@ -945,7 +945,7 @@ unsigned short ClusterMgr::deinitialize()
 	// fprintf(stderr, "EVENT_OPERATE_NODE_STOP  node_type: %d, local_token: %s\n", node_type, local_token);
 	if (node_type != NONE)
 	{
-		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, local_token);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_STOP, node_type, node_token);
 		usleep(10000);
 	}
 	ret = deinitialize_components(COMPONENT_MASK_ALL);
@@ -1126,12 +1126,12 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 // Start the file transfer sender
 			FileTransferParam file_transfer_param;
 			file_transfer_param.session_id = session_id;
-			int sender_token_len = strlen(local_token) + 1;
+			int sender_token_len = strlen(node_token) + 1;
 			file_transfer_param.sender_token = new char[sender_token_len];
 			if (file_transfer_param.sender_token == NULL)
 				throw bad_alloc();
 			memset(file_transfer_param.sender_token, 0x0, sizeof(char) * sender_token_len);
-			strcpy(file_transfer_param.sender_token, local_token);
+			strcpy(file_transfer_param.sender_token, node_token);
 			int filepath_len = strlen(filepath) + 1;
 			file_transfer_param.filepath = new char[filepath_len];
 			if (file_transfer_param.filepath == NULL)
@@ -1266,6 +1266,17 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		*((NodeType*)param1) = node_type;
     	}
     	break;
+	    case PARAM_NODE_TOKEN:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			char *node_token_tmp = strdup(node_token);
+    		*((char**)param1) = node_token_tmp;
+    	}
+    	break;
     	case PARAM_CLUSTER_MAP:
     	{
         	if (param1 == NULL)
@@ -1296,14 +1307,14 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			if (CHECK_FAILURE(ret))
 				return ret;
 			cluster_detail_param->node_type = node_type;
-			assert(local_token != NULL && "local_token should NOT be NULL");
-			strcpy(cluster_detail_param->local_token, local_token);
+			assert(node_token != NULL && "local_token should NOT be NULL");
+			strcpy(cluster_detail_param->local_token, node_token);
 			if (node_type == NONE)
 			{
     			WRITE_FORMAT_ERROR("The node_type[%d] is NOT defined", node_type);
     			return RET_FAILURE_INVALID_ARGUMENT;				
 			}
-			strcpy(cluster_detail_param->cluster_token, (node_type == LEADER ? local_token : cluster_token));
+			strcpy(cluster_detail_param->cluster_token, (node_type == LEADER ? node_token : cluster_token));
     	}
     	break;
     	case PARAM_SYSTEM_INFO:
@@ -2706,6 +2717,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 				if (CHECK_FAILURE(ret))
 					return ret;
 				WRITE_FORMAT_DEBUG("Notify new Leader: %d......", leader_candidate_node_id);
+				WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, leader_candidate_node_token.c_str());
 // Notify the Followers to rebuild the cluster
 				ret = cluster_node->send(MSG_SWITCH_LEADER, (void*)&leader_candidate_node_id);
 				if (CHECK_FAILURE(ret))
@@ -2728,7 +2740,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 		        if (CHECK_FAILURE(ret))
 					return ret;
 	        	assert(interactive_server == NULL && "interactive_server should be NULL");
-	        	WRITE_FORMAT_DEBUG("[%s] Re-Initialize the session server due to role switch...", local_token);
+	        	WRITE_FORMAT_DEBUG("[%s] Re-Initialize the session server due to role switch...", node_token);
 	        	interactive_server = new InteractiveServer(this);
 	        	if (interactive_server == NULL)
 					throw bad_alloc();

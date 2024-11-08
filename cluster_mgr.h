@@ -39,7 +39,7 @@ private:
 	std::string sync_folderpath;
 
 	PNOTIFY_THREAD notify_thread;
-	char* local_token;
+	char* node_token;
 	char* cluster_token; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;

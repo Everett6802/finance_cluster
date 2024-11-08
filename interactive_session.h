@@ -49,6 +49,7 @@ private:
 	int session_id;
 	bool is_root;
 	bool is_leader;
+	char* node_token;
 	unsigned char authority_mask;
 	bool system_monitor;
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;

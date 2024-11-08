@@ -178,6 +178,7 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	session_id(interactive_session_id),
 	is_root(false),
 	is_leader(false),
+	node_token(NULL),
 	authority_mask(0x0),
 	system_monitor(false),
 	monitor_system_timer_thread(NULL),
@@ -202,6 +203,11 @@ InteractiveSession::~InteractiveSession()
 		snprintf(errmsg, ERRMSG_SIZE, "%s Error occurs in InteractiveSession::~InteractiveSession(), due to :%s", session_tag, GetErrorDescription(ret));
 		throw runtime_error(errmsg);
 	}
+	if (node_token != NULL)
+	{
+		free(node_token);
+		node_token = NULL;
+	}
 	if (observer != NULL)
 		observer = NULL;
 	if (manager != NULL)
@@ -218,6 +224,9 @@ unsigned short InteractiveSession::initialize(int system_monitor_period_value)
 	system_monitor_period = system_monitor_period_value;
 	NodeType node_type = NONE;
     ret = manager->get(PARAM_NODE_TYPE, (void*)&node_type);
+ 	if (CHECK_FAILURE(ret))
+		return ret;	
+    ret = manager->get(PARAM_NODE_TOKEN, (void*)&node_token);
  	if (CHECK_FAILURE(ret))
 		return ret;	
 	is_leader = (node_type == LEADER ? true : false);
@@ -1175,6 +1184,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
+	WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
 	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
 	list<string> full_filepath_in_folder_list;
 	get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
@@ -1239,6 +1249,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		strcpy(filepath, argv1_tmp);
 
 	WRITE_FORMAT_DEBUG("Try to synchorinize the file: %s", filepath);
+	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
 	if (!check_file_exist(filepath))
 	{
 		WRITE_FORMAT_WARN("The file[%s] being synchronized does NOT exist", filepath);
