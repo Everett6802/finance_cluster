@@ -40,6 +40,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetFakeAcsptDetail,
 	InteractiveSessionCommand_RunMultiClis,
 	InteractiveSessionCommand_SwitchLeader,
+	InteractiveSessionCommand_RemoveFollower,
 	InteractiveSessionCommandSize
 };
 
@@ -89,7 +90,8 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_fake_acspt_state", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the states of all fake acepts"},
 	{.command="get_fake_acspt_detail", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the details of all fake acepts"},
 	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
-	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"}
+	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"},
+	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"}
 };
 
 // static const char *interactive_session_command[InteractiveSessionCommandSize] = 
@@ -797,7 +799,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_fake_acspt_state_command,
 		&InteractiveSession::handle_get_fake_acspt_detail_command,
 		&InteractiveSession::handle_run_multi_clis_command,
-		&InteractiveSession::handle_switch_leader_command
+		&InteractiveSession::handle_switch_leader_command,
+		&InteractiveSession::handle_remove_follower_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -1858,6 +1861,55 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 	// printf("[InteractiveSession::handle_switch_leader_command]  node_id: %d\n", ((PNOTIFY_SWITCH_LEADER_CFG)notify_cfg)->get_node_id());
 // Asynchronous event: Synchronous in InteractiveServer and Asynchronous in ClusterManager
 	ret = observer->notify(NOTIFY_SWITCH_LEADER, notify_cfg);
+    SAFE_RELEASE(notify_cfg)
+
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_remove_follower_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	unsigned short ret = RET_SUCCESS;
+	if (argc != 2)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+// Notify the parent
+	int node_id = atoi(argv[1]);
+// Before switching leader, check if the node exists
+	ClusterMap cluster_map;
+	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+	// printf("[InteractiveSession::handle_remove_follower_command] Check1: ret: %s\n", GetErrorDescription(ret));
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (cluster_map.size() == 1)
+	{
+		print_to_console(string("Only single node in the cluster. No followers exist !!!\n"));
+		return RET_WARN_INTERACTIVE_COMMAND;		
+	}
+	bool found = false;
+	ret = cluster_map.check_exist_by_node_id(node_id, found);
+	// printf("[InteractiveSession::handle_remove_follower_command] Check2: node_id: %d, ret: %s\n", node_id, GetErrorDescription(ret));
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (!found)
+	{
+		char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Fails to remove unknown follower[%d]\n", node_id);
+		WRITE_ERROR(buf);
+		print_to_console(string(buf));
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	size_t notify_param_size = sizeof(int) + 1;
+	PNOTIFY_CFG notify_cfg = new NotifyRemoveFollowerCfg((void*)&node_id , notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+	// printf("[InteractiveSession::handle_remove_follower_command]  node_id: %d\n", ((PNOTIFY_SWITCH_LEADER_CFG)notify_cfg)->get_node_id());
+// Asynchronous event: Synchronous in InteractiveServer and Asynchronous in ClusterManager
+	ret = observer->notify(NOTIFY_REMOVE_FOLLOWER, notify_cfg);
     SAFE_RELEASE(notify_cfg)
 
 	return ret;

@@ -90,7 +90,6 @@ const char* GetEventTypeDescription(EventType event_type)
 {
 	static char* event_type_description[] = {
 		"Operate Node",
-		"Rebuild Cluster",
 		"Telnet Console",
 		"Sync Data"
 	};

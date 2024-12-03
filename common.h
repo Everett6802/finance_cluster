@@ -264,6 +264,7 @@ enum MessageType{
 	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Sender -> Receiver
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
 	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
+	MSG_REMOVE_FOLLOWER, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
 };
 
@@ -295,6 +296,7 @@ enum ParamType{
 	// PARAM_GET_LOCAL_TOKEN,
 	PARAM_SENDER_TOKEN,
 	PARAM_ACTION_FREEZE,
+	PARAM_REMOVE_FOLLOWER,
 	PARAM_SIZE
 };
 
@@ -321,6 +323,7 @@ enum NotifyType{
 	NOTIFY_SEND_FILE_DONE,
 	NOTIFY_RECEIVE_FILE_DONE,
 	NOTIFY_SWITCH_LEADER,
+	NOTIFY_REMOVE_FOLLOWER,
 	NOTIFY_ADD_EVENT,
 	NOTIFY_SIZE
 };
@@ -345,7 +348,6 @@ enum UsreptConfigType{
 
 enum EventType{
 	EVENT_OPERATE_NODE,
-	EVENT_REBUILD_CLUSTER,
 	EVENT_TELENT_CONSOLE,
 	EVENT_SYNC_DATA,
 	EVENT_SIZE
@@ -376,12 +378,15 @@ enum EventOperateNodeType{
 	EVENT_OPERATE_NODE_STOP,
 	EVENT_OPERATE_NODE_JOIN,
 	EVENT_OPERATE_NODE_LEAVE,
-	EVENT_OPERATE_NODE_SWITCH,
+	EVENT_OPERATE_NODE_SWITCH_LEADER,
+	EVENT_OPERATE_NODE_REMOVE_FOLLOWER,
 	EVENT_OPERATE_NODE_SIZE
 };
 
 enum EventOperateNodeFailType{
-	EVENT_OPERATE_NODE_FAIL_NO_SERVER,
+	EVENT_OPERATE_NODE_FAIL_START,
+	EVENT_OPERATE_NODE_FAIL_JOIN,
+	EVENT_OPERATE_NODE_FAIL_SWITCH,
 	EVENT_OPERATE_NODE_FAIL_SIZE
 };
 
@@ -638,6 +643,7 @@ public:
 	unsigned short delete_node_by_token(std::string node_token);
 	unsigned short pop_node(ClusterNode** first_node);
 	unsigned short cleanup_node();
+	unsigned short cleanup_node_except_one(int alive_node_id);
 	unsigned short set_first_node(const int first_node_id);
 	unsigned short set_first_node_token(const std::string& first_node_token);
 	unsigned short get_first_node(int& first_node_id, std::string& first_node_token, bool peek_only=false);
@@ -1198,6 +1204,21 @@ public:
 	int get_node_id()const;
 };
 typedef NotifySwitchLeaderCfg* PNOTIFY_SWITCH_LEADER_CFG;
+
+///////////////////////////
+
+class NotifyRemoveFollowerCfg : public NotifyCfg
+{
+private:
+	int node_id;
+
+public:
+	NotifyRemoveFollowerCfg(const void* param, size_t param_size);
+	virtual ~NotifyRemoveFollowerCfg();
+
+	int get_node_id()const;
+};
+typedef NotifyRemoveFollowerCfg* PNOTIFY_REMOVE_FOLLOWER_CFG;
 
 ///////////////////////////
 // A wrapper class for data transition in the NotifyThread class

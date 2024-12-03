@@ -592,7 +592,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		// 		return ret;
 		// }
 		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
-		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, node_token);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH_LEADER, node_type, node_token);
     }
     else
     {
@@ -611,7 +611,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 			deinitialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
 		else
     		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
-		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, cluster_token);
+		WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH_LEADER, node_type, cluster_token);
     }
 
 	// // fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
@@ -2532,6 +2532,16 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_REMOVE_FOLLOWER:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the notification of removing follower for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2716,8 +2726,8 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			    ret = cluster_map.get_node_token(leader_candidate_node_id, leader_candidate_node_token);
 				if (CHECK_FAILURE(ret))
 					return ret;
+				WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH_LEADER, node_type, leader_candidate_node_token.c_str());
 				WRITE_FORMAT_DEBUG("Notify new Leader: %d......", leader_candidate_node_id);
-				WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_SWITCH, node_type, leader_candidate_node_token.c_str());
 // Notify the Followers to rebuild the cluster
 				ret = cluster_node->send(MSG_SWITCH_LEADER, (void*)&leader_candidate_node_id);
 				if (CHECK_FAILURE(ret))
@@ -2753,13 +2763,57 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     			ret = rebuild_cluster(leader_candidate_node_id);
 				if (CHECK_FAILURE(ret))
 				{
-					WRITE_FORMAT_ERROR("Rebuild cluster fails while switching rule, due to: %s", GetErrorDescription(ret));
+					WRITE_FORMAT_ERROR("Rebuild cluster fails while switching leader, due to: %s", GetErrorDescription(ret));
 					return ret;
 				}
     		}
     		else
     		{
-				WRITE_FORMAT_ERROR("Unknown node type: %d while switching rule", node_type);
+				WRITE_FORMAT_ERROR("Unknown node type: %d while switching leader", node_type);
+				return RET_FAILURE_INCORRECT_OPERATION;    			
+    		}
+    	}
+    	break;
+	    case NOTIFY_REMOVE_FOLLOWER:
+    	{
+    		PNOTIFY_REMOVE_FOLLOWER_CFG notify_remove_follower_cfg = (PNOTIFY_REMOVE_FOLLOWER_CFG)notify_cfg;
+    		int follower_node_id = notify_remove_follower_cfg->get_node_id();
+    		// printf("[ClusterMgr::async_handle NOTIFY_REMOVE_FOLLOWER] follower_node_id: %d\n", follower_node_id);
+    		if (node_type == LEADER)
+    		{
+				ClusterMap cluster_map;
+			    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				string follower_node_token;
+			    ret = cluster_map.get_node_token(follower_node_id, follower_node_token);
+				if (CHECK_FAILURE(ret))
+					return ret;
+
+				WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_REMOVE_FOLLOWER, node_type, follower_node_token.c_str());
+				WRITE_FORMAT_DEBUG("Notify the removed Follower: %d......", follower_node_id);
+// Notify the Follower which is removed from the cluster
+				ret = cluster_node->send(MSG_REMOVE_FOLLOWER, (void*)&follower_node_id);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				usleep(1000);
+// Leader remove the Follower from the cluster
+			    ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)follower_node_token.c_str());
+				if (CHECK_FAILURE(ret))
+					return ret;
+    		}
+    		else if (node_type == FOLLOWER)
+    		{
+    			ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)follower_node_id);
+				if (CHECK_FAILURE(ret))
+				{
+					WRITE_FORMAT_ERROR("Rebuild cluster fails while removing follower, due to: %s", GetErrorDescription(ret));
+					return ret;
+				}
+    		}
+    		else
+    		{
+				WRITE_FORMAT_ERROR("Unknown node type: %d while removing follower", node_type);
 				return RET_FAILURE_INCORRECT_OPERATION;    			
     		}
     	}

@@ -725,6 +725,17 @@ unsigned short ClusterMap::cleanup_node()
 	return RET_SUCCESS;
 }
 
+unsigned short ClusterMap::cleanup_node_except_one(int alive_node_id)
+{
+	unsigned short ret = RET_SUCCESS;
+	string alive_node_token;
+	ret = get_node_token(alive_node_id, alive_node_token);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	cleanup_node();
+	return add_node(alive_node_id, alive_node_token);
+}
+
 unsigned short ClusterMap::set_first_node(const int first_node_id)
 {
 // Find the node

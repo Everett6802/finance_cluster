@@ -483,7 +483,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const char* message_
 		&FollowerNode::recv_get_fake_acspt_detail,
 		&FollowerNode::recv_request_file_transfer,
 		&FollowerNode::recv_complete_file_transfer,
-		&FollowerNode::recv_switch_leader
+		&FollowerNode::recv_switch_leader,
+		&FollowerNode::recv_remove_follower
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -514,7 +515,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_get_fake_acspt_detail,
 		&FollowerNode::send_request_file_transfer,
 		&FollowerNode::send_complete_file_transfer,
-		&FollowerNode::send_switch_leader
+		&FollowerNode::send_switch_leader,
+		&FollowerNode::send_remove_follower
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -827,6 +829,23 @@ unsigned short FollowerNode::recv_switch_leader(const char* message_data, int me
     assert(observer != NULL && "observer should NOT be NULL");
 // Synchronous event
 	ret = observer->notify(NOTIFY_SWITCH_LEADER, notify_cfg);
+	return ret;
+}
+
+unsigned short FollowerNode::recv_remove_follower(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | follower node ID | EOD
+	unsigned short ret = RET_SUCCESS;
+	int follower_node_id;
+	memcpy(&follower_node_id, message_data, message_size);
+	// printf("[FollowerNode::recv_remove_follower] follower_node_id: %d, message_size: %d", follower_node_id, message_size);
+	PNOTIFY_CFG notify_cfg = new NotifyRemoveFollowerCfg((void*)&follower_node_id, message_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+    assert(observer != NULL && "observer should NOT be NULL");
+// Synchronous event
+	ret = observer->notify(NOTIFY_REMOVE_FOLLOWER, notify_cfg);
 	return ret;
 }
 
@@ -1232,6 +1251,8 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 
 unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}
 
+unsigned short FollowerNode::send_remove_follower(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REMOVE_FOLLOWER);}
+
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -1247,7 +1268,7 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		local_cluster = *(bool*)param1;
     	}
     	break;
-    	case PARAM_FILE_TRANSFER:
+	    case PARAM_FILE_TRANSFER:
     	{
     		if (param1 == NULL)
     		{
@@ -1256,6 +1277,21 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     		}
 // Notify the leader to connect to the sender and become a receiver
 			ret = send_request_file_transfer(param1);
+			if (CHECK_FAILURE(ret))
+				return ret;	
+    	}
+    	break;
+    	case PARAM_REMOVE_FOLLOWER:
+    	{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			int node_id = *(int*)param1;
+			pthread_mutex_lock(&cluster_map_mtx);
+			ret = cluster_map.cleanup_node_except_one(node_id);
+			pthread_mutex_unlock(&cluster_map_mtx);
 			if (CHECK_FAILURE(ret))
 				return ret;	
     	}

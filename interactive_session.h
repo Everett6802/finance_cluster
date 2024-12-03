@@ -94,6 +94,7 @@ private:
 	unsigned short handle_get_fake_acspt_detail_command(int argc, char **argv);
 	unsigned short handle_run_multi_clis_command(int argc, char **argv);
 	unsigned short handle_switch_leader_command(int argc, char **argv);
+	unsigned short handle_remove_follower_command(int argc, char **argv);
 	unsigned short print_to_console(const std::string& response)const;
 	unsigned short print_prompt_to_console()const;
 

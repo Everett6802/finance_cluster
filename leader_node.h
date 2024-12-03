@@ -83,6 +83,7 @@ private:
 	unsigned short recv_request_file_transfer(const char* message_data, int message_size);
 	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
 	unsigned short recv_switch_leader(const char* message_data, int message_size);
+	unsigned short recv_remove_follower(const char* message_data, int message_size);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -100,6 +101,7 @@ private:
 	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_switch_leader(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_remove_follower(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 	void dump_node_channel_map()const;
 	void dump_node_keepalive_map()const;

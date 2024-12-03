@@ -434,6 +434,7 @@ unsigned short InteractiveServer::notify(NotifyType notify_type, void* notify_pa
       	case NOTIFY_CONTROL_FAKE_ACSPT:
       	case NOTIFY_CONTROL_FAKE_USREPT:
       	case NOTIFY_SWITCH_LEADER:
+		case NOTIFY_REMOVE_FOLLOWER:
     	{
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");

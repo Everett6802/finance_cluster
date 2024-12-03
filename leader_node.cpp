@@ -784,7 +784,8 @@ unsigned short LeaderNode::recv(MessageType message_type, const char* message_da
 		&LeaderNode::recv_get_fake_acspt_detail,
 		&LeaderNode::recv_request_file_transfer,
 		&LeaderNode::recv_complete_file_transfer,
-		&LeaderNode::recv_switch_leader
+		&LeaderNode::recv_switch_leader,
+		&LeaderNode::recv_remove_follower
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -816,7 +817,8 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_fake_acspt_detail,
 		&LeaderNode::send_request_file_transfer,
 		&LeaderNode::send_complete_file_transfer,
-		&LeaderNode::send_switch_leader
+		&LeaderNode::send_switch_leader,
+		&LeaderNode::send_remove_follower
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -1024,6 +1026,8 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 }
 
 unsigned short LeaderNode::recv_switch_leader(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
+
+unsigned short LeaderNode::recv_remove_follower(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REMOVE_FOLLOWER);}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -1454,6 +1458,28 @@ unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* 
 	return send_raw_data(MSG_SWITCH_LEADER, buf, BUF_SIZE);
 }
 
+unsigned short LeaderNode::send_remove_follower(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: leader candidate node id
+// Message format:
+// EventType | text | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	static const int BUF_SIZE = sizeof(int); // + 1;
+	int follower_node_id = *(int*)param1;
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, BUF_SIZE);
+	// snprintf(buf, BUF_SIZE, "%d", leader_candidate_node_id);
+	memcpy(buf, &follower_node_id, BUF_SIZE);
+	// printf("[LeaderNode::send_switch_leader]  leader_candidate_node_id: %d\n", leader_candidate_node_id);
+	// return send_string_data(MSG_SWITCH_LEADER, buf);
+	return send_raw_data(MSG_REMOVE_FOLLOWER, buf, BUF_SIZE);
+}
+
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -1531,6 +1557,16 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 						node_channel->freeze_action();
 				}
 			}
+    	}
+    	break;
+      	case PARAM_REMOVE_FOLLOWER:
+    	{
+    		char* follower_token = (char*)param1;
+    		WRITE_FORMAT_WARN("Remove the follower[%s] from the cluster", follower_token);
+    		ret = remove_follower(follower_token);
+    		if (CHECK_FAILURE(ret))
+    			WRITE_FORMAT_ERROR("Fails to remove follower[%s], due to: %s", follower_token, GetErrorDescription(ret));
+			PRINT("The Channel between Follower[%s] and Leader is Removed......\n", follower_token);
     	}
     	break;
     	default:

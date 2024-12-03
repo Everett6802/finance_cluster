@@ -800,6 +800,25 @@ int NotifySwitchLeaderCfg::get_node_id()const
 	return node_id;
 }
 
+//////////////////////////////////////////////////////////
+
+NotifyRemoveFollowerCfg::NotifyRemoveFollowerCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_REMOVE_FOLLOWER, param, param_size)
+{
+// Caution: don't implement as below. The types of char and int are different. Can't be transformed directly
+	// node_id = *(int*)notify_param;
+	// node_id = atoi((char*)notify_param);
+	memcpy(&node_id, notify_param, param_size);
+	// fprintf(stderr, "[NotifyRemoveFollowerCfg::NotifyRemoveFollowerCfg] param:%s, param_size: %d, node_id: %d\n", (char*)param, param_size, node_id);
+}
+
+NotifyRemoveFollowerCfg::~NotifyRemoveFollowerCfg(){}
+
+int NotifyRemoveFollowerCfg::get_node_id()const
+{
+	return node_id;
+}
+
 ///////////////////////////
 
 NotifyEventCfg::NotifyEventCfg(EventCfg* param) :
