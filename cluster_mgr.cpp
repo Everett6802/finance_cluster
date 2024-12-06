@@ -2804,7 +2804,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     		}
     		else if (node_type == FOLLOWER)
     		{
-    			ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)follower_node_id);
+    			ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)&follower_node_id);
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR("Rebuild cluster fails while removing follower, due to: %s", GetErrorDescription(ret));

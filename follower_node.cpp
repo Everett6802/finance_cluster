@@ -1288,9 +1288,22 @@ unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-			int node_id = *(int*)param1;
+			int alive_node_id = *(int*)param1;
+			string alive_node_token;
 			pthread_mutex_lock(&cluster_map_mtx);
-			ret = cluster_map.cleanup_node_except_one(node_id);
+// re-build the cluster map
+			ret = cluster_map.get_node_token(alive_node_id, alive_node_token);
+			if (CHECK_FAILURE(ret))
+				goto OUT;
+			cluster_map.cleanup_node();
+			ret = cluster_map.add_node(cluster_id, cluster_token);
+			if (CHECK_FAILURE(ret))
+				goto OUT;
+			ret = cluster_map.add_node(alive_node_id, alive_node_token);
+			if (CHECK_FAILURE(ret))
+				goto OUT;
+			// ret = cluster_map.cleanup_node_except_one(node_id);
+OUT:
 			pthread_mutex_unlock(&cluster_map_mtx);
 			if (CHECK_FAILURE(ret))
 				return ret;	

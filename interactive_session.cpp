@@ -1837,7 +1837,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 		return ret;
 	if (cluster_map.size() == 1)
 	{
-		print_to_console(string("Only single node in the cluster. Switching leader does NOT take effect\n"));
+		print_to_console(string("Only single node in the cluster. Switching LEADER does NOT take effect\n"));
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	bool found = false;
@@ -1848,7 +1848,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 	if (!found)
 	{
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Fails to switch unknown node[%d] to leader\n", node_id);
+		snprintf(buf, DEF_STRING_SIZE, "Fails to switch unknown node[%d] to LEADER\n", node_id);
 		WRITE_ERROR(buf);
 		print_to_console(string(buf));
 		return RET_WARN_INTERACTIVE_COMMAND;
@@ -1877,7 +1877,7 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
 // Notify the parent
-	int node_id = atoi(argv[1]);
+	int follower_node_id = atoi(argv[1]);
 // Before switching leader, check if the node exists
 	ClusterMap cluster_map;
 	ret = manager->get(PARAM_CLUSTER_MAP, (void*)&cluster_map);
@@ -1886,25 +1886,37 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 		return ret;
 	if (cluster_map.size() == 1)
 	{
-		print_to_console(string("Only single node in the cluster. No followers exist !!!\n"));
+		print_to_console(string("Only single node in the cluster. No FOLLOWERs exist !!!\n"));
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	bool found = false;
-	ret = cluster_map.check_exist_by_node_id(node_id, found);
+	ret = cluster_map.check_exist_by_node_id(follower_node_id, found);
 	// printf("[InteractiveSession::handle_remove_follower_command] Check2: node_id: %d, ret: %s\n", node_id, GetErrorDescription(ret));
 	if (CHECK_FAILURE(ret))
 		return ret;
 	if (!found)
 	{
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Fails to remove unknown follower[%d]\n", node_id);
+		snprintf(buf, DEF_STRING_SIZE, "Fails to remove unknown FOLLOWER[%d]\n", follower_node_id);
+		WRITE_ERROR(buf);
+		print_to_console(string(buf));
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	int leader_node_id;
+	ret = cluster_map.get_node_id(node_token, leader_node_id);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (leader_node_id == follower_node_id)
+	{
+		char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Fails to remove the node[%d] since it's LEADER\n", follower_node_id);
 		WRITE_ERROR(buf);
 		print_to_console(string(buf));
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
 
 	size_t notify_param_size = sizeof(int) + 1;
-	PNOTIFY_CFG notify_cfg = new NotifyRemoveFollowerCfg((void*)&node_id , notify_param_size);
+	PNOTIFY_CFG notify_cfg = new NotifyRemoveFollowerCfg((void*)&follower_node_id , notify_param_size);
 	if (notify_cfg == NULL)
 		throw bad_alloc();
 	// printf("[InteractiveSession::handle_remove_follower_command]  node_id: %d\n", ((PNOTIFY_SWITCH_LEADER_CFG)notify_cfg)->get_node_id());
