@@ -288,8 +288,16 @@ OUT:
 #include <ctime>
 #include <iostream>
 
+
 int main(int argc, char** argv)
 {
+	// char *old_string = "  New FOLLOWER[10.206.24.61] join";
+	// string new_string;
+	// remove_space_from_sides(new_string, old_string);
+	// printf("Old: %s, %d\n", old_string, strlen(old_string));
+	// printf("New: %s, %d\n", new_string.c_str(), new_string.length());
+	// exit(0);
+
     // std::time_t t = std::time(0);   // get time now
     // std::tm* now = std::localtime(&t);
     // std::cout << (now->tm_year + 1900) << '-' 

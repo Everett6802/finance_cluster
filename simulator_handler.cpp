@@ -372,7 +372,7 @@ unsigned short SimulatorHandler::apply_new_fake_acspt_config(const list<string>&
 	}
 // Read the config in simulator
 	list<string> simulator_config_line_list;
-	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r", ',', false);
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r"/*, ','*/, false);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_cfg_filepath, GetErrorDescription(ret));
@@ -464,7 +464,7 @@ unsigned short SimulatorHandler::get_fake_acspt_config_value(const std::list<std
 	}
 // Read the config in simulator
 	list<string> simulator_config_line_list;
-	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r", ',', false);
+	ret = read_file_lines_ex(simulator_config_line_list, fake_acspt_cfg_filepath, "r"/*, ','*/, false);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_acspt_cfg_filepath, GetErrorDescription(ret));
@@ -521,7 +521,7 @@ unsigned short SimulatorHandler::apply_new_fake_usrept_config(const list<string>
 	}
 // Read the config in simulator
 	list<string> simulator_config_line_list;
-	ret = read_file_lines_ex(simulator_config_line_list, fake_usrept_cfg_bak_filepath, "r", ',', false);
+	ret = read_file_lines_ex(simulator_config_line_list, fake_usrept_cfg_bak_filepath, "r"/*, ','*/, false);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_ERROR("Fail to read the simulator config file[%s], due to: %s", fake_usrept_cfg_filepath, GetErrorDescription(ret));

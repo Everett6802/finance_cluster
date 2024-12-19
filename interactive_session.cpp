@@ -20,6 +20,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetRole,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
+	InteractiveSessionCommand_ListEvent,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_GetConfigurationSetupInfo,
 	InteractiveSessionCommand_StartSystemMonitor,
@@ -72,6 +73,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
+	{.command="list_event", .authority=AUTHORITY_ALL, .description="List events"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
@@ -780,6 +782,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_role_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
+		&InteractiveSession::handle_list_event_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_configuration_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
@@ -1041,6 +1044,59 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 		break;
 	}
 	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_list_event_command(int argc, char **argv)
+{
+	// assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	list<EventEntry*> event_list;
+	list<string> event_line_list;
+	ret = event_recorder->read(&event_list, &event_line_list);
+	if (CHECK_SUCCESS(ret))
+	{
+		int event_size = event_list.size();
+		if (event_size != 0)
+			print_to_console(string("\n"));
+		list<EventEntry*>::iterator iter_event = event_list.begin();
+		list<string>::iterator iter_event_line = event_line_list.begin();
+		int event_count = 0;
+		while (iter_event != event_list.end())
+		{
+			EventEntry* event_entry = (PEVENT_ENTRY)*iter_event;
+			string event_line = (string)*iter_event_line + string("\n");
+			print_to_console(event_line);
+			iter_event++;
+			iter_event_line++;
+			event_count++;
+		}
+		if (event_size != 0)
+		{
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "\n ***  %d event(s) found  ***\n", event_count);
+			print_to_console(string(buf) + string("\n"));
+		}
+	} 
+	list<EventEntry*>::iterator iter_clean = event_list.begin();
+	while (iter_clean != event_list.end())
+	{
+		PEVENT_ENTRY event_entry = (PEVENT_ENTRY)*iter_clean;
+		if (event_entry != NULL)
+		{
+			delete event_entry;
+			event_entry = NULL;
+		}
+		iter_clean++;
+	}
+	event_list.clear();
+	return ret;
 }
 
 // unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
