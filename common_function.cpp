@@ -86,43 +86,95 @@ const char *GetErrorDescription(unsigned short ret)
 	throw runtime_error(buf);
 }
 
+static char* EVENT_TYPE_DESCRIPTION[] = {
+	"Operate Node",
+	"Telnet Console",
+	"Sync Data"
+};
+static int EVENT_TYPE_DESCRIPTION_SIZE = sizeof(EVENT_TYPE_DESCRIPTION) / sizeof(EVENT_TYPE_DESCRIPTION[0]);
+
 const char* GetEventTypeDescription(EventType event_type)
 {
-	static char* event_type_description[] = {
-		"Operate Node",
-		"Telnet Console",
-		"Sync Data"
-	};
-	static int event_type_description_size = sizeof(event_type_description) / sizeof(event_type_description[0]);
 	assert(event_type >= 0 && event_type < EVENT_SIZE && "event type is out of range");
-	assert(event_type_description_size == EVENT_SIZE && "event_type_description_size != EVENT_SIZE");
-	return event_type_description[event_type];
+	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_SIZE");
+	return EVENT_TYPE_DESCRIPTION[event_type];
 }
+
+EventType GetEventTypeFromDescription(const char* event_type_description)
+{
+	assert(event_type_description != NULL && "event_type_description should NOT be NULL");
+	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_SIZE");
+	for (int i = 0 ; i < EVENT_SIZE ; i++)
+	{
+		if (strcmp(event_type_description, EVENT_TYPE_DESCRIPTION[i]) == 0)
+			return (EventType)i;
+	}
+    static const int BUF_SIZE = 256;
+    char buf[BUF_SIZE];
+    snprintf(buf, BUF_SIZE, "Unknown event type description: %s", event_type_description);
+    // fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+	throw invalid_argument(buf);
+}
+
+static char* EVENT_SEVERITY_DESCRIPTION[] = {
+	"Critical",
+	"Warning",
+	"Informational"
+};
+static int EVENT_SEVERITY_DESCRIPTION_SIZE = sizeof(EVENT_SEVERITY_DESCRIPTION) / sizeof(EVENT_SEVERITY_DESCRIPTION[0]);
 
 const char* GetEventSeverityDescription(EventSeverity event_severity)
 {
-	static char* event_severity_description[] = {
-		"Critical",
-		"Warning",
-		"Informational"
-	};
-	static int event_severity_description_size = sizeof(event_severity_description) / sizeof(event_severity_description[0]);
 	assert(event_severity >= 0 && event_severity < EVENT_SEVERITY_SIZE && "event severity is out of range");
-	assert(event_severity_description_size == EVENT_SEVERITY_SIZE && "event_severity_description_size != EVENT_SEVERITY_SIZE");
-	return event_severity_description[event_severity];
+	assert(EVENT_SEVERITY_DESCRIPTION_SIZE == EVENT_SEVERITY_SIZE && "EVENT_SEVERITY_DESCRIPTION_SIZE != EVENT_SEVERITY_SIZE");
+	return EVENT_SEVERITY_DESCRIPTION[event_severity];
 }
+
+EventSeverity GetEventSeverityFromDescription(const char* event_severity_description)
+{
+	assert(event_severity_description != NULL && "event_severity_description should NOT be NULL");
+	assert(EVENT_SEVERITY_DESCRIPTION_SIZE == EVENT_SEVERITY_SIZE && "EVENT_SEVERITY_DESCRIPTION_SIZE != EVENT_SEVERITY_SIZE");
+	for (int i = 0 ; i < EVENT_SEVERITY_SIZE ; i++)
+	{
+		if (strcmp(event_severity_description, EVENT_SEVERITY_DESCRIPTION[i]) == 0)
+			return (EventSeverity)i;
+	}
+    static const int BUF_SIZE = 256;
+    char buf[BUF_SIZE];
+    snprintf(buf, BUF_SIZE, "Unknown event severity description: %s", event_severity_description);
+    // fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+	throw invalid_argument(buf);
+}
+
+static char* EVENT_CATEGORY_DESCRIPTION[] = {
+	"Cluter",
+	"Console"
+};
+static int event_category_description_size = sizeof(EVENT_CATEGORY_DESCRIPTION) / sizeof(EVENT_CATEGORY_DESCRIPTION[0]);
 
 const char* GetEventCategoryDescription(EventCategory event_category)
 {
-	static char* event_category_description[] = {
-		"Cluter",
-		"Console"
-	};
-	static int event_category_description_size = sizeof(event_category_description) / sizeof(event_category_description[0]);
 	// printf("Event Category: %d\n", (int)event_category);
 	assert(event_category >= 0 && event_category < EVENT_CATEGORY_SIZE && "event category is out of range");
 	assert(event_category_description_size == EVENT_CATEGORY_SIZE && "event_category_description_size != EVENT_CATEGORY_SIZE");
-	return event_category_description[event_category];
+	return EVENT_CATEGORY_DESCRIPTION[event_category];
+}
+
+EventCategory GetEventCategoryFromDescription(const char* event_category_description)
+{
+	// printf("Event Category: %d\n", (int)event_category);
+	assert(event_category_description != NULL && "event_category_description should NOT be NULL");
+	assert(event_category_description_size == EVENT_CATEGORY_SIZE && "event_category_description_size != EVENT_CATEGORY_SIZE");
+	for (int i = 0 ; i < EVENT_CATEGORY_SIZE ; i++)
+	{
+		if (strcmp(event_category_description, EVENT_CATEGORY_DESCRIPTION[i]) == 0)
+			return (EventCategory)i;
+	}
+    static const int BUF_SIZE = 256;
+    char buf[BUF_SIZE];
+    snprintf(buf, BUF_SIZE, "Unknown event category description: %s", event_category_description);
+    // fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+	throw invalid_argument(buf);
 }
 
 const char* GetEventDeviceDescription(EventDevice event_device)
@@ -230,7 +282,7 @@ unsigned short get_file_line_count(unsigned int &line_count, const char* filepat
 	return RET_SUCCESS;	
 }
 
-unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute, char data_seperate_character, bool ignore_comment)
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute/*, char data_seperate_character*/, bool ignore_comment)
 {
 	if (!check_file_exist(filepath))
 	{

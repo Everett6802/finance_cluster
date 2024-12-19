@@ -287,9 +287,43 @@ OUT:
 
 #include <ctime>
 #include <iostream>
+#include <time.h>
+
 
 int main(int argc, char** argv)
 {
+	// char* search_time_str = "2024-12-23 10:57:09";
+	// tm search_tm;
+	// strptime(search_time_str, "%Y-%m-%d %H:%M:%S", &search_tm);
+	// time_t search_time = mktime(&search_tm);   
+
+    // time_t     cur_time = time(0);
+	// time_t     prev_time = cur_time - 86400;
+    // struct tm  tstruct;
+    // char       buf[80];
+    // tstruct = *localtime(&cur_time);
+    // strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tstruct);
+	// printf("Cur Time: %s\n", buf);
+    // tstruct = *localtime(&prev_time);
+    // strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tstruct);
+	// printf("Prev Time: %s\n", buf);
+	// bool in_the_range = true;
+	// if (search_time < prev_time)
+	// 	in_the_range = false;
+	// else if (search_time > cur_time)
+	// 	in_the_range = false;
+	// printf("Search time[%s] %s in the range\n", search_time_str, (in_the_range ? "is" : "is NOT"));
+
+	// exit(0);
+
+
+	// char *old_string = "  New FOLLOWER[10.206.24.61] join";
+	// string new_string;
+	// remove_space_from_sides(new_string, old_string);
+	// printf("Old: %s, %d\n", old_string, strlen(old_string));
+	// printf("New: %s, %d\n", new_string.c_str(), new_string.length());
+	// exit(0);
+
     // std::time_t t = std::time(0);   // get time now
     // std::tm* now = std::localtime(&t);
     // std::cout << (now->tm_year + 1900) << '-' 

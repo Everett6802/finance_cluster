@@ -414,15 +414,18 @@ typedef CHAR_LIST* PCHAR_LIST;
 
 const char* GetErrorDescription(unsigned short ret);
 const char* GetEventTypeDescription(EventType event_type);
+EventType GetEventTypeFromDescription(const char* event_type_description);
 const char* GetEventSeverityDescription(EventSeverity event_severity);
+EventSeverity GetEventSeverityFromDescription(const char* event_severity_description);
 const char* GetEventCategoryDescription(EventCategory event_category);
+EventCategory GetEventCategoryFromDescription(const char* event_category_description);
 const char* GetEventDeviceDescription(EventDevice event_device);
 
 unsigned short get_local_interface_ip(std::map<std::string, std::string>& interface_ip_map);
 bool check_file_exist(const char* filepath); // folder or file
 bool check_config_file_exist(const char* config_filename);
 unsigned short get_file_line_count(unsigned int &line_count, const char* filepath);
-unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute="r", char data_seperate_character=',', bool ignore_comment=true);
+unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char* filepath, const char* file_read_attribute="r"/*, char data_seperate_character=','*/, bool ignore_comment=true);
 unsigned short read_config_file_lines_ex(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_file_read_attribute, const char* config_folderpath=NULL);
 unsigned short read_config_file_lines(std::list<std::string>& conf_line_list, const char* config_filename, const char* config_folderpath=NULL);
 unsigned short write_file_lines_ex(const std::list<std::string>& line_list, const char* filepath, const char* file_write_attribute="w", const char* newline_character="\n");
@@ -491,6 +494,8 @@ public:
 typedef IFileTx* PIFILE_TX;
 
 class EventCfg;
+struct EventEntry;
+struct EventSearchCriterion;
 
 class IEventDeviceAccess
 {
@@ -501,7 +506,7 @@ public:
 	virtual unsigned short deinitialize()=0;
 	virtual EventDevice get_type()const=0;
 	virtual unsigned short write(const EventCfg* event_cfg)=0;
-	virtual unsigned short read()=0;
+	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL)=0;
 };
 typedef IEventDeviceAccess* PIEVENT_DEVICE_ACCESS;
 
@@ -1438,6 +1443,35 @@ typedef MonitorSystemTimerThread* PMONITOR_SYSTEM_TIMER_THREAD;
 
 ///////////////////////////////////////////////////
 
+struct EventEntry
+{
+	tm event_time;
+	EventType event_type;
+	EventSeverity event_severity;
+	EventCategory event_category;
+	std::string event_description;
+};
+typedef EventEntry* PEVENT_ENTRY;
+enum EventEntryField{EVENT_ENTRY_FIELD_TIME, EVENT_ENTRY_FIELD_TYPE, EVENT_ENTRY_FIELD_SEVERITY, EVENT_ENTRY_FIELD_CATEGORY, EVENT_ENTRY_FIELD_DESCRIPTION, EVENT_ENTRY_FIELD_SIZE};
+
+///////////////////////////////////////////////////
+
+struct EventSearchCriterion
+{
+	bool need_search_event_time;
+	time_t event_time_begin;
+	time_t event_time_end;
+	bool need_search_event_type;
+	EventType search_event_type;
+	bool need_search_event_severity;
+	EventSeverity search_event_severity;
+	bool need_search_event_category;
+	EventCategory search_event_category;
+};
+typedef EventSearchCriterion* PEVENT_SEARCH_CRITERION;
+
+///////////////////////////////////////////////////
+
 class EventFileAccess : public IEventDeviceAccess
 {
 	DECLARE_MSG_DUMPER()
@@ -1446,6 +1480,8 @@ class EventFileAccess : public IEventDeviceAccess
 
 private:
 	FILE* event_log_fp;
+	const char* get_event_log_filepath()const;
+	unsigned short remove_space_from_sides(std::string& new_string, const char* old_string);
 
 public:
 	EventFileAccess();
@@ -1455,7 +1491,7 @@ public:
 	virtual unsigned short deinitialize();
 	virtual EventDevice get_type()const;
 	virtual unsigned short write(const EventCfg* event_cfg);
-	virtual unsigned short read();
+	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL);
 };
 
 ///////////////////////////////////////////////////
@@ -1505,7 +1541,7 @@ public:
 	int release(const char* callable_file_name, unsigned long callable_line_no);
 
 	unsigned short write(const PEVENT_CFG event_cfg);
-	unsigned short read();
+	unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL);
 };
 typedef EventRecorder* PIEVENT_RECORDER;
 

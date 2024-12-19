@@ -1710,20 +1710,87 @@ EventFileAccess::~EventFileAccess()
 	RELEASE_MSG_DUMPER()
 }
 
+const char* EventFileAccess::get_event_log_filepath()const
+{
+	static char* event_log_filepath = NULL;
+	if (event_log_filepath == NULL)
+	{
+		char current_working_directory[DEF_LONG_STRING_SIZE];
+		getcwd(current_working_directory, sizeof(current_working_directory));
+		event_log_filepath = new char[DEF_LONG_STRING_SIZE];
+		if (event_log_filepath == NULL)
+			throw bad_alloc();
+		snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
+	}
+	return event_log_filepath;
+}
+
+// unsigned short EventFileAccess::remove_space_from_sides(char **new_string, const char* old_string)
+unsigned short EventFileAccess::remove_space_from_sides(string& new_string, const char* old_string)
+{
+	assert(old_string != NULL && "old_string should NOT be NULL");
+	// unsigned short ret = RET_SUCCESS;
+	int string_len = strlen(old_string); 
+	int start_index = 0;
+	int end_index = strlen(old_string);
+	bool start_index_found = false;
+	for (int i = 0 ; i < string_len ; i++)
+	{
+		if (old_string[i] != ' ')
+		{
+			start_index = i;
+			start_index_found = true;
+			break;
+		}
+	}
+	if (!start_index_found)
+	{
+		WRITE_FORMAT_ERROR("Fails to find the start index: %s", old_string);
+		return RET_FAILURE_INCORRECT_VALUE;
+	}
+	 
+	bool end_index_found = false;
+	for (int j = string_len - 1 ; j >= 0 ; j--)
+	{
+		if (old_string[j] != ' ')
+		{
+			end_index = j;
+			end_index_found = true;
+			break;
+		}
+	}
+	if (!end_index_found)
+	{
+		WRITE_FORMAT_ERROR("Fails to find the end index: %s", old_string);
+		return RET_FAILURE_INCORRECT_VALUE;
+	}
+
+	int new_string_len = end_index - start_index + 1;
+	char* new_string_tmp = new char[new_string_len + 1];
+	if (new_string_tmp == NULL)
+		throw bad_alloc();
+	strncpy(new_string_tmp, &old_string[start_index], new_string_len);
+	// *new_string = new_string_tmp;
+	new_string = std::string(new_string_tmp);
+	delete[] new_string_tmp;
+	return RET_SUCCESS;
+}
+
 unsigned short EventFileAccess::initialize()
 {
-    char current_working_directory[DEF_LONG_STRING_SIZE];
-  	getcwd(current_working_directory, sizeof(current_working_directory));
-    char event_log_filepath[DEF_LONG_STRING_SIZE];
-    snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
+    // char current_working_directory[DEF_LONG_STRING_SIZE];
+  	// getcwd(current_working_directory, sizeof(current_working_directory));
+    // char event_log_filepath[DEF_LONG_STRING_SIZE];
+    // snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
 
- 	WRITE_FORMAT_ERROR("Open the event log file: %s", event_log_filepath);
-	event_log_fp = fopen(event_log_filepath, "a+");
+ 	WRITE_FORMAT_ERROR("Open the event log file: %s", get_event_log_filepath());
+	event_log_fp = fopen(get_event_log_filepath(), "a+");
  	if (event_log_fp == NULL)
  	{
  		WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
   		return RET_FAILURE_SYSTEM_API;	
   	}
+	return RET_SUCCESS;
 }
 
 unsigned short EventFileAccess::deinitialize()
@@ -1734,6 +1801,7 @@ unsigned short EventFileAccess::deinitialize()
 		fclose(event_log_fp);
 		event_log_fp = NULL;
 	}
+	return RET_SUCCESS;
 }
 
 EventDevice EventFileAccess::get_type()const{return EVENT_DEVICE_FILE;}
@@ -1768,9 +1836,126 @@ Here, the programmer can use the fflush function to make sure that the current s
 	return ret;
 }
 
-unsigned short EventFileAccess::read()
+unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string>* event_line_list, EventSearchCriterion* event_search_criterion)
 {
 	unsigned short ret = RET_SUCCESS;
+	list<string>* line_list = NULL;
+	if (event_line_list != NULL && event_search_criterion == NULL)
+		line_list = event_line_list;
+	else
+	{
+		line_list = new list<string>;
+		if (line_list == NULL)
+			throw bad_alloc();
+	}
+	ret = read_file_lines_ex(*line_list, get_event_log_filepath());
+	if (CHECK_FAILURE(ret))
+		return ret;
+	// printf("line_list size: %d\n", line_list->size());
+	list<string>::iterator iter = line_list->begin();
+	while(iter != line_list->end())
+	{
+// Can NOT do in this way. The line variable is empty
+		// char* line = (char*)((string)*iter).c_str();
+		char* line = strdup((char*)((string)*iter).c_str());
+		if (line == NULL)
+			throw bad_alloc();
+		// printf("line: %s\n", line);
+		char* line_field_tmp;
+		char* rest_line_field;
+		int line_field_count = 0;
+		PEVENT_ENTRY event_entry = new EventEntry;
+		if (event_entry == NULL) throw bad_alloc();
+// Parse the data
+		char* line_tmp = line;
+		while ((line_field_tmp = strtok_r(line_tmp, "|", &rest_line_field)) != NULL)
+		{
+			string line_field;
+			ret = remove_space_from_sides(line_field, line_field_tmp);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			// printf("%d  line_field: %s\n", line_field_count, line_field.c_str());
+			switch(line_field_count)
+			{
+				case EVENT_ENTRY_FIELD_TIME:
+				{
+					strptime(line_field.c_str(), "%Y-%m-%d %H:%M:%S", &event_entry->event_time);
+				}
+				break;
+				case EVENT_ENTRY_FIELD_TYPE:
+				{
+					event_entry->event_type = GetEventTypeFromDescription(line_field.c_str());
+				}
+				break;
+				case EVENT_ENTRY_FIELD_SEVERITY:
+				{
+					event_entry->event_severity = GetEventSeverityFromDescription(line_field.c_str());
+				}
+				break;
+				case EVENT_ENTRY_FIELD_CATEGORY:
+				{
+					event_entry->event_category = GetEventCategoryFromDescription(line_field.c_str());
+				}
+				break;
+				case EVENT_ENTRY_FIELD_DESCRIPTION:
+				{
+					event_entry->event_description = line_field;
+				}
+				break;
+				default:
+				{
+					WRITE_FORMAT_ERROR("Unknown event entry field type: %d", line_field_count);
+					return RET_FAILURE_INTERNAL_ERROR;
+				}
+				break;
+			}
+			if (line_tmp != NULL) line_tmp = NULL;
+			line_field_count++;
+		}
+		if (line != NULL)
+		{
+			free(line);
+			line = NULL;
+		}
+// Exploit the search criterion if necessary
+		if (event_search_criterion != NULL)
+		{
+			// char buf1[80], buf2[80];
+			// strftime(buf1, sizeof(buf1), "%Y-%m-%d %H:%M", &event_entry->event_time);
+			// time_t event_time = mktime(&event_entry->event_time);
+			// tm tstruct = *localtime(&event_time);
+			// strftime(buf2, sizeof(buf2), "%Y-%m-%d %H:%M", &tstruct);
+			// printf("Time: %s | %s, Type: %d, Severity: %d, Category: %d\n", buf1, buf2, event_entry->event_type, event_entry->event_severity, event_entry->event_category);
+			if (event_search_criterion->need_search_event_time)
+			{
+				time_t event_time = mktime(&event_entry->event_time);
+				if (event_time < event_search_criterion->event_time_begin)
+					goto OUT;
+				else if (event_time > event_search_criterion->event_time_end)
+					goto OUT;
+			}
+			if (event_search_criterion->need_search_event_type && event_search_criterion->search_event_type != event_entry->event_type)
+				goto OUT;
+			if (event_search_criterion->need_search_event_severity && event_search_criterion->search_event_severity != event_entry->event_severity)
+				goto OUT;
+			if (event_search_criterion->need_search_event_category && event_search_criterion->search_event_category != event_entry->event_category)
+				goto OUT;
+		}
+		event_list->push_back(event_entry);
+		if (event_line_list != NULL)
+			event_line_list->push_back((string)*iter);
+OUT:
+		iter++;
+	}	
+	if (event_line_list == NULL)
+	{
+		if (line_list != NULL)
+		{
+			delete line_list;
+			line_list = NULL;
+		}
+	}
+
 	return ret;
 }
 
@@ -1953,8 +2138,10 @@ unsigned short EventRecorder::write(const PEVENT_CFG event_cfg)
 	return ret;
 }
 
-unsigned short EventRecorder::read()
+unsigned short EventRecorder::read(list<EventEntry*>* event_list, list<string>* event_line_list, EventSearchCriterion* event_search_criterion)
 {
 	unsigned short ret = RET_SUCCESS;
+	assert(event_list != NULL && "event_list should NOT be NULL");
+    ret = event_device_access->read(event_list, event_line_list, event_search_criterion);
 	return ret;
 }
