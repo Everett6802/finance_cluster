@@ -295,7 +295,8 @@ int main(int argc, char** argv)
 	// char* search_time_str = "2024-12-23 10:57:09";
 	// tm search_tm;
 	// strptime(search_time_str, "%Y-%m-%d %H:%M:%S", &search_tm);
-	// time_t search_time = mktime(&search_tm);   
+	// time_t search_time = mktime(&search_tm);
+	// printf("Time: %s -> %d-%02d-%02d %02d:%02d:%02d -> %d -> %s\n", search_time_str, search_tm.tm_year + 1900, search_tm.tm_mon + 1, search_tm.tm_mday, search_tm.tm_hour, search_tm.tm_min, search_tm.tm_sec, search_time, ctime(&search_time));
 
     // time_t     cur_time = time(0);
 	// time_t     prev_time = cur_time - 86400;
@@ -315,7 +316,6 @@ int main(int argc, char** argv)
 	// printf("Search time[%s] %s in the range\n", search_time_str, (in_the_range ? "is" : "is NOT"));
 
 	// exit(0);
-
 
 	// char *old_string = "  New FOLLOWER[10.206.24.61] join";
 	// string new_string;

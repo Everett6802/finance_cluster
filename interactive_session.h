@@ -74,7 +74,7 @@ private:
 	unsigned short handle_get_role_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_system_info_command(int argc, char **argv);
-	unsigned short handle_list_event_command(int argc, char **argv);
+	unsigned short handle_search_event_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
 	unsigned short handle_get_configuration_setup_command(int argc, char **argv);
 	unsigned short handle_start_system_monitor_command(int argc, char **argv);

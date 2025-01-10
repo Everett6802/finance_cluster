@@ -1459,8 +1459,8 @@ enum EventEntryField{EVENT_ENTRY_FIELD_TIME, EVENT_ENTRY_FIELD_TYPE, EVENT_ENTRY
 struct EventSearchCriterion
 {
 	bool need_search_event_time;
-	time_t event_time_begin;
-	time_t event_time_end;
+	time_t search_event_time_begin;
+	time_t search_event_time_end;
 	bool need_search_event_type;
 	EventType search_event_type;
 	bool need_search_event_severity;

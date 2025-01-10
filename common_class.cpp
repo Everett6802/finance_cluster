@@ -1880,6 +1880,8 @@ unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string
 				case EVENT_ENTRY_FIELD_TIME:
 				{
 					strptime(line_field.c_str(), "%Y-%m-%d %H:%M:%S", &event_entry->event_time);
+					event_entry->event_time.tm_isdst = -1; // Add this line to avoid the field is NOT defined overwise an out-of-range error occurs while calling mktime()
+					// printf("Time: %s -> %d-%02d-%02d %02d:%02d:%02d\n", line_field.c_str(), event_entry->event_time.tm_year + 1900, event_entry->event_time.tm_mon + 1, event_entry->event_time.tm_mday, event_entry->event_time.tm_hour, event_entry->event_time.tm_min, event_entry->event_time.tm_sec);
 				}
 				break;
 				case EVENT_ENTRY_FIELD_TYPE:
@@ -1912,26 +1914,18 @@ unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string
 			if (line_tmp != NULL) line_tmp = NULL;
 			line_field_count++;
 		}
-		if (line != NULL)
-		{
-			free(line);
-			line = NULL;
-		}
 // Exploit the search criterion if necessary
 		if (event_search_criterion != NULL)
 		{
-			// char buf1[80], buf2[80];
-			// strftime(buf1, sizeof(buf1), "%Y-%m-%d %H:%M", &event_entry->event_time);
-			// time_t event_time = mktime(&event_entry->event_time);
-			// tm tstruct = *localtime(&event_time);
-			// strftime(buf2, sizeof(buf2), "%Y-%m-%d %H:%M", &tstruct);
-			// printf("Time: %s | %s, Type: %d, Severity: %d, Category: %d\n", buf1, buf2, event_entry->event_type, event_entry->event_severity, event_entry->event_category);
 			if (event_search_criterion->need_search_event_time)
 			{
 				time_t event_time = mktime(&event_entry->event_time);
-				if (event_time < event_search_criterion->event_time_begin)
+				// printf("Error: %s\n", strerror(errno));
+				// printf("Time: %d-%02d-%02d %02d:%02d:%02d -> %s", event_entry->event_time.tm_year + 1900, event_entry->event_time.tm_mon + 1, event_entry->event_time.tm_mday, event_entry->event_time.tm_hour, event_entry->event_time.tm_min, event_entry->event_time.tm_sec, ctime(&event_time));
+				// printf("Begin: %ld, End: %ld, Cur: %ld\n", event_search_criterion->search_event_time_begin, event_search_criterion->search_event_time_end, event_time);
+				if (event_time < event_search_criterion->search_event_time_begin)
 					goto OUT;
-				else if (event_time > event_search_criterion->event_time_end)
+				else if (event_time > event_search_criterion->search_event_time_end)
 					goto OUT;
 			}
 			if (event_search_criterion->need_search_event_type && event_search_criterion->search_event_type != event_entry->event_type)
@@ -1940,13 +1934,18 @@ unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string
 				goto OUT;
 			if (event_search_criterion->need_search_event_category && event_search_criterion->search_event_category != event_entry->event_category)
 				goto OUT;
+			if (event_line_list != NULL)
+				event_line_list->push_back((string)*iter);
 		}
 		event_list->push_back(event_entry);
-		if (event_line_list != NULL)
-			event_line_list->push_back((string)*iter);
 OUT:
+		if (line != NULL)
+		{
+			free(line);
+			line = NULL;
+		}
 		iter++;
-	}	
+	}
 	if (event_line_list == NULL)
 	{
 		if (line_list != NULL)

@@ -73,7 +73,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
-	{.command="list_event", .authority=AUTHORITY_ALL, .description="List events"},
+	{.command="search_event", .authority=AUTHORITY_ALL, .description="Search for events"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
@@ -782,7 +782,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_role_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
-		&InteractiveSession::handle_list_event_command,
+		&InteractiveSession::handle_search_event_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_configuration_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
@@ -1046,7 +1046,7 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 	return RET_SUCCESS;
 }
 
-unsigned short InteractiveSession::handle_list_event_command(int argc, char **argv)
+unsigned short InteractiveSession::handle_search_event_command(int argc, char **argv)
 {
 	if (argc != 1)
 	{
@@ -1058,34 +1058,84 @@ unsigned short InteractiveSession::handle_list_event_command(int argc, char **ar
 	unsigned short ret = RET_SUCCESS;
 	list<EventEntry*> event_list;
 	list<string> event_line_list;
-	EventSearchCriterion event_search_criterion = {.need_search_event_time=false, .need_search_event_type=false, .need_search_event_severity=false, .need_search_event_category=false};
-	event_search_criterion.need_search_event_type = true;
-	event_search_criterion.search_event_type = EVENT_TELENT_CONSOLE;
-	event_search_criterion.need_search_event_severity = true;
-	event_search_criterion.search_event_severity = EVENT_SEVERITY_CRITICAL;
-	event_search_criterion.need_search_event_category = true;
-	event_search_criterion.search_event_category = EVENT_CATEGORY_CONSOLE;
-	ret = event_recorder->read(&event_list, &event_line_list/*, &event_search_criterion*/);
+	EventSearchCriterion* event_search_criterion = new EventSearchCriterion;
+	if (event_search_criterion == NULL)
+		throw bad_alloc();
+	*event_search_criterion = {.need_search_event_time=false, .need_search_event_type=false, .need_search_event_severity=false, .need_search_event_category=false};
+	event_search_criterion->need_search_event_time = true;
+	event_search_criterion->search_event_time_end = time(0);
+	event_search_criterion->search_event_time_begin = event_search_criterion->search_event_time_end - 86400;
+	// printf("Begin: %d, End: %d\n", event_search_criterion->search_event_time_begin, event_search_criterion->search_event_time_end);
+	event_search_criterion->need_search_event_type = true;
+	event_search_criterion->search_event_type = EVENT_TELENT_CONSOLE;
+	// event_search_criterion->need_search_event_severity = true;
+	// event_search_criterion->search_event_severity = EVENT_SEVERITY_CRITICAL;
+	// event_search_criterion->need_search_event_category = true;
+	// event_search_criterion->search_event_category = EVENT_CATEGORY_CONSOLE;
+	if (event_search_criterion != NULL)
+	{
+		print_to_console(string("\n# Search Rule #\n"));
+		if (event_search_criterion->need_search_event_time)
+		{
+			tm search_event_time_begin = *localtime(&event_search_criterion->search_event_time_begin);
+			tm search_event_time_end = *localtime(&event_search_criterion->search_event_time_end);
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "Time Range  %d-%02d-%02d %02d:%02d:%02d -> %d-%02d-%02d %02d:%02d:%02d\n", 
+				search_event_time_begin.tm_year + 1900, 
+				search_event_time_begin.tm_mon + 1, 
+				search_event_time_begin.tm_mday, 
+				search_event_time_begin.tm_hour, 
+				search_event_time_begin.tm_min, 
+				search_event_time_begin.tm_sec,
+				search_event_time_end.tm_year + 1900, 
+				search_event_time_end.tm_mon + 1, 
+				search_event_time_end.tm_mday, 
+				search_event_time_end.tm_hour, 
+				search_event_time_end.tm_min, 
+				search_event_time_end.tm_sec
+			);
+			print_to_console(string(buf));
+		}
+		if (event_search_criterion->need_search_event_type)
+		{
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "Type  %s\n", GetEventTypeDescription(event_search_criterion->search_event_type));
+			print_to_console(string(buf) + string("\n"));
+		}
+		if (event_search_criterion->need_search_event_severity)
+		{
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "Severity  %s\n", GetEventSeverityDescription(event_search_criterion->search_event_severity));
+			print_to_console(string(buf) + string("\n"));
+		}
+		if (event_search_criterion->need_search_event_category)
+		{
+			char buf[DEF_STRING_SIZE];
+			snprintf(buf, DEF_STRING_SIZE, "Category  %s\n", GetEventCategoryDescription(event_search_criterion->search_event_category));
+			print_to_console(string(buf) + string("\n"));
+		}
+	}
+	ret = event_recorder->read(&event_list, &event_line_list, event_search_criterion);
 	if (CHECK_SUCCESS(ret))
 	{
-		int event_size = event_list.size();
-		print_to_console(string("\n"));
-		list<EventEntry*>::iterator iter_event = event_list.begin();
+		// list<EventEntry*>::iterator iter_event = event_list.begin();
+		int event_line_size = event_line_list.size();
+		if (event_search_criterion == NULL) print_to_console(string("\n"));
 		list<string>::iterator iter_event_line = event_line_list.begin();
 		int event_count = 0;
-		while (iter_event != event_list.end())
+		while (iter_event_line != event_line_list.end())
 		{
-			EventEntry* event_entry = (PEVENT_ENTRY)*iter_event;
+			// EventEntry* event_entry = (PEVENT_ENTRY)*iter_event;
 			string event_line = (string)*iter_event_line + string("\n");
 			print_to_console(event_line);
-			iter_event++;
+			// iter_event++;
 			iter_event_line++;
 			event_count++;
 		}
 		char buf[DEF_STRING_SIZE];
 		snprintf(buf, DEF_STRING_SIZE, "\n ***  %d event(s) found  ***\n", event_count);
 		print_to_console(string(buf) + string("\n"));
-	} 
+	}
 	list<EventEntry*>::iterator iter_clean = event_list.begin();
 	while (iter_clean != event_list.end())
 	{
@@ -1098,6 +1148,11 @@ unsigned short InteractiveSession::handle_list_event_command(int argc, char **ar
 		iter_clean++;
 	}
 	event_list.clear();
+	if (event_search_criterion != NULL)
+	{
+		delete event_search_criterion;
+		event_search_criterion = NULL;
+	}
 	return ret;
 }
 
