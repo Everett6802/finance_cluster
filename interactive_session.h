@@ -32,6 +32,7 @@ private:
 	static const int WAIT_SESSION_TIMEOUT;
 
 	static void init_command_map();
+	static void init_config_command_map();
 
 	PINOTIFY observer; // To InteractiveServer
 	PIMANAGER manager; // To ClusterMgr
@@ -54,8 +55,10 @@ private:
 	bool system_monitor;
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
 	int system_monitor_period;
+	bool is_config_mode;
 
 	bool check_command_authority(int command_type);
+	bool check_config_command_authority(int command_type);
 	unsigned short get_complete_sync_folderpath(std::string& complete_sync_folderpath)const;
 
 	static void* session_thread_handler(void* void_tr);
@@ -71,6 +74,7 @@ private:
 	unsigned short handle_command(int argc, char **argv);
 	unsigned short handle_help_command(int argc, char **argv);
 	unsigned short handle_exit_command(int argc, char **argv);
+	unsigned short handle_switch_config_mode_command(int argc, char **argv);
 	unsigned short handle_get_role_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_system_info_command(int argc, char **argv);
@@ -96,6 +100,12 @@ private:
 	unsigned short handle_run_multi_clis_command(int argc, char **argv);
 	unsigned short handle_switch_leader_command(int argc, char **argv);
 	unsigned short handle_remove_follower_command(int argc, char **argv);
+// Handle command in configuration mode related fundtions
+	unsigned short handle_config_command(int argc, char **argv);
+	unsigned short handle_config_help_command(int argc, char **argv);
+	unsigned short handle_config_exit_command(int argc, char **argv);
+	unsigned short handle_config_search_event_command(int argc, char **argv);
+
 	unsigned short print_to_console(const std::string& response)const;
 	unsigned short print_prompt_to_console()const;
 

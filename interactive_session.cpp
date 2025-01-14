@@ -17,6 +17,7 @@ enum InteractiveSessionCommandType
 {
 	InteractiveSessionCommand_Help,
 	InteractiveSessionCommand_Exit,
+	InteractiveSessionCommand_SwitchConfigMode,
 	InteractiveSessionCommand_GetRole,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
@@ -45,6 +46,14 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommandSize
 };
 
+// Configuration Command type definition
+enum InteractiveSessionConfigCommandType
+{
+	InteractiveSessionConfigCommand_Help,
+	InteractiveSessionConfigCommand_Exit,
+	InteractiveSessionConfigCommand_SearchEvent,
+	InteractiveSessionConfigCommandSize
+};
 
 struct CommandAttribute
 {
@@ -53,7 +62,8 @@ struct CommandAttribute
 	string description;
 };
 typedef CommandAttribute* PCOMMAND_ATTRIBUTE;
-
+typedef CommandAttribute ConfigCommandAttribute;
+typedef ConfigCommandAttribute* PCONFIG_COMMAND_ATTRIBUTE;
 
 static const unsigned char AUTHORITY_ALL = 0x0;
 static const unsigned char AUTHORITY_LEADER = 0x1;
@@ -65,11 +75,16 @@ static const unsigned char AUTHORITY_ROOT = 0x1 << 1;
 #define GET_AUTHORITY(x) interactive_session_command_attr[x].authority
 #define GET_DESCRIPTION(x) interactive_session_command_attr[x].description
 #define CHECK_AUTHORITY(x, y) (y >= GET_AUTHORITY(x) ? true : false)
+#define GET_CONFIG_COMMAND(x) interactive_session_config_command_attr[x].command
+#define GET_CONFIG_AUTHORITY(x) interactive_session_config_command_attr[x].authority
+#define GET_CONFIG_DESCRIPTION(x) interactive_session_config_command_attr[x].description
+#define CHECK_CONFIG_AUTHORITY(x, y) (y >= GET_CONFIG_AUTHORITY(x) ? true : false)
 
 static const CommandAttribute interactive_session_command_attr[InteractiveSessionCommandSize] = 
 {
 	{.command="help", .authority=AUTHORITY_ALL, .description="The usage"},
 	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the session"},
+	{.command="config", .authority=AUTHORITY_ALL, .description="Switch to configuration mode"},
 	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
@@ -94,6 +109,12 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
 	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"},
 	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"}
+};
+static const ConfigCommandAttribute interactive_session_config_command_attr[InteractiveSessionConfigCommandSize] = 
+{
+	{.command="help", .authority=AUTHORITY_ALL, .description="The usage in configuration mode"},
+	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the configuration mode"},
+	{.command="search_event", .authority=AUTHORITY_ALL, .description="Set criterion for searching event"}
 };
 
 // static const char *interactive_session_command[InteractiveSessionCommandSize] = 
@@ -122,8 +143,11 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 
 typedef map<string, InteractiveSessionCommandType> COMMAND_MAP;
 typedef COMMAND_MAP::iterator COMMAND_MAP_ITER;
+typedef map<string, InteractiveSessionConfigCommandType> CONFIG_COMMAND_MAP;
+typedef CONFIG_COMMAND_MAP::iterator CONFIG_COMMAND_MAP_ITER;
 
 static const char* INTERACTIVE_PROMPT = "FC> ";
+static const char* INTERACTIVE_CONFIG_PROMPT = "FC(config)> ";
 // static const char* INCORRECT_COMMAND_ARGUMENT_FORMAT = "Incorrect command[%s] argument: %s";
 
 static string welcome_phrases = "\n************** Welcome to Finance Cluster CLI **************\n\n";
@@ -131,6 +155,7 @@ static string incomplete_command_phrases = "\nIncomplete Command\n\n";
 static string incorrect_command_phrases = "\nIncorrect Command\n\n";
 
 static COMMAND_MAP command_map;
+static CONFIG_COMMAND_MAP config_command_map;
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 const int InteractiveSession::REQ_BUF_SIZE = 1024;
@@ -155,6 +180,7 @@ void InteractiveSession::init_command_map()
 			for (int i = 0 ; i < InteractiveSessionCommandSize ; i++)
 			{
 				// command_map.insert(make_pair(string(interactive_session_command[i]), (InteractiveSessionCommandType)i));
+				// printf("Insert command: %s\n", interactive_session_command_attr[i].command);
 				command_map.insert(make_pair(interactive_session_command_attr[i].command, (InteractiveSessionCommandType)i));
 			}
 			// for(COMMAND_MAP_ITER iter = command_map.begin() ; iter != command_map.end() ; iter++)
@@ -164,6 +190,25 @@ void InteractiveSession::init_command_map()
 			// 	STATIC_WRITE_FORMAT_DEBUG("Command %d: %s", command_type, command_description.c_str());
 			// }
 			init_map = true;
+		}
+		pthread_mutex_unlock(&mtx);
+	}
+}
+
+void InteractiveSession::init_config_command_map()
+{
+	static bool init_config_map = false;
+	if (!init_config_map)
+	{
+		pthread_mutex_lock(&mtx);
+		if (!init_config_map)
+		{
+			for (int i = 0 ; i < InteractiveSessionConfigCommandSize ; i++)
+			{
+				// printf("Insert config command: %s\n", interactive_session_config_command_attr[i].command);
+				config_command_map.insert(make_pair(interactive_session_config_command_attr[i].command, (InteractiveSessionConfigCommandType)i));
+			}
+			init_config_map = true;
 		}
 		pthread_mutex_unlock(&mtx);
 	}
@@ -186,11 +231,13 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	authority_mask(0x0),
 	system_monitor(false),
 	monitor_system_timer_thread(NULL),
-	system_monitor_period(0)
+	system_monitor_period(0),
+	is_config_mode(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 	IMPLEMENT_EVT_RECORDER()
 	init_command_map();
+	init_config_command_map();
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
 	memset(session_tag, 0x0, sizeof(char) * 64);
 	snprintf(session_tag, 64, "%d (%s:%d)", session_id, inet_ntoa(sock_addr.sin_addr), htons(sock_addr.sin_port));
@@ -378,6 +425,10 @@ bool InteractiveSession::check_command_authority(int command_type)
 	return CHECK_AUTHORITY(command_type, authority_mask);
 }
 
+bool InteractiveSession::check_config_command_authority(int command_type)
+{
+	return CHECK_CONFIG_AUTHORITY(command_type, authority_mask);
+}
 
 unsigned short InteractiveSession::get_complete_sync_folderpath(string& sync_folderpath)const
 {
@@ -502,41 +553,70 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 				// WRITE_FORMAT_DEBUG("Command Argument[Inner]: %s, rest: %s", argv_inner[cur_argc_inner], rest_command_line_inner);
 				if (command_line_inner != NULL)
 				{
-// Check if the command exist
-					COMMAND_MAP::iterator iter = command_map.find(string(argv_inner[cur_argc_inner]));
-					if (iter == command_map.end())
+					if (is_config_mode)
 					{
-						WRITE_FORMAT_ERROR("Error!! Unknown command: %s", argv_inner[0]);
-						char unknown_command_error[64];
-						snprintf(unknown_command_error, 64, "Unknown command: %s\n", argv_inner[0]);
-						print_to_console(string(unknown_command_error));
-						can_execute = false;
-						break;
+// Check if the config command exist
+						CONFIG_COMMAND_MAP::iterator iter = config_command_map.find(string(argv_inner[cur_argc_inner]));
+						if (iter == config_command_map.end())
+						{
+							WRITE_FORMAT_ERROR("Error!! Unknown config command: %s", argv_inner[0]);
+							char unknown_config_command_error[64];
+							snprintf(unknown_config_command_error, 64, "Unknown config command: %s\n", argv_inner[0]);
+							print_to_console(string(unknown_config_command_error));
+							can_execute = false;
+							break;
+						}
+						else
+						{
+// Some commmands require privilege user
+							int command_type = (int)iter->second;
+							if (!check_command_authority(command_type))
+							{
+								WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s config command", authority_mask, GET_CONFIG_AUTHORITY(command_type), argv_inner[0]);
+								static string no_role_string("No Authority to Execute\n");
+								print_to_console(no_role_string);
+								can_execute = false;
+							}						
+						}						
 					}
 					else
 					{
-// Stop system monitor before executing other commands if the system monitor is enabled
-						if (system_monitor && (strcmp(argv_inner[0], "stop_system_monitor") != 0))
-					    {
-							WRITE_WARN("Warning!! System Monitor Enabled");
-							static string system_monitor_string("System Montior Enabled\n");
-							print_to_console(system_monitor_string);
-							goto OUT;
-					    }
-// Some commmands require privilege user
-					    int command_type = (int)iter->second;
-						if (!check_command_authority(command_type))
+// Check if the command exist
+						COMMAND_MAP::iterator iter = command_map.find(string(argv_inner[cur_argc_inner]));
+						if (iter == command_map.end())
 						{
-							// if (!is_root)
-							// {
-							// 	can_execute = false;
-							// 	WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
-							// }
-							WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s command", authority_mask, GET_AUTHORITY(command_type), argv_inner[0]);
-							static string no_role_string("No Authority to Execute\n");
-							print_to_console(no_role_string);
+							WRITE_FORMAT_ERROR("Error!! Unknown command: %s", argv_inner[0]);
+							char unknown_command_error[64];
+							snprintf(unknown_command_error, 64, "Unknown command: %s\n", argv_inner[0]);
+							print_to_console(string(unknown_command_error));
 							can_execute = false;
-						}						
+							break;
+						}
+						else
+						{
+// Stop system monitor before executing other commands if the system monitor is enabled
+							if (system_monitor && (strcmp(argv_inner[0], "stop_system_monitor") != 0))
+							{
+								WRITE_WARN("Warning!! System Monitor Enabled");
+								static string system_monitor_string("System Montior Enabled\n");
+								print_to_console(system_monitor_string);
+								goto OUT;
+							}
+// Some commmands require privilege user
+							int command_type = (int)iter->second;
+							if (!check_command_authority(command_type))
+							{
+								// if (!is_root)
+								// {
+								// 	can_execute = false;
+								// 	WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
+								// }
+								WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s command", authority_mask, GET_AUTHORITY(command_type), argv_inner[0]);
+								static string no_role_string("No Authority to Execute\n");
+								print_to_console(no_role_string);
+								can_execute = false;
+							}						
+						}
 					}
 					command_line_inner = NULL;
 				}
@@ -545,32 +625,68 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 // Handle command
 			if (can_execute)
 			{
-				WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
-				ret = handle_command(cur_argc_inner, argv_inner);
-				if (CHECK_SUCCESS(ret))
-					WRITE_FORMAT_DEBUG("Execute the %s command...... DONE", argv_inner[0]);
-				else if (CHECK_FAILURE(ret))
+				if (is_config_mode)
 				{
-					char rsp_buf[RSP_BUF_SIZE + 1];
-					memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-					snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
-// Show warning if error occurs while executing the command and then exit
-					WRITE_ERROR(rsp_buf);
-					snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
-					print_to_console(string(rsp_buf));
-					// return ret;				
-				}
-				else if (CHECK_WARN(ret))
-				{
-					char rsp_buf[RSP_BUF_SIZE + 1];
-					memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-					snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+					WRITE_FORMAT_DEBUG("Try to execute the %s config command......", argv_inner[0]);
+					ret = handle_config_command(cur_argc_inner, argv_inner);
+					if (CHECK_SUCCESS(ret))
+						WRITE_FORMAT_DEBUG("Execute the %s config command...... DONE", argv_inner[0]);
+					else if (CHECK_WARN(ret))
+					{
+						char rsp_buf[RSP_BUF_SIZE + 1];
+						memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s config command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
-					WRITE_WARN(rsp_buf);
-					snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
-					print_to_console(string(rsp_buf));
-					// goto OUT;
-					// return ret;	
+						WRITE_WARN(rsp_buf);
+						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						print_to_console(string(rsp_buf));
+					}
+					else
+					{
+						static const int BUF_SIZE = 256;
+						char buf[BUF_SIZE];
+						snprintf(buf, BUF_SIZE, "Unexpected return while executing the config command[%s]: %s", argv_inner[0], GetErrorDescription(ret));
+						fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+						throw runtime_error(buf);
+					}
+				}
+				else
+				{
+					WRITE_FORMAT_DEBUG("Try to execute the %s command......", argv_inner[0]);
+					ret = handle_command(cur_argc_inner, argv_inner);
+					if (CHECK_SUCCESS(ret))
+						WRITE_FORMAT_DEBUG("Execute the %s command...... DONE", argv_inner[0]);
+					else if (CHECK_FAILURE(ret))
+					{
+						char rsp_buf[RSP_BUF_SIZE + 1];
+						memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+// Show warning if error occurs while executing the command and then exit
+						WRITE_ERROR(rsp_buf);
+						snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						print_to_console(string(rsp_buf));
+						// return ret;				
+					}
+					else if (CHECK_WARN(ret))
+					{
+						char rsp_buf[RSP_BUF_SIZE + 1];
+						memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+// Show warning if warn occurs while executing the command
+						WRITE_WARN(rsp_buf);
+						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						print_to_console(string(rsp_buf));
+						// goto OUT;
+						// return ret;	
+					}
+					else
+					{
+						static const int BUF_SIZE = 256;
+						char buf[BUF_SIZE];
+						snprintf(buf, BUF_SIZE, "Unexpected return while executing the command[%s]: %s", argv_inner[0], GetErrorDescription(ret));
+						fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+						throw runtime_error(buf);
+					}
 				}
 			}
 			if (command_line_outer != NULL)
@@ -769,7 +885,8 @@ unsigned short InteractiveSession::print_to_console(const string& response)const
 unsigned short InteractiveSession::print_prompt_to_console()const
 {
 	static string prompt(INTERACTIVE_PROMPT);
-	return print_to_console(prompt);
+	static string config_prompt(INTERACTIVE_CONFIG_PROMPT);
+	return print_to_console((is_config_mode ? config_prompt : prompt));
 }
 
 unsigned short InteractiveSession::handle_command(int argc, char **argv)
@@ -779,6 +896,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 	{
 		&InteractiveSession::handle_help_command,
 		&InteractiveSession::handle_exit_command,
+		&InteractiveSession::handle_switch_config_mode_command,
 		&InteractiveSession::handle_get_role_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
@@ -878,7 +996,6 @@ unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 		print_to_console(incorrect_command_phrases);
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
-
 // Send message to the user
 	print_to_console(string("Bye bye !!!"));
 // Notify the parent
@@ -891,6 +1008,19 @@ unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
 // Asynchronous event
 	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
 	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_switch_config_mode_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	is_config_mode = true;
 	return RET_SUCCESS;
 }
 
@@ -2038,6 +2168,69 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
     SAFE_RELEASE(notify_cfg)
 
 	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_command(int argc, char **argv)
+{
+	typedef unsigned short (InteractiveSession::*handle_config_command_func_ptr)(int argc, char**argv);
+	static handle_config_command_func_ptr handle_config_command_func_array[] =
+	{
+		&InteractiveSession::handle_config_help_command,
+		&InteractiveSession::handle_config_exit_command,
+		&InteractiveSession::handle_config_search_event_command
+	};
+	// assert (iter != command_map.end() && "Unknown command");
+	CONFIG_COMMAND_MAP::iterator iter = config_command_map.find(string(argv[0]));
+	// printf("key: %s\n", argv[0]);
+	int config_command_type = (int)iter->second;
+	// printf("valud: %d\n", config_command_type);
+	return (this->*(handle_config_command_func_array[config_command_type]))(argc, argv);
+}
+
+unsigned short InteractiveSession::handle_config_help_command(int argc, char **argv)
+{
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	string usage_string;
+	usage_string += string("====================== Usage ======================\n");
+	for (int i = 0; i < InteractiveSessionConfigCommandSize; i++)
+	{
+		if (CHECK_AUTHORITY(i, authority_mask))
+			usage_string += string("* ") + GET_CONFIG_COMMAND(i) + string("\n Description: ") + GET_CONFIG_DESCRIPTION(i) + string("\n");	
+	}
+	usage_string += string("===================================================\n\n");
+
+	ret = print_to_console(usage_string);
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_exit_command(int argc, char **argv)
+{
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	if (!is_config_mode)
+	{
+		WRITE_ERROR("Incorrect operation: NOT in the configuraiton mode");
+		print_to_console(incorrect_command_phrases);
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	is_config_mode = false;
+	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_config_search_event_command(int argc, char **argv)
+{
+	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_param)
