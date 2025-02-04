@@ -50,9 +50,10 @@ const unsigned short RET_FAILURE_END = 0xFFF;
 
 const unsigned short RET_WARN_BASE = 0x1000;
 const unsigned short RET_WARN_INTERACTIVE_COMMAND = RET_WARN_BASE + 0;
-const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 1;
-const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND = RET_WARN_BASE + 2;
-const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS = RET_WARN_BASE + 3;
+const unsigned short RET_WARN_INTERACTIVE_CONFIG_COMMAND = RET_WARN_BASE + 1;
+const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 2;
+const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND = RET_WARN_BASE + 3;
+const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS = RET_WARN_BASE + 4;
 const unsigned short RET_WARN_END = 0x10FF;
 
 bool SHOW_CONSOLE = true;

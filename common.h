@@ -114,6 +114,10 @@ if (x != NULL)\
 #define GET_BUF(x) ((char*)x+MESSAGE_TYPE_LEN+MESSAGE_SIZE_LEN)
 #endif
 
+#ifndef ENABLE_SEARCH_RULE
+#define ENABLE_SEARCH_RULE(x) (x.need_search_event_time || x.need_search_event_type || x.need_search_event_severity || x.need_search_event_category)
+#endif
+
 // Event Recorder
 #define DECLARE_EVT_RECORDER()\
 EventRecorder* event_recorder;
@@ -185,6 +189,7 @@ extern const unsigned short RET_FAILURE_END;
 
 extern const unsigned short RET_WARN_BASE;
 extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
+extern const unsigned short RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
@@ -350,7 +355,7 @@ enum EventType{
 	EVENT_OPERATE_NODE,
 	EVENT_TELENT_CONSOLE,
 	EVENT_SYNC_DATA,
-	EVENT_SIZE
+	EVENT_TYPE_SIZE
 };
 
 enum EventSeverity{
@@ -439,6 +444,8 @@ void get_curtime_str(std::string& curtime);
 const char* pthread_cond_timedwait_err(int ret);
 unsigned short create_folder_recursive(const char* full_folderpath);
 unsigned short get_filepath_in_folder_recursive(std::list<std::string>& full_filepath_in_folder_list, const std::string& parent_full_folderpath);
+std::string join(const std::string string_list[], int string_list_len, const std::string& delimiter=std::string(", "));
+std::string join(const char *string_list[], int string_list_len, const char* delimiter=", ");
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -495,7 +502,7 @@ typedef IFileTx* PIFILE_TX;
 
 class EventCfg;
 struct EventEntry;
-struct EventSearchCriterion;
+struct EventSearchRule;
 
 class IEventDeviceAccess
 {
@@ -506,7 +513,7 @@ public:
 	virtual unsigned short deinitialize()=0;
 	virtual EventDevice get_type()const=0;
 	virtual unsigned short write(const EventCfg* event_cfg)=0;
-	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL)=0;
+	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchRule* event_search_criterion=NULL)=0;
 };
 typedef IEventDeviceAccess* PIEVENT_DEVICE_ACCESS;
 
@@ -1456,7 +1463,7 @@ enum EventEntryField{EVENT_ENTRY_FIELD_TIME, EVENT_ENTRY_FIELD_TYPE, EVENT_ENTRY
 
 ///////////////////////////////////////////////////
 
-struct EventSearchCriterion
+struct EventSearchRule
 {
 	bool need_search_event_time;
 	time_t search_event_time_begin;
@@ -1468,7 +1475,7 @@ struct EventSearchCriterion
 	bool need_search_event_category;
 	EventCategory search_event_category;
 };
-typedef EventSearchCriterion* PEVENT_SEARCH_CRITERION;
+typedef EventSearchRule* PEVENT_SEARCH_RULE;
 
 ///////////////////////////////////////////////////
 
@@ -1491,7 +1498,7 @@ public:
 	virtual unsigned short deinitialize();
 	virtual EventDevice get_type()const;
 	virtual unsigned short write(const EventCfg* event_cfg);
-	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL);
+	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchRule* event_search_criterion=NULL);
 };
 
 ///////////////////////////////////////////////////
@@ -1541,7 +1548,7 @@ public:
 	int release(const char* callable_file_name, unsigned long callable_line_no);
 
 	unsigned short write(const PEVENT_CFG event_cfg);
-	unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchCriterion* event_search_criterion=NULL);
+	unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchRule* event_search_criterion=NULL);
 };
 typedef EventRecorder* PIEVENT_RECORDER;
 

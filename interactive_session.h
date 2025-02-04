@@ -56,6 +56,7 @@ private:
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
 	int system_monitor_period;
 	bool is_config_mode;
+	EventSearchRule event_search_rule;
 
 	bool check_command_authority(int command_type);
 	bool check_config_command_authority(int command_type);
@@ -79,6 +80,7 @@ private:
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
 	unsigned short handle_get_system_info_command(int argc, char **argv);
 	unsigned short handle_search_event_command(int argc, char **argv);
+	unsigned short handle_list_search_rule_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
 	unsigned short handle_get_configuration_setup_command(int argc, char **argv);
 	unsigned short handle_start_system_monitor_command(int argc, char **argv);
@@ -108,6 +110,7 @@ private:
 
 	unsigned short print_to_console(const std::string& response)const;
 	unsigned short print_prompt_to_console()const;
+	unsigned short print_search_rule_to_console()const;
 
 public:
 	InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int client_fd, const sockaddr_in& sock_addraddress, int interactive_session_id);

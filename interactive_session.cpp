@@ -21,7 +21,8 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_GetRole,
 	InteractiveSessionCommand_GetClusterDetail,
 	InteractiveSessionCommand_GetSystemInfo,
-	InteractiveSessionCommand_ListEvent,
+	InteractiveSessionCommand_SearchEvent,
+	InteractiveSessionCommand_ListSearchRule,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_GetConfigurationSetupInfo,
 	InteractiveSessionCommand_StartSystemMonitor,
@@ -89,6 +90,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
 	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
 	{.command="search_event", .authority=AUTHORITY_ALL, .description="Search for events"},
+	{.command="list_search_rule", .authority=AUTHORITY_ALL, .description="List the search rules"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
@@ -110,11 +112,50 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"},
 	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"}
 };
+
+static const char* interactive_session_unset_search_event_config_command = "unset";
+static const char* interactive_session_search_event_type_config_command[] = 
+{
+	"operate_node",
+	"telnet_console",
+	"sync_data"
+};
+static const int SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE = sizeof(interactive_session_search_event_type_config_command) / sizeof(interactive_session_search_event_type_config_command[0]);
+
+static const char* interactive_session_search_event_severity_config_command[] = 
+{
+	"critical",
+	"warning",
+	"informational"
+};
+static const int SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE = sizeof(interactive_session_search_event_severity_config_command) / sizeof(interactive_session_search_event_severity_config_command[0]);
+
+static const char* interactive_session_search_event_category_config_command[] = 
+{
+	"cluster",
+	"console"
+};
+static const int SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE = sizeof(interactive_session_search_event_category_config_command) / sizeof(interactive_session_search_event_category_config_command[0]);
+
+// static const char* ConfigCommandSearchEventDescritpion = "Set criterion for searching event\n"
+// " * time_option\n  1) Last 24 hours  2) Last 7 days  3) Last 30 days\n"
+// " * time\n  Time format: YYYY/mm/dd_HH:MM_YYYY/mm/dd_HH:MM"
+// " * type\n"
+// " * severity\n"
+// " * category\n";
+static const string ConfigCommandSearchEventDescritpion = string("Set rules for searching event\n")
+													    + string(" * time_option\n  1) Last 24 hours  2) Last 7 days  3) Last 30 days\n")
+													    + string(" * time\n  Time format: YYYY/mm/dd_HH:MM-YYYY/mm/dd_HH:MM\n")
+													    + string(" * type\n  ") + join(interactive_session_search_event_type_config_command, SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE) + string("\n")
+													    + string(" * severity\n  ") + join(interactive_session_search_event_severity_config_command, SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE) + string("\n")
+													    + string(" * category\n  ") + join(interactive_session_search_event_category_config_command, SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE) + string("\n")
+														+ string(" Dismiss the setting: unset\n");
+
 static const ConfigCommandAttribute interactive_session_config_command_attr[InteractiveSessionConfigCommandSize] = 
 {
 	{.command="help", .authority=AUTHORITY_ALL, .description="The usage in configuration mode"},
 	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the configuration mode"},
-	{.command="search_event", .authority=AUTHORITY_ALL, .description="Set criterion for searching event"}
+	{.command="search_event", .authority=AUTHORITY_ALL, .description=ConfigCommandSearchEventDescritpion.c_str()}
 };
 
 // static const char *interactive_session_command[InteractiveSessionCommandSize] = 
@@ -168,6 +209,11 @@ const int InteractiveSession::MAX_ARGC = 20;
 
 // const char* InteractiveSession::session_thread_tag = "Listen Thread";
 const int InteractiveSession::WAIT_SESSION_TIMEOUT = 60; // 5 seconds
+
+static const int SECONDS_IN_A_DAY = 86400;
+static const int TIME_INTERVAL_LIST[] = {SECONDS_IN_A_DAY, 7 * SECONDS_IN_A_DAY, 30 * SECONDS_IN_A_DAY};
+static const int TIME_INTERVAL_LIST_SIZE = sizeof(TIME_INTERVAL_LIST) / sizeof(TIME_INTERVAL_LIST[0]); 
+static const int DEFAULT_TIME_OPTION = 1;
 
 void InteractiveSession::init_command_map()
 {
@@ -236,6 +282,10 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 {
 	IMPLEMENT_MSG_DUMPER()
 	IMPLEMENT_EVT_RECORDER()
+	event_search_rule = {.need_search_event_time=false, .need_search_event_type=false, .need_search_event_severity=false, .need_search_event_category=false};
+	event_search_rule.need_search_event_time = true;
+	event_search_rule.search_event_time_end = time(0);
+	event_search_rule.search_event_time_begin = event_search_rule.search_event_time_end - TIME_INTERVAL_LIST[DEFAULT_TIME_OPTION];
 	init_command_map();
 	init_config_command_map();
 	memcpy(&sock_addr, &client_sockaddr, sizeof(sockaddr_in));
@@ -889,6 +939,52 @@ unsigned short InteractiveSession::print_prompt_to_console()const
 	return print_to_console((is_config_mode ? config_prompt : prompt));
 }
 
+unsigned short InteractiveSession::print_search_rule_to_console()const
+{
+	print_to_console(string("\n# Search Rule #\n"));
+	char buf[DEF_STRING_SIZE];
+	if (event_search_rule.need_search_event_time)
+	{
+		tm search_event_time_begin = *localtime(&event_search_rule.search_event_time_begin);
+		tm search_event_time_end = *localtime(&event_search_rule.search_event_time_end);
+		// char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Time Range  %d/%02d/%02d_%02d:%02d:%02d -> %d/%02d/%02d_%02d:%02d:%02d\n", 
+			search_event_time_begin.tm_year + 1900, 
+			search_event_time_begin.tm_mon + 1, 
+			search_event_time_begin.tm_mday, 
+			search_event_time_begin.tm_hour, 
+			search_event_time_begin.tm_min, 
+			search_event_time_begin.tm_sec,
+			search_event_time_end.tm_year + 1900, 
+			search_event_time_end.tm_mon + 1, 
+			search_event_time_end.tm_mday, 
+			search_event_time_end.tm_hour, 
+			search_event_time_end.tm_min, 
+			search_event_time_end.tm_sec
+		);
+		print_to_console(string(buf));
+	}
+	if (event_search_rule.need_search_event_type)
+	{
+		// char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Type  %s\n", GetEventTypeDescription(event_search_rule.search_event_type));
+		print_to_console(string(buf) + string("\n"));
+	}
+	if (event_search_rule.need_search_event_severity)
+	{
+		// char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Severity  %s\n", GetEventSeverityDescription(event_search_rule.search_event_severity));
+		print_to_console(string(buf) + string("\n"));
+	}
+	if (event_search_rule.need_search_event_category)
+	{
+		// char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Category  %s\n", GetEventCategoryDescription(event_search_rule.search_event_category));
+		print_to_console(string(buf) + string("\n"));
+	}
+	return RET_SUCCESS;
+}
+
 unsigned short InteractiveSession::handle_command(int argc, char **argv)
 {
 	typedef unsigned short (InteractiveSession::*handle_command_func_ptr)(int argc, char**argv);
@@ -901,6 +997,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_cluster_detail_command,
 		&InteractiveSession::handle_get_system_info_command,
 		&InteractiveSession::handle_search_event_command,
+		&InteractiveSession::handle_list_search_rule_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_configuration_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
@@ -1188,69 +1285,25 @@ unsigned short InteractiveSession::handle_search_event_command(int argc, char **
 	unsigned short ret = RET_SUCCESS;
 	list<EventEntry*> event_list;
 	list<string> event_line_list;
-	EventSearchCriterion* event_search_criterion = new EventSearchCriterion;
-	if (event_search_criterion == NULL)
-		throw bad_alloc();
-	*event_search_criterion = {.need_search_event_time=false, .need_search_event_type=false, .need_search_event_severity=false, .need_search_event_category=false};
-	event_search_criterion->need_search_event_time = true;
-	event_search_criterion->search_event_time_end = time(0);
-	event_search_criterion->search_event_time_begin = event_search_criterion->search_event_time_end - 86400;
-	// printf("Begin: %d, End: %d\n", event_search_criterion->search_event_time_begin, event_search_criterion->search_event_time_end);
-	event_search_criterion->need_search_event_type = true;
-	event_search_criterion->search_event_type = EVENT_TELENT_CONSOLE;
-	// event_search_criterion->need_search_event_severity = true;
-	// event_search_criterion->search_event_severity = EVENT_SEVERITY_CRITICAL;
-	// event_search_criterion->need_search_event_category = true;
-	// event_search_criterion->search_event_category = EVENT_CATEGORY_CONSOLE;
-	if (event_search_criterion != NULL)
-	{
-		print_to_console(string("\n# Search Rule #\n"));
-		if (event_search_criterion->need_search_event_time)
-		{
-			tm search_event_time_begin = *localtime(&event_search_criterion->search_event_time_begin);
-			tm search_event_time_end = *localtime(&event_search_criterion->search_event_time_end);
-			char buf[DEF_STRING_SIZE];
-			snprintf(buf, DEF_STRING_SIZE, "Time Range  %d-%02d-%02d %02d:%02d:%02d -> %d-%02d-%02d %02d:%02d:%02d\n", 
-				search_event_time_begin.tm_year + 1900, 
-				search_event_time_begin.tm_mon + 1, 
-				search_event_time_begin.tm_mday, 
-				search_event_time_begin.tm_hour, 
-				search_event_time_begin.tm_min, 
-				search_event_time_begin.tm_sec,
-				search_event_time_end.tm_year + 1900, 
-				search_event_time_end.tm_mon + 1, 
-				search_event_time_end.tm_mday, 
-				search_event_time_end.tm_hour, 
-				search_event_time_end.tm_min, 
-				search_event_time_end.tm_sec
-			);
-			print_to_console(string(buf));
-		}
-		if (event_search_criterion->need_search_event_type)
-		{
-			char buf[DEF_STRING_SIZE];
-			snprintf(buf, DEF_STRING_SIZE, "Type  %s\n", GetEventTypeDescription(event_search_criterion->search_event_type));
-			print_to_console(string(buf) + string("\n"));
-		}
-		if (event_search_criterion->need_search_event_severity)
-		{
-			char buf[DEF_STRING_SIZE];
-			snprintf(buf, DEF_STRING_SIZE, "Severity  %s\n", GetEventSeverityDescription(event_search_criterion->search_event_severity));
-			print_to_console(string(buf) + string("\n"));
-		}
-		if (event_search_criterion->need_search_event_category)
-		{
-			char buf[DEF_STRING_SIZE];
-			snprintf(buf, DEF_STRING_SIZE, "Category  %s\n", GetEventCategoryDescription(event_search_criterion->search_event_category));
-			print_to_console(string(buf) + string("\n"));
-		}
-	}
-	ret = event_recorder->read(&event_list, &event_line_list, event_search_criterion);
+	// event_search_rule.need_search_event_time = true;
+	// event_search_rule.search_event_time_end = time(0);
+	// event_search_rule.search_event_time_begin = event_search_rule.search_event_time_end - 86400;
+	// printf("Begin: %d, End: %d\n", event_search_rule.search_event_time_begin, event_search_rule.search_event_time_end);
+	// event_search_rule.need_search_event_type = true;
+	// event_search_rule.search_event_type = EVENT_TELENT_CONSOLE;
+	// event_search_rule.need_search_event_severity = true;
+	// event_search_rule.search_event_severity = EVENT_SEVERITY_CRITICAL;
+	// event_search_rule.need_search_event_category = true;
+	// event_search_rule.search_event_category = EVENT_CATEGORY_CONSOLE;
+	bool enable_search_rule = ENABLE_SEARCH_RULE(event_search_rule);
+	if (enable_search_rule)
+		print_search_rule_to_console();
+	ret = event_recorder->read(&event_list, &event_line_list, (enable_search_rule ? &event_search_rule : NULL));
 	if (CHECK_SUCCESS(ret))
 	{
 		// list<EventEntry*>::iterator iter_event = event_list.begin();
 		int event_line_size = event_line_list.size();
-		if (event_search_criterion == NULL) print_to_console(string("\n"));
+		print_to_console(string("\n"));
 		list<string>::iterator iter_event_line = event_line_list.begin();
 		int event_count = 0;
 		while (iter_event_line != event_line_list.end())
@@ -1278,14 +1331,26 @@ unsigned short InteractiveSession::handle_search_event_command(int argc, char **
 		iter_clean++;
 	}
 	event_list.clear();
-	if (event_search_criterion != NULL)
-	{
-		delete event_search_criterion;
-		event_search_criterion = NULL;
-	}
 	return ret;
 }
 
+unsigned short InteractiveSession::handle_list_search_rule_command(int argc, char **argv)
+{
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+	bool enable_search_rule = ENABLE_SEARCH_RULE(event_search_rule);
+	if (enable_search_rule)
+		print_search_rule_to_console();
+	else
+		print_to_console(string("\n*** No search rule ***\n\n"));
+	return ret;
+}
 // unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
 // {
 // 	static const char* NODE_SYSTEM_INFO_TITLE = "\n====================== Node System Info ======================\n";
@@ -2193,7 +2258,7 @@ unsigned short InteractiveSession::handle_config_help_command(int argc, char **a
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
 		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_COMMAND;
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
 
 	unsigned short ret = RET_SUCCESS;
@@ -2216,7 +2281,7 @@ unsigned short InteractiveSession::handle_config_exit_command(int argc, char **a
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
 		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_COMMAND;
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
 	if (!is_config_mode)
 	{
@@ -2230,7 +2295,183 @@ unsigned short InteractiveSession::handle_config_exit_command(int argc, char **a
 
 unsigned short InteractiveSession::handle_config_search_event_command(int argc, char **argv)
 {
-	return RET_SUCCESS;
+	if (argc != 3)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s, config command count: %d", argv[0], argc);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	unsigned short ret = RET_SUCCESS;
+	const char* rule_key = argv[1];
+	const char* rule_value = argv[2];
+	if (strcmp(rule_key, "time_option") == 0)
+	{
+		int select = atoi(rule_value) - 1;
+		if (select < 0 || select >= TIME_INTERVAL_LIST_SIZE)
+		{
+				WRITE_FORMAT_WARN("Incorrect index to select time interval: %s", rule_value);
+				return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+		}
+		event_search_rule.need_search_event_time = true;
+		event_search_rule.search_event_time_end = time(0);
+		event_search_rule.search_event_time_begin = event_search_rule.search_event_time_end - TIME_INTERVAL_LIST[select];
+	}
+	else if (strcmp(rule_key, "time") == 0)
+	{
+		if (strcmp(interactive_session_unset_search_event_config_command, rule_value) == 0)
+			event_search_rule.need_search_event_time = false;
+		else
+		{
+			char* rule_value_tmp = strdup(rule_value);
+			char *search_event_time_begin_str =  NULL;
+			char *search_event_time_end_str =  NULL;
+			search_event_time_begin_str = strtok_r(rule_value_tmp, "-", &search_event_time_end_str);
+			if (search_event_time_begin_str == NULL || search_event_time_end_str == NULL)
+			{
+				WRITE_FORMAT_WARN("Incorrect search event time value: %s", rule_value);
+				ret = RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+				goto OUT;
+			}
+			tm tm_begin;
+			if (strptime(search_event_time_begin_str, "%Y/%m/%d_%H:%M", &tm_begin) == NULL)
+			{
+				WRITE_FORMAT_WARN("Incorrect search event start time format: %s", search_event_time_begin_str);
+				ret = RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+				goto OUT;
+			}
+			else
+			{
+				tm_begin.tm_sec = 0;
+				tm_begin.tm_isdst = -1; // Add this line to avoid the field is NOT defined overwise an out-of-range error occurs while calling mktime()
+				// printf("Begin Time: %s -> %d/%02d/%02d %02d:%02d:%02d\n", search_event_time_begin_str, tm_begin.tm_year + 1900, tm_begin.tm_mon + 1, tm_begin.tm_mday, tm_begin.tm_hour, tm_begin.tm_min, tm_begin.tm_sec);
+				event_search_rule.search_event_time_begin = mktime(&tm_begin);
+			}
+			tm tm_end;
+			if (strptime(search_event_time_end_str, "%Y/%m/%d_%H:%M", &tm_end) == NULL)
+			{
+				WRITE_FORMAT_WARN("Incorrect search event end time format: %s", search_event_time_end_str);
+				ret = RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+				goto OUT;
+			}
+			else
+			{
+				tm_end.tm_sec = 0;
+				tm_end.tm_isdst = -1; // Add this line to avoid the field is NOT defined overwise an out-of-range error occurs while calling mktime()
+				// printf("Time: %s -> %d/%02d/%02d %02d:%02d:%02d\n", search_event_time_end_str, tm_end.tm_year + 1900, tm_end.tm_mon + 1, tm_end.tm_mday, tm_end.tm_hour, tm_end.tm_min, tm_end.tm_sec);
+				event_search_rule.search_event_time_end = mktime(&tm_end);
+			}
+			event_search_rule.need_search_event_time = true;
+OUT:
+			if(rule_value_tmp != NULL)
+			{
+				free(rule_value_tmp);
+				rule_value_tmp = NULL;
+			}
+		}
+	}
+	else if (strcmp(rule_key, "type") == 0)
+	{
+		if (SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE != EVENT_TYPE_SIZE)
+		{
+			static const char* errmsg = "ERROR!!! The definitions of event type are NOT identical. Terminate the process...";
+			fprintf(stderr, errmsg);
+			throw runtime_error(errmsg);
+		}
+		bool found = false;
+		for (int i = 0 ; i < SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE ; i++)
+		{
+			if (strcmp(interactive_session_search_event_type_config_command[i], rule_value) == 0)
+			{
+				event_search_rule.need_search_event_type = true;
+				event_search_rule.search_event_type = (EventType)i;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			if (strcmp(interactive_session_unset_search_event_config_command, rule_value) == 0)
+			{
+				event_search_rule.need_search_event_type = false;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			WRITE_FORMAT_WARN("Unknown search event type value: %s", rule_value);
+			return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+		}
+	}
+	else if (strcmp(rule_key, "severity") == 0)
+	{
+		if (SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE != EVENT_SEVERITY_SIZE)
+		{
+			static const char* errmsg = "ERROR!!! The definitions of event severity are NOT identical. Terminate the process...";
+			fprintf(stderr, errmsg);
+			throw runtime_error(errmsg);
+		}
+		bool found = false;
+		for (int i = 0 ; i < SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE ; i++)
+		{
+			if (strcmp(interactive_session_search_event_severity_config_command[i], rule_value) == 0)
+			{
+				event_search_rule.need_search_event_severity = true;
+				event_search_rule.search_event_severity = (EventSeverity)i;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			if (strcmp(interactive_session_unset_search_event_config_command, rule_value) == 0)
+			{
+				event_search_rule.need_search_event_severity = false;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			WRITE_FORMAT_WARN("Unknown search event severity value: %s", rule_value);
+			return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+		}		
+	}
+	else if (strcmp(rule_key, "category") == 0)
+	{
+		if (SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE != EVENT_CATEGORY_SIZE)
+		{
+			static const char* errmsg = "ERROR!!! The definitions of event category are NOT identical. Terminate the process...";
+			fprintf(stderr, errmsg);
+			throw runtime_error(errmsg);
+		}
+		bool found = false;
+		for (int i = 0 ; i < SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE ; i++)
+		{
+			if (strcmp(interactive_session_search_event_category_config_command[i], rule_value) == 0)
+			{
+				event_search_rule.need_search_event_category = true;
+				event_search_rule.search_event_category = (EventCategory)i;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			if (strcmp(interactive_session_unset_search_event_config_command, rule_value) == 0)
+			{
+				event_search_rule.need_search_event_category = false;
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			WRITE_FORMAT_WARN("Unknown search event category value: %s", rule_value);
+			return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+		}
+	}
+	else
+	{
+    	WRITE_FORMAT_WARN("Unknown search rule key: %s", rule_key);
+    	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+
+	return ret;
 }
 
 unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_param)

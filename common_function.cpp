@@ -51,6 +51,7 @@ const char *GetErrorDescription(unsigned short ret)
 	{
 		// "Warn Base",
 		"Warn Interactive Command",
+		"Warn Interactive Configuration Command",
 		"Warn Simulator Not Installed",
 		"Warn Simulator Package Not Found",
 		"Warn File Transfer in Process"
@@ -95,16 +96,16 @@ static int EVENT_TYPE_DESCRIPTION_SIZE = sizeof(EVENT_TYPE_DESCRIPTION) / sizeof
 
 const char* GetEventTypeDescription(EventType event_type)
 {
-	assert(event_type >= 0 && event_type < EVENT_SIZE && "event type is out of range");
-	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_SIZE");
+	assert(event_type >= 0 && event_type < EVENT_TYPE_SIZE && "event type is out of range");
+	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_TYPE_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_TYPE_SIZE");
 	return EVENT_TYPE_DESCRIPTION[event_type];
 }
 
 EventType GetEventTypeFromDescription(const char* event_type_description)
 {
 	assert(event_type_description != NULL && "event_type_description should NOT be NULL");
-	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_SIZE");
-	for (int i = 0 ; i < EVENT_SIZE ; i++)
+	assert(EVENT_TYPE_DESCRIPTION_SIZE == EVENT_TYPE_SIZE && "EVENT_TYPE_DESCRIPTION_SIZE != EVENT_TYPE_SIZE");
+	for (int i = 0 ; i < EVENT_TYPE_SIZE ; i++)
 	{
 		if (strcmp(event_type_description, EVENT_TYPE_DESCRIPTION[i]) == 0)
 			return (EventType)i;
@@ -482,7 +483,7 @@ void get_curtime_str(string& curtime)
   	time_t t = time(NULL);
   	struct tm tm = *localtime(&t);
   	char curtime_str[DEF_SHORT_STRING_SIZE];
-  	snprintf(curtime_str, DEF_SHORT_STRING_SIZE, "%d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  	snprintf(curtime_str, DEF_SHORT_STRING_SIZE, "%d/%02d/%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
   	curtime = curtime_str;
 }
 
@@ -490,7 +491,7 @@ void get_curtime_str(string& curtime)
 // {
 //   	time_t t = time(NULL);
 //   	struct tm tm = *localtime(&t);
-//   	printf("%s: %d-%02d-%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+//   	printf("%s: %d/%02d/%02d %02d:%02d:%02d\n", (title == NULL ? "Time" : title), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 // }
 
 const char* pthread_cond_timedwait_err(int ret)
@@ -591,4 +592,21 @@ unsigned short get_filepath_in_folder_recursive(std::list<std::string>& full_fil
     }
     closedir(dp);
     return ret;
+}
+
+string join(const string string_list[], int string_list_len, const string& delimiter)
+{
+	string new_string = string_list[0];
+	for (int i = 1 ; i < string_list_len ; i++)
+		new_string += (delimiter + string_list[i]);
+	return new_string;
+}
+
+string join(const char *string_list[], int string_list_len, const char* delimiter)
+{
+	string new_string_list[string_list_len];
+	for (int i = 0 ; i < string_list_len ; i++)
+		new_string_list[i] = string(string_list[i]);
+	string new_delimiter = string(delimiter);
+	return join(new_string_list, string_list_len, new_delimiter);
 }
