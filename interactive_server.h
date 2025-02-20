@@ -44,7 +44,7 @@ private:
 	INTERACTIVE_SESSION_MAP interactive_session_map;
 	PNOTIFY_THREAD notify_thread;
 	PIMANAGER manager; // To ClusterMgr
-	int system_monitor_period;
+	// int system_monitor_period;
 
 	volatile int listen_exit;
 	pthread_t listen_tid;
@@ -84,7 +84,7 @@ public:
 	const_iterator begin();
 	const_iterator end();
 
-	unsigned short initialize(int system_monitor_period_value);
+	unsigned short initialize(/*int system_monitor_period_value*/);
 	unsigned short deinitialize();
 	unsigned short print_console(const std::string& console_message, int session_id=-1)const;
 

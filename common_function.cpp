@@ -54,7 +54,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"Warn Interactive Configuration Command",
 		"Warn Simulator Not Installed",
 		"Warn Simulator Package Not Found",
-		"Warn File Transfer in Process"
+		"Warn File Transfer in Process",
+		"Warn Cluster Not Single"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
 	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);

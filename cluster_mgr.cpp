@@ -53,6 +53,7 @@ unsigned short ClusterMgr::parse_config()
 	if (CHECK_FAILURE(ret))
 		return ret;
 	list<string>::iterator iter = conf_line_list.begin();
+	int conf_line_count = 0;
 	while (iter != conf_line_list.end())
 	{
 		string line = (string)*iter;
@@ -73,13 +74,13 @@ unsigned short ClusterMgr::parse_config()
 		// fprintf(stderr, "conf_name: %s, conf_value: %s\n", conf_name, conf_value);
 		if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
 		{
-			cluster_network = string(conf_value);
-			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_CLUSTER_NETWORK, cluster_network.c_str());
+			initial_cluster_config.cluster_network = string(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_CLUSTER_NETWORK, initial_cluster_config.cluster_network.c_str());
 		}
 		else if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
 		{
-			cluster_netmask_digits = atoi(conf_value);
-			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_CLUSTER_NETMASK_DIGITS, cluster_netmask_digits);
+			initial_cluster_config.cluster_netmask_digits = atoi(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_CLUSTER_NETMASK_DIGITS, initial_cluster_config.cluster_netmask_digits);
 		}
 		else if (strcmp(conf_name, CONF_FIELD_LOCAL_CLUSTER) == 0)
 		{
@@ -93,9 +94,9 @@ unsigned short ClusterMgr::parse_config()
 			}
 			// fprintf(stderr, "conf_value_new: %s\n", conf_value_new);
 			if (strcmp(conf_value_new, "yes") == 0)
-				local_cluster = true;
+				initial_cluster_config.local_cluster = true;
 			else if (strcmp(conf_value_new, "no") == 0)
-				local_cluster = false;
+				initial_cluster_config.local_cluster = false;
 			else
 			{
 				WRITE_FORMAT_ERROR("Incorrect configuration value: %s, should be 'yes' or 'no'", conf_value_new);
@@ -106,18 +107,18 @@ unsigned short ClusterMgr::parse_config()
 				free(conf_value_new);
 				conf_value_new = NULL;
 			}
-			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_LOCAL_CLUSTER, (initial_cluster_config.local_cluster ? "yes" : "no"));
 			// fprintf(stderr, "CONF Name: %s, Value: %s\n", CONF_FIELD_LOCAL_CLUSTER, (local_cluster ? "yes" : "no"));
 		}
 		else if (strcmp(conf_name, CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
 		{
-			system_monitor_period = atoi(conf_value);
-			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_SYSTEM_MONITOR_PERIOD, system_monitor_period);
+			initial_cluster_config.system_monitor_period = atoi(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %d", CONF_FIELD_SYSTEM_MONITOR_PERIOD, initial_cluster_config.system_monitor_period);
 		}
 		else if (strcmp(conf_name, CONF_FIELD_SYNC_FOLDERPATH) == 0)
 		{
-			sync_folderpath = string(conf_value);
-			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_SYNC_FOLDERPATH, sync_folderpath.c_str());
+			initial_cluster_config.sync_folderpath = string(conf_value);
+			WRITE_FORMAT_DEBUG("CONF Name: %s, Value: %s", CONF_FIELD_SYNC_FOLDERPATH, initial_cluster_config.sync_folderpath.c_str());
 		}
 		else
 		{
@@ -133,7 +134,63 @@ unsigned short ClusterMgr::parse_config()
 			free(line_tmp);
 			line_tmp = NULL;
 		}
+		conf_line_count++;
 		iter++;
+	}
+	if (conf_line_count != CONF_FIELD_LIST_SIZE)
+	{
+		WRITE_FORMAT_ERROR("The amount of the configuraion is incorrect, expected: %d, actual: %d", CONF_FIELD_LIST_SIZE, conf_line_count);
+		return RET_FAILURE_INTERNAL_ERROR;	
+	}
+// Since there are some classes in the member variables of ClusterConfig, we can't do memory copy directly
+	// memcpy(&current_cluster_config, &initial_cluster_config, sizeof(ClusterConfig));
+	current_cluster_config.cluster_network = initial_cluster_config.cluster_network;
+	current_cluster_config.cluster_netmask_digits = initial_cluster_config.cluster_netmask_digits;
+	current_cluster_config.local_cluster = initial_cluster_config.local_cluster;
+	current_cluster_config.system_monitor_period = initial_cluster_config.system_monitor_period;
+	current_cluster_config.sync_folderpath = initial_cluster_config.sync_folderpath;
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::generate_config_string(string& config_string, const ClusterConfig& cluster_config)const
+{
+	for (int i = 0 ; i < CONF_FIELD_LIST_SIZE ; i++)
+	{
+		// printf("%s\n", CONF_FIELD_LIST[i]);
+		if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_CLUSTER_NETWORK) == 0)
+		{
+			config_string += (string(CONF_FIELD_CLUSTER_NETWORK) + string(": ") + cluster_config.cluster_network + string("\n"));
+		}
+		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
+		{
+/*
+在微軟的Visual studio 有一個function叫itoa 可以讓你把數字轉換成字串
+但是在Linux的GNU C當中並沒有這個function可以呼叫
+*/
+			char buf[DEF_VERY_SHORT_STRING_SIZE];
+			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%d", cluster_config.cluster_netmask_digits);
+			config_string += (string(CONF_FIELD_CLUSTER_NETMASK_DIGITS) + string(": ") + string(buf) + string("\n"));
+		}
+		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_LOCAL_CLUSTER) == 0)
+		{
+			config_string += (string(CONF_FIELD_LOCAL_CLUSTER) + string(": ") + string((cluster_config.local_cluster ? "yes" : "no")) + string("\n"));
+		}
+		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
+		{
+			char buf[DEF_VERY_SHORT_STRING_SIZE];
+			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%d", cluster_config.system_monitor_period);
+			config_string += (string(CONF_FIELD_SYSTEM_MONITOR_PERIOD) + string(": ") + string(buf) + string("\n"));
+		}
+		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_SYNC_FOLDERPATH) == 0)
+		{
+			config_string += (string(CONF_FIELD_SYNC_FOLDERPATH) + string(": ") + cluster_config.sync_folderpath + string("\n"));
+		}
+		else
+		{
+			WRITE_FORMAT_ERROR("Unknown configuration field: %s", CONF_FIELD_LIST[i]);
+			return RET_FAILURE_INTERNAL_ERROR;
+		}
+		// printf("res: %s\n", config_string.c_str());
 	}
 	return RET_SUCCESS;
 }
@@ -168,7 +225,7 @@ bool ClusterMgr::check_interface_exist(const char* network_interface)const
 
 unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 {
-	if (local_cluster)
+	if (current_cluster_config.local_cluster)
 	{
 		WRITE_ERROR("Should NOT find local IP for local cluster");
 		return RET_FAILURE_INCORRECT_OPERATION;		
@@ -229,7 +286,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 
       	if (need_check_network)
       	{
-	      	if (ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+	      	if (ipv4_addr.is_same_network(current_cluster_config.cluster_netmask_digits, current_cluster_config.cluster_network.c_str()))
       			found = true;
       	}
       	else
@@ -251,7 +308,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 	}
 	if (!found)
 	{
-		WRITE_FORMAT_ERROR("Fail to find the interface in the network: %s/%d", cluster_network.c_str(), cluster_netmask_digits);
+		WRITE_FORMAT_ERROR("Fail to find the interface in the network: %s/%d", current_cluster_config.cluster_network.c_str(), current_cluster_config.cluster_netmask_digits);
 		return RET_FAILURE_INCORRECT_CONFIG;
 	}
 
@@ -260,7 +317,7 @@ unsigned short ClusterMgr::find_local_ip(bool need_check_network)
 
 ClusterMgr::ClusterMgr() :
 	notify_thread(NULL),
-	local_cluster(true),
+	// local_cluster(true),
 	node_token(NULL),
 	cluster_token(NULL),
 	node_type(NONE),
@@ -358,7 +415,7 @@ unsigned short ClusterMgr::become_leader()
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 	unsigned short ret = RET_SUCCESS;
-	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&current_cluster_config.local_cluster);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	ret = cluster_node->initialize();
@@ -379,7 +436,7 @@ unsigned short ClusterMgr::become_follower(bool need_rebuild_cluster)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 	unsigned short ret = RET_SUCCESS;
-	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	ret = cluster_node->set(PARAM_LOCAL_CLUSTER, (void*)&current_cluster_config.local_cluster);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	ret = cluster_node->set(PARAM_CONNECTION_RETRY, (void*)&need_rebuild_cluster);
@@ -403,7 +460,7 @@ unsigned short ClusterMgr::become_file_sender()
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 	unsigned short ret = RET_SUCCESS;
-	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&current_cluster_config.local_cluster);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	ret = file_tx->initialize();
@@ -427,7 +484,7 @@ unsigned short ClusterMgr::become_file_receiver(const char* sender_token)
 		return RET_FAILURE_INSUFFICIENT_MEMORY;
 	}
 	unsigned short ret = RET_SUCCESS;
-	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&local_cluster);
+	ret = file_tx->set(PARAM_LOCAL_CLUSTER, (void*)&current_cluster_config.local_cluster);
 	if (CHECK_FAILURE(ret))
 		return ret;
 	ret = file_tx->initialize();
@@ -488,7 +545,7 @@ unsigned short ClusterMgr::stop_connection()
 unsigned short ClusterMgr::close_console()
 {
 	bool local_follower = false;
-	if (local_cluster)
+	if (current_cluster_config.local_cluster)
 		is_local_follower(local_follower);
 	if (!local_follower)
 	{
@@ -607,7 +664,7 @@ unsigned short ClusterMgr::rebuild_cluster(int new_leader_node_id)
 		ret = become_follower(true);
         if (CHECK_FAILURE(ret))
 			return ret;
-		if (local_cluster)
+		if (current_cluster_config.local_cluster)
 			deinitialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
 		else
     		initialize_components(COMPONENT_MASK_NOT_LOCAL_FOLLOWER);
@@ -639,7 +696,7 @@ unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 		interactive_server = new InteractiveServer(this);
 		if (interactive_server == NULL)
 			throw bad_alloc();
-		ret = interactive_server->initialize(system_monitor_period);
+		ret = interactive_server->initialize(/*current_cluster_config.system_monitor_period*/);
 		if (CHECK_FAILURE(ret))
 			return ret;
 	}
@@ -669,7 +726,7 @@ unsigned short ClusterMgr::initialize_components(unsigned short component_mask)
 		system_operator = new SystemOperator(this);
 		if (system_operator == NULL)
 			throw bad_alloc();
-		ret = system_operator->initialize(cluster_network.c_str(), cluster_netmask_digits);
+		ret = system_operator->initialize(current_cluster_config.cluster_network.c_str(), current_cluster_config.cluster_netmask_digits);
 		if (CHECK_FAILURE(ret))
 			return ret;
 	}
@@ -836,7 +893,7 @@ unsigned short ClusterMgr::initialize()
 // Find local token
 	if (node_token == NULL)
 	{
-		if (local_cluster)
+		if (current_cluster_config.local_cluster)
 		{
 			char local_token_tmp[LOCAL_CLUSTER_SHM_BUFSIZE];
 			// srand(time(NULL));   // Initialization, should only be called once.
@@ -854,13 +911,13 @@ unsigned short ClusterMgr::initialize()
 			{
 // Check if local_token and cluster_token are in the same network
 		      	IPv4Addr ipv4_addr(cluster_token);
-		      	if (!ipv4_addr.is_same_network(cluster_netmask_digits, cluster_network.c_str()))
+		      	if (!ipv4_addr.is_same_network(current_cluster_config.cluster_netmask_digits, current_cluster_config.cluster_network.c_str()))
 		      	{
 					// fprintf(stderr, "local_token: %s\n", local_token);
 					// fprintf(stderr, "cluster_token: %s\n", cluster_token);
 					// fprintf(stderr, "cluster_network: %s\n", cluster_network.c_str());
 					// fprintf(stderr, "cluster_netmask_digits: %d\n", cluster_netmask_digits);
-		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%d]", node_token, cluster_token, cluster_network.c_str(), cluster_netmask_digits);
+		      		WRITE_FORMAT_ERROR("The local IP[%s] and cluster IP[%s] are NOT in the same network[%s/%d]", node_token, cluster_token, current_cluster_config.cluster_network.c_str(), current_cluster_config.cluster_netmask_digits);
 		      		return RET_FAILURE_INCORRECT_CONFIG;
 		      	}
 			}
@@ -879,7 +936,7 @@ unsigned short ClusterMgr::initialize()
 	// ret = start_connection();
 	// fprintf(stderr, "cluster_token: %s, local_token: %s\n", cluster_token, local_token);
 	bool local_follower = false;
-	if (local_cluster)
+	if (current_cluster_config.local_cluster)
 	{
 		ret = is_local_follower(local_follower);
 		if (CHECK_FAILURE(ret))
@@ -1049,7 +1106,7 @@ unsigned short ClusterMgr::is_local_follower(bool& local_follower) const
 {
 	unsigned short ret = RET_SUCCESS;
 	local_follower = false;
-	if (local_cluster)
+	if (current_cluster_config.local_cluster)
 	{
 		int process_count = 0;
 		ret = get_process_count(PROCESS_NAME, process_count);
@@ -1100,7 +1157,6 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
 	    	assert(file_tx == NULL && "file_tx should be NULL");
-	    	unsigned short ret = RET_SUCCESS;
 	    	PCLUSTER_FILE_TRANSFER_PARAM cluster_file_transfer_param = (PCLUSTER_FILE_TRANSFER_PARAM)param1;
 	    	assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
 	    	const char* filepath = (const char*)param2;
@@ -1238,6 +1294,48 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
+    	case PARAM_CLUSTER_SETUP_NETWORK:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+	    	current_cluster_config.cluster_network = *(string*)param1;
+		}
+		break;
+    	case PARAM_CLUSTER_SETUP_NETMASK_DIGITS:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+	    	current_cluster_config.cluster_netmask_digits = *(int*)param1;
+		}
+		break;
+		case PARAM_SYSTEM_MONITOR_PERIOD:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+	    	current_cluster_config.system_monitor_period = *(int*)param1;
+		}
+		break;
+    	case PARAM_CLUSTER_SYNC_FOLDERPATH:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			printf("Old  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
+	    	current_cluster_config.sync_folderpath = *(string*)param1;
+			printf("New  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -1286,6 +1384,19 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		}
     		PCLUSTER_MAP cluster_map = (ClusterMap*)param1;
  		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)cluster_map);
+			if (CHECK_FAILURE(ret))
+				return ret;
+    	}
+    	break;
+    	case PARAM_CLUSTER_IS_SINGLE:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			bool& is_single = *(bool*)param1;
+ 		   	ret = cluster_node->get(PARAM_CLUSTER_IS_SINGLE, (void*)&is_single);
 			if (CHECK_FAILURE(ret))
 				return ret;
     	}
@@ -1551,36 +1662,53 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		string& configuration_setup_string = *(string*)param1;
-			list<string> conf_line_list;
-			ret = read_config_file_lines(conf_line_list, FINANCE_CLUSTER_CONF_FILENAME);
+			ret = generate_config_string(configuration_setup_string, initial_cluster_config);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			list<string>::iterator iter = conf_line_list.begin();
-			while (iter != conf_line_list.end())
-			{
-				string line = (string)*iter;
-				char* line_tmp = strdup(line.c_str());
-				char* conf_name = strtok(line_tmp, "=");
-				if (conf_name == NULL)
-				{
-					WRITE_FORMAT_ERROR("Incorrect configuration name: %s", line_tmp);
-					return RET_FAILURE_INCORRECT_CONFIG;
-				}
-				char* conf_value = strtok(NULL, "=");
-				if (conf_value == NULL)
-				{
-					WRITE_FORMAT_ERROR("Incorrect configuration value: %s", line_tmp);
-					return RET_FAILURE_INCORRECT_CONFIG;
-				}
-				configuration_setup_string += (string(conf_name) + string(": ") + string(conf_value) + string("\n"));
-				if (line_tmp != NULL)
-				{
-					free(line_tmp);
-					line_tmp = NULL;
-				}
-				iter++;
-			}
+			// list<string> conf_line_list;
+			// ret = read_config_file_lines(conf_line_list, FINANCE_CLUSTER_CONF_FILENAME);
+			// if (CHECK_FAILURE(ret))
+			// 	return ret;
+			// list<string>::iterator iter = conf_line_list.begin();
+			// while (iter != conf_line_list.end())
+			// {
+			// 	string line = (string)*iter;
+			// 	char* line_tmp = strdup(line.c_str());
+			// 	char* conf_name = strtok(line_tmp, "=");
+			// 	if (conf_name == NULL)
+			// 	{
+			// 		WRITE_FORMAT_ERROR("Incorrect configuration name: %s", line_tmp);
+			// 		return RET_FAILURE_INCORRECT_CONFIG;
+			// 	}
+			// 	char* conf_value = strtok(NULL, "=");
+			// 	if (conf_value == NULL)
+			// 	{
+			// 		WRITE_FORMAT_ERROR("Incorrect configuration value: %s", line_tmp);
+			// 		return RET_FAILURE_INCORRECT_CONFIG;
+			// 	}
+			// 	configuration_setup_string += (string(conf_name) + string(": ") + string(conf_value) + string("\n"));
+			// 	if (line_tmp != NULL)
+			// 	{
+			// 		free(line_tmp);
+			// 		line_tmp = NULL;
+			// 	}
+			// 	iter++;
+			// }
 			configuration_setup_string += string("\n");
+    	}
+    	break;
+    	case PARAM_RUNNING_SETUP:
+    	{
+        	if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+    		string& running_setup_string = *(string*)param1;
+			ret = generate_config_string(running_setup_string, current_cluster_config);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			running_setup_string += string("\n");
     	}
     	break;
     	case PARAM_CONFIGURATION_VALUE:
@@ -1594,27 +1722,27 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETWORK) == 0)
 			{
 				string& conf_value = *(string*)param2;
-				conf_value = cluster_network;
+				conf_value = current_cluster_config.cluster_network;
 			}
 			else if (strcmp(conf_name, CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
 			{
 				int& conf_value = *(int*)param2;
-				conf_value = cluster_netmask_digits;
+				conf_value = current_cluster_config.cluster_netmask_digits;
 			}
 			else if (strcmp(conf_name, CONF_FIELD_LOCAL_CLUSTER) == 0)
 			{
 				bool& conf_value = *(bool*)param2;
-				conf_value = local_cluster;
+				conf_value = current_cluster_config.local_cluster;
 			}
 			else if (strcmp(conf_name, CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
 			{
 				int& conf_value = *(int*)param2;
-				conf_value = system_monitor_period;
+				conf_value = current_cluster_config.system_monitor_period;
 			}
 			else if (strcmp(conf_name, CONF_FIELD_SYNC_FOLDERPATH) == 0)
 			{
 				string& conf_value = *(string*)param2;
-				conf_value = sync_folderpath;
+				conf_value = current_cluster_config.sync_folderpath;
 			}
 			else
 			{
@@ -2171,6 +2299,16 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		ret = file_tx->get(PARAM_SENDER_TOKEN, &param1);
     	}
     	break;
+		case PARAM_SYSTEM_MONITOR_PERIOD:
+		{
+	        if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}	
+			*(int*)param1 = current_cluster_config.system_monitor_period;
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2210,7 +2348,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			if (CHECK_SUCCESS(ret))
 			{
 				simulator_installed = true;
-				if ((!local_cluster) && (node_type == LEADER))
+				if ((!current_cluster_config.local_cluster) && (node_type == LEADER))
 				{
 					assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 					ret = cluster_node->send(MSG_INSTALL_SIMULATOR, (void*)simulator_package_filepath);
@@ -2242,7 +2380,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 			config_line_list_str_tmp = NULL;
 
 			ret = simulator_handler->apply_new_fake_acspt_config(new_config_line_list);
-			if (CHECK_SUCCESS(ret) && (!local_cluster))
+			if (CHECK_SUCCESS(ret) && (!current_cluster_config.local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -2317,7 +2455,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 
 			// fprintf(stderr, "%d: %d, %d\n", new_config_line_list.size(), new_pkt_profile_config_line_list.size(), new_wlan_profile_config_line_list.size());
 			ret = simulator_handler->apply_new_fake_usrept_config(new_config_line_list, new_pkt_profile_config_line_list, new_wlan_profile_config_line_list);
-			if (CHECK_SUCCESS(ret) && (!local_cluster))
+			if (CHECK_SUCCESS(ret) && (!current_cluster_config.local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -2362,7 +2500,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				}
 				break;
 			}
-			if (CHECK_SUCCESS(ret) && (!local_cluster))
+			if (CHECK_SUCCESS(ret) && (!current_cluster_config.local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -2406,7 +2544,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
 				}
 				break;
 			}
-			if (CHECK_SUCCESS(ret) && (!local_cluster))
+			if (CHECK_SUCCESS(ret) && (!current_cluster_config.local_cluster))
 			{
 				if (node_type == LEADER)
 				{
@@ -2754,7 +2892,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 	        	interactive_server = new InteractiveServer(this);
 	        	if (interactive_server == NULL)
 					throw bad_alloc();
-	        	ret = interactive_server->initialize(system_monitor_period);
+	        	ret = interactive_server->initialize(/*current_cluster_config.system_monitor_period*/);
 	        	if (CHECK_FAILURE(ret))
 					return ret;
     		}

@@ -114,7 +114,7 @@ InteractiveServer::InteractiveServer(PIMANAGER mgr) :
 	server_fd(0),
 	notify_thread(NULL),
 	manager(mgr),
-	system_monitor_period(0),
+	// system_monitor_period(0),
 	listen_exit(0),
 	listen_tid(0),
 	listen_thread_ret(RET_SUCCESS)
@@ -289,7 +289,7 @@ unsigned short InteractiveServer::print_all_session(const std::string& console_m
 	return RET_SUCCESS;
 }
 
-unsigned short InteractiveServer::initialize(int system_monitor_period_value)
+unsigned short InteractiveServer::initialize(/*int system_monitor_period_value*/)
 {
 	unsigned short ret = RET_SUCCESS;
 // Initialize the worker thread for handling events
@@ -309,7 +309,7 @@ unsigned short InteractiveServer::initialize(int system_monitor_period_value)
 // Initialize the synchronization object
 	session_mtx = PTHREAD_MUTEX_INITIALIZER;
 	// mtx_cluster_map = PTHREAD_MUTEX_INITIALIZER;
-	system_monitor_period = system_monitor_period_value;
+	// system_monitor_period = system_monitor_period_value;
 // Create worker thread
 	if (pthread_create(&listen_tid, NULL, listen_thread_handler, this))
 	{
@@ -608,7 +608,7 @@ unsigned short InteractiveServer::listen_thread_handler_internal()
 			else
 			{
 // Initialize a session ......
-				ret = interactive_session->initialize(system_monitor_period);
+				ret = interactive_session->initialize(/*system_monitor_period*/);
 				if (CHECK_FAILURE(ret))
 				{
 					delete interactive_session;

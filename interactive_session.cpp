@@ -16,7 +16,6 @@ using namespace std;
 enum InteractiveSessionCommandType
 {
 	InteractiveSessionCommand_Help,
-	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommand_SwitchConfigMode,
 	InteractiveSessionCommand_GetRole,
 	InteractiveSessionCommand_GetClusterDetail,
@@ -25,6 +24,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_ListSearchRule,
 	// InteractiveSessionCommand_GetNodeSystemInfo,
 	InteractiveSessionCommand_GetConfigurationSetupInfo,
+	InteractiveSessionCommand_GetRunningSetupInfo,
 	InteractiveSessionCommand_StartSystemMonitor,
 	InteractiveSessionCommand_StopSystemMonitor,
 	InteractiveSessionCommand_SyncFolder,
@@ -44,6 +44,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_RunMultiClis,
 	InteractiveSessionCommand_SwitchLeader,
 	InteractiveSessionCommand_RemoveFollower,
+	InteractiveSessionCommand_Exit,
 	InteractiveSessionCommandSize
 };
 
@@ -51,8 +52,11 @@ enum InteractiveSessionCommandType
 enum InteractiveSessionConfigCommandType
 {
 	InteractiveSessionConfigCommand_Help,
-	InteractiveSessionConfigCommand_Exit,
 	InteractiveSessionConfigCommand_SearchEvent,
+	InteractiveSessionConfigCommand_SetupCluster,
+	InteractiveSessionConfigCommand_MonitorSystem,
+	InteractiveSessionConfigCommand_SyncCluster,
+	InteractiveSessionConfigCommand_Exit,
 	InteractiveSessionConfigCommandSize
 };
 
@@ -84,7 +88,6 @@ static const unsigned char AUTHORITY_ROOT = 0x1 << 1;
 static const CommandAttribute interactive_session_command_attr[InteractiveSessionCommandSize] = 
 {
 	{.command="help", .authority=AUTHORITY_ALL, .description="The usage"},
-	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the session"},
 	{.command="config", .authority=AUTHORITY_ALL, .description="Switch to configuration mode"},
 	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
@@ -92,6 +95,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="search_event", .authority=AUTHORITY_ALL, .description="Search for events"},
 	{.command="list_search_rule", .authority=AUTHORITY_ALL, .description="List the search rules"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
+	{.command="get_running_setup", .authority=AUTHORITY_LEADER, .description="Get the running setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
 	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the Receiver  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
@@ -110,7 +114,8 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="get_fake_acspt_detail", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the details of all fake acepts"},
 	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
 	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"},
-	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"}
+	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"},
+	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the session"}
 };
 
 static const char* interactive_session_unset_search_event_config_command = "unset";
@@ -149,13 +154,27 @@ static const string ConfigCommandSearchEventDescritpion = string("Set rules for 
 													    + string(" * type\n  ") + join(interactive_session_search_event_type_config_command, SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE) + string("\n")
 													    + string(" * severity\n  ") + join(interactive_session_search_event_severity_config_command, SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE) + string("\n")
 													    + string(" * category\n  ") + join(interactive_session_search_event_category_config_command, SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE) + string("\n")
-														+ string(" Dismiss the setting: unset\n");
+														+ string(" Dismiss the setting: unset");
+
+static const string ConfigCommandSetupClusterDescritpion = string("Set configurations for cluster setup\n")
+                                                          + string(" * network\n  network  Ex: 10.206.24.0\n")
+                                                          + string(" * netmask_digits\n  netmask digit  Ex: 23\n")
+														  + string(" Caution: can only be set while cluster is single (no other Followers)");
+
+static const string ConfigCommandMonitorSystemDescritpion = string("Set configurations for monitoring system\n")
+                                                          + string(" * period\n  monitor period in seconds");
+														  
+static const string ConfigCommandSyncClusterDescritpion = string("Set configurations for synchronizing data in the cluster\n")
+                                                        + string(" * folderpath\n  folder path");
 
 static const ConfigCommandAttribute interactive_session_config_command_attr[InteractiveSessionConfigCommandSize] = 
 {
 	{.command="help", .authority=AUTHORITY_ALL, .description="The usage in configuration mode"},
-	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the configuration mode"},
-	{.command="search_event", .authority=AUTHORITY_ALL, .description=ConfigCommandSearchEventDescritpion.c_str()}
+	{.command="search_event", .authority=AUTHORITY_ALL, .description=ConfigCommandSearchEventDescritpion.c_str()},
+	{.command="setup_cluster", .authority=AUTHORITY_LEADER, .description=ConfigCommandSetupClusterDescritpion.c_str()},
+	{.command="monitor_system", .authority=AUTHORITY_LEADER, .description=ConfigCommandMonitorSystemDescritpion.c_str()},
+	{.command="sync_cluster", .authority=AUTHORITY_LEADER, .description=ConfigCommandSyncClusterDescritpion.c_str()},
+	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the configuration mode"}
 };
 
 // static const char *interactive_session_command[InteractiveSessionCommandSize] = 
@@ -277,7 +296,7 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	authority_mask(0x0),
 	system_monitor(false),
 	monitor_system_timer_thread(NULL),
-	system_monitor_period(0),
+	// system_monitor_period(0),
 	is_config_mode(false)
 {
 	IMPLEMENT_MSG_DUMPER()
@@ -318,11 +337,11 @@ InteractiveSession::~InteractiveSession()
 	RELEASE_MSG_DUMPER()
 }
 
-unsigned short InteractiveSession::initialize(int system_monitor_period_value)
+unsigned short InteractiveSession::initialize(/*int system_monitor_period_value*/)
 {
 	assert(manager != NULL && "manager should NOT be NULL");
 	unsigned short ret = RET_SUCCESS;
-	system_monitor_period = system_monitor_period_value;
+	// system_monitor_period = system_monitor_period_value;
 	NodeType node_type = NONE;
     ret = manager->get(PARAM_NODE_TYPE, (void*)&node_type);
  	if (CHECK_FAILURE(ret))
@@ -506,6 +525,13 @@ unsigned short InteractiveSession::get_complete_sync_folderpath(string& sync_fol
 	return ret;
 }
 
+bool InteractiveSession::check_cluster_is_single()const
+{
+	bool is_single;
+	manager->get(PARAM_CLUSTER_IS_SINGLE, (void*)&is_single);
+	return is_single;
+}
+
 void* InteractiveSession::session_thread_handler(void* pvoid)
 {
 	InteractiveSession* pthis = (InteractiveSession*)pvoid;
@@ -603,10 +629,12 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 				// WRITE_FORMAT_DEBUG("Command Argument[Inner]: %s, rest: %s", argv_inner[cur_argc_inner], rest_command_line_inner);
 				if (command_line_inner != NULL)
 				{
+					string cur_command = string(argv_inner[cur_argc_inner]);
+					// printf("cur command: %s\n", cur_command.c_str());
 					if (is_config_mode)
 					{
 // Check if the config command exist
-						CONFIG_COMMAND_MAP::iterator iter = config_command_map.find(string(argv_inner[cur_argc_inner]));
+						CONFIG_COMMAND_MAP::iterator iter = config_command_map.find(cur_command/*string(argv_inner[cur_argc_inner])*/);
 						if (iter == config_command_map.end())
 						{
 							WRITE_FORMAT_ERROR("Error!! Unknown config command: %s", argv_inner[0]);
@@ -632,7 +660,13 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 					else
 					{
 // Check if the command exist
-						COMMAND_MAP::iterator iter = command_map.find(string(argv_inner[cur_argc_inner]));
+						if (system_monitor && (strcmp(cur_command.c_str(), "quit") == 0))
+						{
+							argv_inner[0] = "stop_system_monitor";
+							cur_command = string(argv_inner[0]);
+						}
+
+						COMMAND_MAP::iterator iter = command_map.find(cur_command/*string(argv_inner[cur_argc_inner])*/);
 						if (iter == command_map.end())
 						{
 							WRITE_FORMAT_ERROR("Error!! Unknown command: %s", argv_inner[0]);
@@ -991,7 +1025,6 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 	static handle_command_func_ptr handle_command_func_array[] =
 	{
 		&InteractiveSession::handle_help_command,
-		&InteractiveSession::handle_exit_command,
 		&InteractiveSession::handle_switch_config_mode_command,
 		&InteractiveSession::handle_get_role_command,
 		&InteractiveSession::handle_get_cluster_detail_command,
@@ -1000,6 +1033,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_list_search_rule_command,
 		// &InteractiveSession::handle_get_node_system_info_command,
 		&InteractiveSession::handle_get_configuration_setup_command,
+		&InteractiveSession::handle_get_running_setup_command,
 		&InteractiveSession::handle_start_system_monitor_command,
 		&InteractiveSession::handle_stop_system_monitor_command,
 		&InteractiveSession::handle_sync_folder_command,
@@ -1018,7 +1052,8 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_get_fake_acspt_detail_command,
 		&InteractiveSession::handle_run_multi_clis_command,
 		&InteractiveSession::handle_switch_leader_command,
-		&InteractiveSession::handle_remove_follower_command
+		&InteractiveSession::handle_remove_follower_command,
+		&InteractiveSession::handle_exit_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	COMMAND_MAP::iterator iter = command_map.find(string(argv[0]));
@@ -1082,30 +1117,6 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 
 	ret = print_to_console(usage_string);
 	return ret;
-}
-
-unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
-{
-	assert(observer != NULL && "observer should NOT be NULL");
-	if (argc != 1)
-	{
-		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
-		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_COMMAND;
-	}
-// Send message to the user
-	print_to_console(string("Bye bye !!!"));
-// Notify the parent
-	size_t notify_param_size = sizeof(int);
-	PNOTIFY_CFG notify_cfg = new NotifySessionExitCfg((void*)&session_id, notify_param_size);
-	if (notify_cfg == NULL)
-		throw bad_alloc();
-// Notify the event
-	WRITE_FORMAT_WARN("[%s] The session is closed......", session_tag);
-// Asynchronous event
-	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
-	SAFE_RELEASE(notify_cfg)
-	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::handle_switch_config_mode_command(int argc, char **argv)
@@ -1394,9 +1405,20 @@ unsigned short InteractiveSession::handle_get_configuration_setup_command(int ar
 	return RET_SUCCESS;
 }
 
+unsigned short InteractiveSession::handle_get_running_setup_command(int argc, char **argv)
+{
+	unsigned short ret = RET_SUCCESS;
+	string running_setup_string;
+	ret = manager->get(PARAM_RUNNING_SETUP, (void*)&running_setup_string);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	print_to_console(running_setup_string);
+	return RET_SUCCESS;
+}
+
 unsigned short InteractiveSession::handle_start_system_monitor_command(int argc, char **argv)
 {
-	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n**********************\n\n");
+	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n Type: quit to stop\n**********************\n\n");
 	if (argc != 1)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
@@ -1414,6 +1436,10 @@ unsigned short InteractiveSession::handle_start_system_monitor_command(int argc,
 	monitor_system_timer_thread = new MonitorSystemTimerThread(this, manager);
 	if (monitor_system_timer_thread == NULL)
 		throw bad_alloc();
+	int system_monitor_period;
+    ret = manager->get(PARAM_SYSTEM_MONITOR_PERIOD, (void*)&system_monitor_period);
+ 	if (CHECK_FAILURE(ret))
+		return ret;	
 	if (system_monitor_period != 0)
 		monitor_system_timer_thread->set_period(system_monitor_period);
 	ret = monitor_system_timer_thread->initialize();
@@ -2235,14 +2261,41 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 	return ret;
 }
 
+unsigned short InteractiveSession::handle_exit_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+// Send message to the user
+	print_to_console(string("Bye bye !!!"));
+// Notify the parent
+	size_t notify_param_size = sizeof(int);
+	PNOTIFY_CFG notify_cfg = new NotifySessionExitCfg((void*)&session_id, notify_param_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Notify the event
+	WRITE_FORMAT_WARN("[%s] The session is closed......", session_tag);
+// Asynchronous event
+	observer->notify(NOTIFY_SESSION_EXIT, notify_cfg);
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
 unsigned short InteractiveSession::handle_config_command(int argc, char **argv)
 {
 	typedef unsigned short (InteractiveSession::*handle_config_command_func_ptr)(int argc, char**argv);
 	static handle_config_command_func_ptr handle_config_command_func_array[] =
 	{
 		&InteractiveSession::handle_config_help_command,
-		&InteractiveSession::handle_config_exit_command,
-		&InteractiveSession::handle_config_search_event_command
+		&InteractiveSession::handle_config_search_event_command,
+		&InteractiveSession::handle_config_cluster_setup_command,
+		&InteractiveSession::handle_config_monitor_system_command,
+		&InteractiveSession::handle_config_sync_cluster_command,
+		&InteractiveSession::handle_config_exit_command
 	};
 	// assert (iter != command_map.end() && "Unknown command");
 	CONFIG_COMMAND_MAP::iterator iter = config_command_map.find(string(argv[0]));
@@ -2273,24 +2326,6 @@ unsigned short InteractiveSession::handle_config_help_command(int argc, char **a
 
 	ret = print_to_console(usage_string);
 	return ret;
-}
-
-unsigned short InteractiveSession::handle_config_exit_command(int argc, char **argv)
-{
-	if (argc != 1)
-	{
-		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
-		print_to_console(incorrect_command_phrases);
-		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
-	}
-	if (!is_config_mode)
-	{
-		WRITE_ERROR("Incorrect operation: NOT in the configuraiton mode");
-		print_to_console(incorrect_command_phrases);
-		return RET_FAILURE_INCORRECT_OPERATION;
-	}
-	is_config_mode = false;
-	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::handle_config_search_event_command(int argc, char **argv)
@@ -2467,11 +2502,116 @@ OUT:
 	}
 	else
 	{
-    	WRITE_FORMAT_WARN("Unknown search rule key: %s", rule_key);
+    	WRITE_FORMAT_WARN("Unknown search_event key: %s", rule_key);
     	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
 
 	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_cluster_setup_command(int argc, char **argv)
+{
+	if (argc != 3)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s, config command count: %d", argv[0], argc);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	unsigned short ret = RET_SUCCESS;
+	bool cluster_is_single;
+	ret = manager->get(PARAM_CLUSTER_IS_SINGLE, (void*)&cluster_is_single);
+	if (CHECK_FAILURE(ret))
+		return ret;
+	if (!cluster_is_single)
+	{
+		static string error_string("Cluster is NOT a single node (No Followers)");
+		print_to_console(error_string);
+		return RET_WARN_CLUSTER_NOT_SINGLE;
+	}
+	const char* rule_key = argv[1];
+	const char* rule_value = argv[2];
+	if (strcmp(rule_key, "network") == 0)
+	{
+		string network = string(rule_value);
+		ret = manager->set(PARAM_CLUSTER_SETUP_NETWORK, (void*)&network);
+	}
+	else if (strcmp(rule_key, "netmask_digits") == 0)
+	{
+		int netmask_digits = atoi(rule_value);
+		ret = manager->set(PARAM_CLUSTER_SETUP_NETMASK_DIGITS, (void*)&netmask_digits);
+	}
+	else
+	{
+    	WRITE_FORMAT_WARN("Unknown monitor_system key: %s", rule_key);
+    	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_monitor_system_command(int argc, char **argv)
+{
+	if (argc != 3)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s, config command count: %d", argv[0], argc);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	unsigned short ret = RET_SUCCESS;
+	const char* rule_key = argv[1];
+	const char* rule_value = argv[2];
+	if (strcmp(rule_key, "period") == 0)
+	{
+		int system_monitor_period = atoi(rule_value);
+		ret = manager->set(PARAM_SYSTEM_MONITOR_PERIOD, (void*)&system_monitor_period);
+	}
+	else
+	{
+    	WRITE_FORMAT_WARN("Unknown monitor_system key: %s", rule_key);
+    	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_sync_cluster_command(int argc, char **argv)
+{
+	if (argc != 3)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s, config command count: %d", argv[0], argc);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	unsigned short ret = RET_SUCCESS;
+	const char* rule_key = argv[1];
+	const char* rule_value = argv[2];
+	if (strcmp(rule_key, "folderpath") == 0)
+	{
+		string folderpath = string(rule_value);
+		ret = manager->set(PARAM_CLUSTER_SYNC_FOLDERPATH, (void*)&folderpath);
+	}
+	else
+	{
+    	WRITE_FORMAT_WARN("Unknown sync_cluster key: %s", rule_key);
+    	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	return ret;
+}
+
+unsigned short InteractiveSession::handle_config_exit_command(int argc, char **argv)
+{
+	if (argc != 1)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect config command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+	}
+	if (!is_config_mode)
+	{
+		WRITE_ERROR("Incorrect operation: NOT in the configuraiton mode");
+		print_to_console(incorrect_command_phrases);
+		return RET_FAILURE_INCORRECT_OPERATION;
+	}
+	is_config_mode = false;
+	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_param)

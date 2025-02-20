@@ -54,6 +54,7 @@ const unsigned short RET_WARN_INTERACTIVE_CONFIG_COMMAND = RET_WARN_BASE + 1;
 const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 2;
 const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND = RET_WARN_BASE + 3;
 const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS = RET_WARN_BASE + 4;
+const unsigned short RET_WARN_CLUSTER_NOT_SINGLE = RET_WARN_BASE + 5;
 const unsigned short RET_WARN_END = 0x10FF;
 
 bool SHOW_CONSOLE = true;
@@ -92,6 +93,14 @@ const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS = "cluster_netmask_digits";
 const char* CONF_FIELD_LOCAL_CLUSTER = "local_cluster";
 const char* CONF_FIELD_SYSTEM_MONITOR_PERIOD = "system_monitor_period";
 const char* CONF_FIELD_SYNC_FOLDERPATH = "sync_folderpath";
+const char* CONF_FIELD_LIST[] = {
+    CONF_FIELD_CLUSTER_NETWORK,
+    CONF_FIELD_CLUSTER_NETMASK_DIGITS,
+    CONF_FIELD_LOCAL_CLUSTER,
+    CONF_FIELD_SYSTEM_MONITOR_PERIOD,
+    CONF_FIELD_SYNC_FOLDERPATH
+};
+const int CONF_FIELD_LIST_SIZE = sizeof(CONF_FIELD_LIST) / sizeof(CONF_FIELD_LIST[0]);
 
 const int PAYLOAD_SESSION_ID_DIGITS = 2;
 const char* PAYLOAD_SESSION_ID_STRING_FORMAT = "%02d";

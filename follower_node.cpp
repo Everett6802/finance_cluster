@@ -1340,6 +1340,18 @@ unsigned short FollowerNode::get(ParamType param_type, void* param1, void* param
             pthread_mutex_unlock(&cluster_map_mtx);
     	}
     	break;
+		// case PARAM_CLUSTER_IS_SINGLE:
+		// {
+    	// 	if (param1 == NULL)
+    	// 	{
+    	// 		WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    	// 		return RET_FAILURE_INVALID_ARGUMENT;
+    	// 	}
+        //     pthread_mutex_lock(&cluster_map_mtx);
+        //     *(bool*)param1 = cluster_map.is_single();
+        //     pthread_mutex_unlock(&cluster_map_mtx);
+		// }
+		// break;
     	case PARAM_NODE_ID:
     	{
     		if (param1 == NULL)

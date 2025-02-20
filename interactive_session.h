@@ -54,13 +54,14 @@ private:
 	unsigned char authority_mask;
 	bool system_monitor;
 	PMONITOR_SYSTEM_TIMER_THREAD monitor_system_timer_thread;
-	int system_monitor_period;
+	// int system_monitor_period;
 	bool is_config_mode;
 	EventSearchRule event_search_rule;
 
 	bool check_command_authority(int command_type);
 	bool check_config_command_authority(int command_type);
 	unsigned short get_complete_sync_folderpath(std::string& complete_sync_folderpath)const;
+	bool check_cluster_is_single()const;
 
 	static void* session_thread_handler(void* void_tr);
 	unsigned short session_thread_handler_internal();
@@ -74,7 +75,6 @@ private:
 // Handle command related fundtions
 	unsigned short handle_command(int argc, char **argv);
 	unsigned short handle_help_command(int argc, char **argv);
-	unsigned short handle_exit_command(int argc, char **argv);
 	unsigned short handle_switch_config_mode_command(int argc, char **argv);
 	unsigned short handle_get_role_command(int argc, char **argv);
 	unsigned short handle_get_cluster_detail_command(int argc, char **argv);
@@ -83,6 +83,7 @@ private:
 	unsigned short handle_list_search_rule_command(int argc, char **argv);
 	// unsigned short handle_get_node_system_info_command(int argc, char **argv);
 	unsigned short handle_get_configuration_setup_command(int argc, char **argv);
+	unsigned short handle_get_running_setup_command(int argc, char **argv);
 	unsigned short handle_start_system_monitor_command(int argc, char **argv);
 	unsigned short handle_stop_system_monitor_command(int argc, char **argv);
 	unsigned short handle_sync_folder_command(int argc, char **argv);
@@ -102,11 +103,15 @@ private:
 	unsigned short handle_run_multi_clis_command(int argc, char **argv);
 	unsigned short handle_switch_leader_command(int argc, char **argv);
 	unsigned short handle_remove_follower_command(int argc, char **argv);
+	unsigned short handle_exit_command(int argc, char **argv);
 // Handle command in configuration mode related fundtions
 	unsigned short handle_config_command(int argc, char **argv);
 	unsigned short handle_config_help_command(int argc, char **argv);
-	unsigned short handle_config_exit_command(int argc, char **argv);
 	unsigned short handle_config_search_event_command(int argc, char **argv);
+	unsigned short handle_config_cluster_setup_command(int argc, char **argv);
+	unsigned short handle_config_monitor_system_command(int argc, char **argv);
+	unsigned short handle_config_sync_cluster_command(int argc, char **argv);
+	unsigned short handle_config_exit_command(int argc, char **argv);
 
 	unsigned short print_to_console(const std::string& response)const;
 	unsigned short print_prompt_to_console()const;
@@ -116,7 +121,7 @@ public:
 	InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int client_fd, const sockaddr_in& sock_addraddress, int interactive_session_id);
 	~InteractiveSession();
 
-	unsigned short initialize(int system_monitor_period_value);
+	unsigned short initialize(/*int system_monitor_period_value*/);
 	unsigned short deinitialize();
 	const char* get_session_tag()const;
 	unsigned short print_console(const std::string& console_string)const;

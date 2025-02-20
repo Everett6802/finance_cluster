@@ -30,13 +30,24 @@ class ClusterMgr : public IManager
 		int follower_node_amount;
 	};
 
+	struct ClusterConfig
+	{
+		std::string cluster_network;
+		int cluster_netmask_digits;
+		bool local_cluster;
+		int system_monitor_period;
+		std::string sync_folderpath;
+	};
+
 private:
 // config
-	std::string cluster_network;
-	int cluster_netmask_digits;
-	bool local_cluster;
-	int system_monitor_period;
-	std::string sync_folderpath;
+	// std::string cluster_network;
+	// int cluster_netmask_digits;
+	// bool local_cluster;
+	// int system_monitor_period;
+	// std::string sync_folderpath;
+	ClusterConfig initial_cluster_config;
+	ClusterConfig current_cluster_config;
 
 	PNOTIFY_THREAD notify_thread;
 	char* node_token;
@@ -56,6 +67,7 @@ private:
 	SystemOperator* system_operator;
 
 	unsigned short parse_config();
+	unsigned short generate_config_string(std::string& config_string, const ClusterConfig& cluster_config)const;
 	bool check_interface_exist(const char* network_interface)const;
 	unsigned short find_local_ip(bool need_check_network=false);
 	void set_keepalive_timer_interval(int delay=0, int period=0);

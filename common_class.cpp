@@ -604,6 +604,11 @@ bool ClusterMap::is_empty()const
 	return cluster_map.empty();
 }
 
+bool ClusterMap::is_single()const
+{
+	return (cluster_map.size() == 1 ? true : false);
+}
+
 void ClusterMap::set_local_cluster(bool need_local_cluster)
 {
 	if (need_local_cluster != local_cluster)

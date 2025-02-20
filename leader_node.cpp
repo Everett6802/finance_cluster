@@ -1595,11 +1595,23 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		ClusterMap& cluster_map_param = *(ClusterMap*)param1;
-         pthread_mutex_lock(&node_channel_mtx);
-         ret = cluster_map_param.copy(cluster_map);
-         pthread_mutex_unlock(&node_channel_mtx);
+            pthread_mutex_lock(&node_channel_mtx);
+            ret = cluster_map_param.copy(cluster_map);
+            pthread_mutex_unlock(&node_channel_mtx);
     	}
     	break;
+		case PARAM_CLUSTER_IS_SINGLE:
+		{
+    		if (param1 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			pthread_mutex_lock(&node_channel_mtx);
+            *(bool*)param1 = cluster_map.is_single();
+			pthread_mutex_unlock(&node_channel_mtx);
+		}
+		break;
     	case PARAM_CLUSTER_NODE_AMOUNT:
     	{
     		if (param1 == NULL)
@@ -1608,7 +1620,7 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
     		int& cluster_node_amount_param = *(int*)param1;
-         pthread_mutex_lock(&node_channel_mtx);
+
          cluster_node_amount_param = cluster_map.size();
          pthread_mutex_unlock(&node_channel_mtx);
     	}

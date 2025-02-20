@@ -193,6 +193,7 @@ extern const unsigned short RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
+extern const unsigned short RET_WARN_CLUSTER_NOT_SINGLE;
 extern const unsigned short RET_WARN_END;
 
 extern bool SHOW_CONSOLE;
@@ -226,6 +227,8 @@ extern const char* CONF_FIELD_CLUSTER_NETMASK_DIGITS;
 extern const char* CONF_FIELD_LOCAL_CLUSTER;
 extern const char* CONF_FIELD_SYSTEM_MONITOR_PERIOD;
 extern const char* CONF_FIELD_SYNC_FOLDERPATH;
+extern const char* CONF_FIELD_LIST[];
+extern const int CONF_FIELD_LIST_SIZE;
 
 extern const int PAYLOAD_SESSION_ID_DIGITS;
 extern const char* PAYLOAD_SESSION_ID_STRING_FORMAT;
@@ -281,12 +284,14 @@ enum ParamType{
 	PARAM_NODE_ID,
 	PARAM_NODE_TOKEN,
 	PARAM_CLUSTER_MAP,
+	PARAM_CLUSTER_IS_SINGLE,
 	PARAM_CONNECTION_RETRY,
 	PARAM_LOCAL_CLUSTER,
 	PARAM_CLUSTER_DETAIL,
 	PARAM_SYSTEM_INFO,
 	// PARAM_NODE_SYSTEM_INFO,
 	PARAM_CONFIGURATION_SETUP,
+	PARAM_RUNNING_SETUP,
 	PARAM_CONFIGURATION_VALUE,
 	PARAM_SYSTEM_MONITOR,
 	PARAM_SIMULATOR_VERSION,
@@ -302,6 +307,10 @@ enum ParamType{
 	PARAM_SENDER_TOKEN,
 	PARAM_ACTION_FREEZE,
 	PARAM_REMOVE_FOLLOWER,
+	PARAM_CLUSTER_SETUP_NETWORK,
+	PARAM_CLUSTER_SETUP_NETMASK_DIGITS,
+	PARAM_SYSTEM_MONITOR_PERIOD,
+	PARAM_CLUSTER_SYNC_FOLDERPATH,
 	PARAM_SIZE
 };
 
@@ -647,6 +656,7 @@ public:
 
     size_t size()const;
     bool is_empty()const;
+	bool is_single()const;
     void set_local_cluster(bool need_local_cluster);
     unsigned short copy(const ClusterMap& another_cluster_map);
 	unsigned short add_node(int node_id, std::string node_token);
