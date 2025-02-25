@@ -91,7 +91,8 @@ const char *GetErrorDescription(unsigned short ret)
 static char* EVENT_TYPE_DESCRIPTION[] = {
 	"Operate Node",
 	"Telnet Console",
-	"Sync Data"
+	"Sync Data",
+	"Update Config"
 };
 static int EVENT_TYPE_DESCRIPTION_SIZE = sizeof(EVENT_TYPE_DESCRIPTION) / sizeof(EVENT_TYPE_DESCRIPTION[0]);
 

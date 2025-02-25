@@ -57,6 +57,7 @@ private:
 	// int system_monitor_period;
 	bool is_config_mode;
 	EventSearchRule event_search_rule;
+	bool cluster_config_updated;
 
 	bool check_command_authority(int command_type);
 	bool check_config_command_authority(int command_type);

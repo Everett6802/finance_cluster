@@ -136,10 +136,14 @@ if (event_recorder != NULL)\
 	event_recorder = NULL;\
 }
 
-#define WRITE_EVT_RECORDER(EventCfgType,...)\
+/*
+Why to add ## before __VA_ARGS__
+https://ithelp.ithome.com.tw/articles/10160393
+*/
+#define WRITE_EVT_RECORDER(EventCfgType, ...)\
 do{\
 	EventCfgType* event_cfg = NULL;\
-	EventCfgType::generate_obj(&event_cfg,__VA_ARGS__);\
+	EventCfgType::generate_obj(&event_cfg, ##__VA_ARGS__);\
 	event_recorder->write(event_cfg);\
 }while(0);
 
@@ -364,6 +368,7 @@ enum EventType{
 	EVENT_OPERATE_NODE,
 	EVENT_TELENT_CONSOLE,
 	EVENT_SYNC_DATA,
+	EVENT_UPDATE_CONFIG,
 	EVENT_TYPE_SIZE
 };
 
@@ -1377,6 +1382,19 @@ public:
 	static unsigned short generate_obj(SyncDataEventCfg **obj, const char* data_path, NodeType note_type, const char* node_token, char is_folder);
 };
 typedef SyncDataEventCfg* PSYNC_DATA_EVENT_CFG;
+
+///////////////////////////////////////////////////
+
+class UpdateConfigEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	UpdateConfigEventCfg(const void* param, size_t param_size);
+	virtual ~UpdateConfigEventCfg();
+
+public:
+	static unsigned short generate_obj(UpdateConfigEventCfg **obj);
+};
+typedef UpdateConfigEventCfg* PUPDATE_CONFIG_EVENT_CFG;
 
 ///////////////////////////////////////////////////
 

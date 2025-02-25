@@ -454,3 +454,28 @@ SyncDataEventCfg::SyncDataEventCfg(const void* param, size_t param_size) :
 }
 
 SyncDataEventCfg::~SyncDataEventCfg(){}
+
+//////////////////////////////////////////////////////////
+
+const int UpdateConfigEventCfg::EVENT_DATA_SIZE = 0;
+
+unsigned short UpdateConfigEventCfg::generate_obj(UpdateConfigEventCfg **obj)
+{
+	assert(obj != NULL && "obj should NOT be NULL");
+	UpdateConfigEventCfg *obj_tmp = new UpdateConfigEventCfg(NULL, EVENT_DATA_SIZE);
+	if (obj_tmp == NULL)
+		throw bad_alloc();
+	*obj = obj_tmp;
+	return RET_SUCCESS;
+}
+
+UpdateConfigEventCfg::UpdateConfigEventCfg(const void* param, size_t param_size) :
+	EventCfg(EVENT_UPDATE_CONFIG, EVENT_SEVERITY_INFORMATIONAL, EVENT_CATEGORY_CONSOLE, param, param_size)
+{
+	generate_content_base_description();
+	static string content_description = string("Cluster configurations are updated");
+	event_description += content_description;
+}
+
+UpdateConfigEventCfg::~UpdateConfigEventCfg(){}
+

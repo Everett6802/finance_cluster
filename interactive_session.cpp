@@ -297,7 +297,8 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	system_monitor(false),
 	monitor_system_timer_thread(NULL),
 	// system_monitor_period(0),
-	is_config_mode(false)
+	is_config_mode(false),
+	cluster_config_updated(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 	IMPLEMENT_EVT_RECORDER()
@@ -2545,6 +2546,7 @@ unsigned short InteractiveSession::handle_config_cluster_setup_command(int argc,
     	WRITE_FORMAT_WARN("Unknown monitor_system key: %s", rule_key);
     	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
+	if (!cluster_config_updated) cluster_config_updated = true;
 	return ret;
 }
 
@@ -2569,6 +2571,7 @@ unsigned short InteractiveSession::handle_config_monitor_system_command(int argc
     	WRITE_FORMAT_WARN("Unknown monitor_system key: %s", rule_key);
     	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
+	if (!cluster_config_updated) cluster_config_updated = true;
 	return ret;
 }
 
@@ -2593,6 +2596,7 @@ unsigned short InteractiveSession::handle_config_sync_cluster_command(int argc, 
     	WRITE_FORMAT_WARN("Unknown sync_cluster key: %s", rule_key);
     	return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 	}
+	if (!cluster_config_updated) cluster_config_updated = true;
 	return ret;
 }
 
@@ -2610,6 +2614,12 @@ unsigned short InteractiveSession::handle_config_exit_command(int argc, char **a
 		print_to_console(incorrect_command_phrases);
 		return RET_FAILURE_INCORRECT_OPERATION;
 	}
+	if (cluster_config_updated)
+	{
+		WRITE_EVT_RECORDER(UpdateConfigEventCfg);
+		cluster_config_updated = false;
+	} 
+
 	is_config_mode = false;
 	return RET_SUCCESS;
 }
