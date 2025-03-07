@@ -371,7 +371,7 @@ unsigned short FileChannel::send_thread_handler_internal()
 	WRITE_FORMAT_DEBUG("Start to read data from the file for the Node[%s]...", remote_token.c_str());
    	int read_cnt = 0;
    	int send_cnt = 0;
-   	while (!feof(tx_fp))
+   	while (exit == 0 && !feof(tx_fp))
    	{
 // Read data from the file
    		read_bytes = fread(tx_buf, sizeof(char), MAX_BUF_SIZE, tx_fp);

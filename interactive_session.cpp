@@ -154,6 +154,7 @@ static const string ConfigCommandSearchEventDescritpion = string("Set rules for 
 													    + string(" * type\n  ") + join(interactive_session_search_event_type_config_command, SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE) + string("\n")
 													    + string(" * severity\n  ") + join(interactive_session_search_event_severity_config_command, SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE) + string("\n")
 													    + string(" * category\n  ") + join(interactive_session_search_event_category_config_command, SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE) + string("\n")
+														+ string(" * description\n  sub-string in the description\n")
 														+ string(" Dismiss the setting: unset");
 
 static const string ConfigCommandSetupClusterDescritpion = string("Set configurations for cluster setup\n")
@@ -1015,6 +1016,12 @@ unsigned short InteractiveSession::print_search_rule_to_console()const
 	{
 		// char buf[DEF_STRING_SIZE];
 		snprintf(buf, DEF_STRING_SIZE, "Category  %s\n", GetEventCategoryDescription(event_search_rule.search_event_category));
+		print_to_console(string(buf) + string("\n"));
+	}
+	if (event_search_rule.need_search_event_description)
+	{
+		// char buf[DEF_STRING_SIZE];
+		snprintf(buf, DEF_STRING_SIZE, "Description  %s\n", event_search_rule.search_event_description.c_str());
 		print_to_console(string(buf) + string("\n"));
 	}
 	return RET_SUCCESS;
@@ -2499,6 +2506,18 @@ OUT:
 		{
 			WRITE_FORMAT_WARN("Unknown search event category value: %s", rule_value);
 			return RET_WARN_INTERACTIVE_CONFIG_COMMAND;
+		}
+	}
+	else if (strcmp(rule_key, "description") == 0)
+	{
+		if (strcmp(interactive_session_unset_search_event_config_command, rule_value) == 0)
+		{
+			event_search_rule.need_search_event_description = false;
+		}
+		else
+		{
+			event_search_rule.need_search_event_description = true;
+			event_search_rule.search_event_description = rule_value;
 		}
 	}
 	else

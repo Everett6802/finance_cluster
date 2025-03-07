@@ -115,7 +115,7 @@ if (x != NULL)\
 #endif
 
 #ifndef ENABLE_SEARCH_RULE
-#define ENABLE_SEARCH_RULE(x) (x.need_search_event_time || x.need_search_event_type || x.need_search_event_severity || x.need_search_event_category)
+#define ENABLE_SEARCH_RULE(x) (x.need_search_event_time || x.need_search_event_type || x.need_search_event_severity || x.need_search_event_category || x.need_search_event_description)
 #endif
 
 // Event Recorder
@@ -1502,6 +1502,8 @@ struct EventSearchRule
 	EventSeverity search_event_severity;
 	bool need_search_event_category;
 	EventCategory search_event_category;
+	bool need_search_event_description;
+	std::string search_event_description;
 };
 typedef EventSearchRule* PEVENT_SEARCH_RULE;
 

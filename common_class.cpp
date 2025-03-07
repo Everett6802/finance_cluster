@@ -1943,6 +1943,8 @@ unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string
 				goto OUT;
 			if (event_search_rule->need_search_event_category && event_search_rule->search_event_category != event_entry->event_category)
 				goto OUT;
+			if (event_search_rule->need_search_event_description && event_entry->event_description.find(event_search_rule->search_event_description) == string::npos)
+				goto OUT;
 			if (event_line_list != NULL)
 				event_line_list->push_back((string)*iter);
 		}
