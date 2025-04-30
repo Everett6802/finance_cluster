@@ -484,7 +484,8 @@ unsigned short FollowerNode::recv(MessageType message_type, const char* message_
 		&FollowerNode::recv_request_file_transfer,
 		&FollowerNode::recv_complete_file_transfer,
 		&FollowerNode::recv_switch_leader,
-		&FollowerNode::recv_remove_follower
+		&FollowerNode::recv_remove_follower,
+		&FollowerNode::recv_remote_sync_file
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -516,7 +517,8 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_request_file_transfer,
 		&FollowerNode::send_complete_file_transfer,
 		&FollowerNode::send_switch_leader,
-		&FollowerNode::send_remove_follower
+		&FollowerNode::send_remove_follower,
+		&FollowerNode::send_remote_sync_file
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -847,6 +849,20 @@ unsigned short FollowerNode::recv_remove_follower(const char* message_data, int 
 // Synchronous event
 	ret = observer->notify(NOTIFY_REMOVE_FOLLOWER, notify_cfg);
 	return ret;
+}
+
+unsigned short FollowerNode::recv_remote_sync_file(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | filepath | EOD
+// 	PNOTIFY_CFG notify_cfg = new NotifyRemoteSyncFileCfg((void*)message_data, message_size);
+// 	if (notify_cfg == NULL)
+// 		throw bad_alloc();
+//     assert(observer != NULL && "observer should NOT be NULL");
+// // Synchronous event
+// 	ret = observer->notify(NOTIFY_REMOTE_SYNC_FILE, notify_cfg);
+	// return ret;
+	return send_remote_sync_file((void*)message_data);
 }
 
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
@@ -1252,6 +1268,37 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 unsigned short FollowerNode::send_switch_leader(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_SWITCH_LEADER);}
 
 unsigned short FollowerNode::send_remove_follower(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_REMOVE_FOLLOWER);}
+
+unsigned short FollowerNode::send_remote_sync_file(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: filepath
+// Message format:
+// EventType | return value | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+
+	unsigned short ret = RET_SUCCESS;
+// Start to transfer the file
+	ClusterFileTransferParam cluster_file_transfer_param;
+	cluster_file_transfer_param.session_id = -1;
+	const char* filepath = (const char*)param1;
+	ret = observer->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	usleep(100000);
+	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	observer->set(PARAM_REMOTE_SYNC_FILE_FLAG_OFF);
+	static const int BUF_SIZE = sizeof(unsigned short);
+	char buf[BUF_SIZE];
+	memcpy(buf, &ret, sizeof(unsigned short));
+	send_raw_data(MSG_REMOTE_SYNC_FILE, buf, BUF_SIZE);
+	if (CHECK_FAILURE(ret) && ret != RET_FAILURE_RESOURCE_BUSY)
+		return ret;
+	return RET_SUCCESS;
+}
 
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
 {

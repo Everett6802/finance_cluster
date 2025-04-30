@@ -33,6 +33,7 @@ const unsigned short RET_FAILURE_HANDLE_THREAD = RET_FAILURE_BASE + 11;
 const unsigned short RET_FAILURE_SYSTEM_API = RET_FAILURE_BASE + 12;
 const unsigned short RET_FAILURE_INTERNAL_ERROR = RET_FAILURE_BASE + 13;
 const unsigned short RET_FAILURE_INCORRECT_VALUE = RET_FAILURE_BASE + 14;
+const unsigned short RET_FAILURE_RESOURCE_BUSY = RET_FAILURE_BASE + 15;
 ///// Connection Related /////
 const unsigned short RET_FAILURE_CONNECTION_BASE = 0x100;
 const unsigned short RET_FAILURE_CONNECTION_ERROR = RET_FAILURE_CONNECTION_BASE + 0;
@@ -55,6 +56,7 @@ const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED = RET_WARN_BASE + 2;
 const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND = RET_WARN_BASE + 3;
 const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS = RET_WARN_BASE + 4;
 const unsigned short RET_WARN_CLUSTER_NOT_SINGLE = RET_WARN_BASE + 5;
+const unsigned short RET_WARN_REMOTE_FILE_TRANSFER_FAILURE = RET_WARN_BASE + 6;
 const unsigned short RET_WARN_END = 0x10FF;
 
 bool SHOW_CONSOLE = true;

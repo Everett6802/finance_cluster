@@ -56,10 +56,12 @@ private:
 	PINODE cluster_node;
 	FileTxType file_tx_type;
 	PIFILE_TX file_tx;
+	int remote_sync_file_enable;
+	unsigned short remote_sync_file_ret;
 
 // parameters related to session
 	InteractiveServer* interactive_server;
-	InteractiveSessionConcurrentParam interactive_session_param[MAX_INTERACTIVE_SESSION];
+	InteractiveSessionConcurrentParam* interactive_session_param;
 
 	SimulatorHandler* simulator_handler;
 	bool simulator_installed;

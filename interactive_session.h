@@ -89,6 +89,7 @@ private:
 	unsigned short handle_stop_system_monitor_command(int argc, char **argv);
 	unsigned short handle_sync_folder_command(int argc, char **argv);
 	unsigned short handle_sync_file_command(int argc, char **argv);
+	unsigned short handle_remote_sync_file_command(int argc, char **argv);
 	unsigned short handle_get_simulator_version_command(int argc, char **argv);
 	unsigned short handle_trasnfer_simulator_package_command(int argc, char **argv);
 	unsigned short handle_install_simulator_command(int argc, char **argv);

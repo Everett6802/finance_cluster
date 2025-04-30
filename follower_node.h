@@ -66,7 +66,8 @@ private:
 	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
 	unsigned short recv_switch_leader(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short recv_remove_follower(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
-// send
+	unsigned short recv_remote_sync_file(const char* message_data, int message_size);
+	// send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -84,6 +85,7 @@ private:
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_switch_leader(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short send_remove_follower(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
+	unsigned short send_remote_sync_file(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 public:
 	FollowerNode(PIMANAGER parent, const char* server_token=NULL, const char* token=NULL);  // server_token/token is NULL for local cluster

@@ -176,6 +176,7 @@ extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
 extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
 extern const unsigned short RET_FAILURE_INCORRECT_VALUE;
+extern const unsigned short RET_FAILURE_RESOURCE_BUSY;
 ///// Connection Related /////
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
 extern const unsigned short RET_FAILURE_CONNECTION_ERROR;
@@ -198,6 +199,7 @@ extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
 extern const unsigned short RET_WARN_CLUSTER_NOT_SINGLE;
+extern const unsigned short RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 extern const unsigned short RET_WARN_END;
 
 extern bool SHOW_CONSOLE;
@@ -277,6 +279,7 @@ enum MessageType{
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
 	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
 	MSG_REMOVE_FOLLOWER, // Uni-Direction, Leader -> Follower
+	MSG_REMOTE_SYNC_FILE, // Uni-Direction, Leader -> Follower
 	MSG_SIZE
 };
 
@@ -287,6 +290,7 @@ enum ParamType{
 	PARAM_NODE_TYPE,
 	PARAM_NODE_ID,
 	PARAM_NODE_TOKEN,
+	PARAM_NODE_TOKEN_LOOKUP,
 	PARAM_CLUSTER_MAP,
 	PARAM_CLUSTER_IS_SINGLE,
 	PARAM_CONNECTION_RETRY,
@@ -315,6 +319,9 @@ enum ParamType{
 	PARAM_CLUSTER_SETUP_NETMASK_DIGITS,
 	PARAM_SYSTEM_MONITOR_PERIOD,
 	PARAM_CLUSTER_SYNC_FOLDERPATH,
+	PARAM_REMOTE_SYNC_FILE,
+	PARAM_REMOTE_SYNC_FILE_FLAG_OFF,
+	PARAM_REMOTE_SYNC_FILE_RETURN_VALUE,
 	PARAM_SIZE
 };
 
@@ -343,6 +350,7 @@ enum NotifyType{
 	NOTIFY_SWITCH_LEADER,
 	NOTIFY_REMOVE_FOLLOWER,
 	NOTIFY_ADD_EVENT,
+	// NOTIFY_REMOTE_SYNC_FILE,
 	NOTIFY_SIZE
 };
 
@@ -368,6 +376,7 @@ enum EventType{
 	EVENT_OPERATE_NODE,
 	EVENT_TELENT_CONSOLE,
 	EVENT_SYNC_DATA,
+	EVENT_REMOTE_SYNC_DATA,
 	EVENT_UPDATE_CONFIG,
 	EVENT_TYPE_SIZE
 };
@@ -1248,8 +1257,23 @@ public:
 typedef NotifyRemoveFollowerCfg* PNOTIFY_REMOVE_FOLLOWER_CFG;
 
 ///////////////////////////
+
+// class NotifyRemoteSyncFileCfg : public NotifyCfg
+// {
+// private:
+// 	char* filepath;
+
+// public:
+// NotifyRemoteSyncFileCfg(const void* param, size_t param_size);
+// 	virtual ~NotifyRemoteSyncFileCfg();
+
+// 	const char* get_filepath()const;
+// };
+// typedef NotifyRemoteSyncFileCfg* PNOTIFY_REMOTE_SYNC_FILE_CFG;
+
+///////////////////////////
 // A wrapper class for data transition in the NotifyThread class
-class EventCfg;
+// class EventCfg;
 class NotifyEventCfg : public NotifyCfg
 {
 private:
@@ -1382,6 +1406,28 @@ public:
 	static unsigned short generate_obj(SyncDataEventCfg **obj, const char* data_path, NodeType note_type, const char* node_token, char is_folder);
 };
 typedef SyncDataEventCfg* PSYNC_DATA_EVENT_CFG;
+
+///////////////////////////////////////////////////
+
+struct RemoteSyncDataEventData
+{
+	char data_path[DEF_LONG_STRING_SIZE];
+	// NodeType node_type;
+	char remote_node_token[DEF_LONG_STRING_SIZE];
+	// char is_folder;
+}__attribute__ ((packed));
+typedef RemoteSyncDataEventData* PREMOTE_SYNC_DATA_EVENT_DATA;
+
+class RemoteSyncDataEventCfg : public EventCfg
+{
+	static const int EVENT_DATA_SIZE;
+	RemoteSyncDataEventCfg(const void* param, size_t param_size);
+	virtual ~RemoteSyncDataEventCfg();
+
+public:
+	static unsigned short generate_obj(RemoteSyncDataEventCfg **obj, const char* data_path, const char* remote_node_token/*, char is_folder*/);
+};
+typedef RemoteSyncDataEventCfg* PREMOTE_SYNC_DATA_EVENT_CFG;
 
 ///////////////////////////////////////////////////
 

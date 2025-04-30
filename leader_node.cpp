@@ -785,7 +785,8 @@ unsigned short LeaderNode::recv(MessageType message_type, const char* message_da
 		&LeaderNode::recv_request_file_transfer,
 		&LeaderNode::recv_complete_file_transfer,
 		&LeaderNode::recv_switch_leader,
-		&LeaderNode::recv_remove_follower
+		&LeaderNode::recv_remove_follower,
+		&LeaderNode::recv_remote_sync_file
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
 	{
@@ -818,7 +819,8 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_request_file_transfer,
 		&LeaderNode::send_complete_file_transfer,
 		&LeaderNode::send_switch_leader,
-		&LeaderNode::send_remove_follower
+		&LeaderNode::send_remove_follower,
+		&LeaderNode::send_remote_sync_file
 	};
 
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -1028,6 +1030,16 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 unsigned short LeaderNode::recv_switch_leader(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
 
 unsigned short LeaderNode::recv_remove_follower(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REMOVE_FOLLOWER);}
+
+unsigned short LeaderNode::recv_remote_sync_file(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | return value | EOD
+	unsigned short ret = RET_SUCCESS;
+	unsigned short remote_sync_file_ret = (unsigned short)atoi(message_data);
+	ret = observer->set(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	return ret;
+}
 
 unsigned short LeaderNode::send_check_keepalive(void* param1, void* param2, void* param3)
 {
@@ -1480,6 +1492,43 @@ unsigned short LeaderNode::send_remove_follower(void* param1, void* param2, void
 	return send_raw_data(MSG_REMOVE_FOLLOWER, buf, BUF_SIZE);
 }
 
+unsigned short LeaderNode::send_remote_sync_file(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: follower node id
+// param2: file path in follower
+// Message format:
+// EventType | text | EOD
+	if (param1 == NULL || param2 == NULL)
+	{
+		WRITE_ERROR("param1/param2 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	unsigned short ret = RET_SUCCESS;
+	int follower_node_id = *(int*)param1;
+	const char* remote_filepath = (char*)param2;
+	string follower_node_token;
+	pthread_mutex_lock(&node_channel_mtx);
+	ret = cluster_map.get_node_token(follower_node_id, follower_node_token);
+	pthread_mutex_unlock(&node_channel_mtx);
+	if (ret == RET_FAILURE_NOT_FOUND)
+	{
+		WRITE_FORMAT_ERROR("Fail to find the node token from node id[%d]", follower_node_id);
+		return ret;
+	}
+
+	// int buf_size = sizeof(int) + strlen((char*)remote_filepath) + 1;
+	// char* buf = new char[buf_size];
+	// if (buf == NULL)
+	// 	throw bad_alloc();
+	// memset(buf, 0x0, sizeof(char) * buf_size);
+	// char* buf_ptr = buf;
+	// memcpy(buf_ptr, param1, sizeof(int));
+	// buf_ptr += sizeof(int);
+	// memcpy(buf_ptr, (char*)param2, strlen((char*)remote_filepath));
+	return send_raw_data(MSG_REMOTE_SYNC_FILE, remote_filepath, strlen((char*)remote_filepath) + 1, follower_node_token.c_str());
+}
+
 unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 {
     unsigned short ret = RET_SUCCESS;
@@ -1587,6 +1636,24 @@ unsigned short LeaderNode::get(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+		case PARAM_NODE_TOKEN_LOOKUP:
+		{
+    		if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1/param2 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			int node_id = *(int*)param1;
+			string node_token;
+            pthread_mutex_lock(&node_channel_mtx);
+            ret = cluster_map.get_node_token(node_id, node_token);
+            pthread_mutex_unlock(&node_channel_mtx);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			char *node_token_tmp = strdup(node_token.c_str());
+    		*((char**)param2) = node_token_tmp;
+		}
+		break;
     	case PARAM_CLUSTER_MAP:
     	{
     		if (param1 == NULL)

@@ -553,7 +553,6 @@ const char* NotifyFakeAcsptDetailCfg::get_fake_acspt_detail()const
 	return fake_acspt_detail;
 }
 
-
 ///////////////////////////
 
 NotifyFileTransferConnectCfg::NotifyFileTransferConnectCfg(const void* param, size_t param_size) :
@@ -819,7 +818,7 @@ int NotifyRemoveFollowerCfg::get_node_id()const
 	return node_id;
 }
 
-///////////////////////////
+//////////////////////////////////////////////////////////
 
 NotifyEventCfg::NotifyEventCfg(EventCfg* param) :
 	NotifyCfg(NOTIFY_ADD_EVENT)
@@ -837,3 +836,26 @@ EventCfg* NotifyEventCfg::get_event_cfg()
 {
 	return event_param;
 }
+
+//////////////////////////////////////////////////////////
+
+// NotifyRemoteSyncFileCfg::NotifyRemoteSyncFileCfg(const void* param, size_t param_size) :
+// 	NotifyCfgEx(NOTIFY_REMOTE_SYNC_FILE, param, param_size)
+// {
+// 	assert(param != NULL && "param should NOT be NULL");
+// // De-Serialize: convert the type of session id from string to integer  
+// 	const char* param_char = (const char*)notify_param;
+// 	filepath = (char*)(param_char);
+// 	if (strlen(filepath) == 0)
+// 		filepath = NULL;
+// }
+
+// NotifyRemoteSyncFileCfg::~NotifyRemoteSyncFileCfg()
+// {
+// 	filepath = NULL;
+// }
+
+// const char* NotifyRemoteSyncFileCfg::get_filepath()const
+// {
+// 	return filepath;
+// }

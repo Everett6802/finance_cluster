@@ -32,7 +32,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"Failure Handle Thread",
 		"Failure System API",
 		"Failure Internal Error",
-		"Failure Incorrect Value"
+		"Failure Incorrect Value",
+		"Failure Resource Busy"
 	};
 	static const char *connection_ret_failure_description[] =
 	{
@@ -55,7 +56,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"Warn Simulator Not Installed",
 		"Warn Simulator Package Not Found",
 		"Warn File Transfer in Process",
-		"Warn Cluster Not Single"
+		"Warn Cluster Not Single",
+		"Warn Remote File Transfer Failure",
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
 	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);
@@ -92,6 +94,7 @@ static char* EVENT_TYPE_DESCRIPTION[] = {
 	"Operate Node",
 	"Telnet Console",
 	"Sync Data",
+	"Remote Sync Data",
 	"Update Config"
 };
 static int EVENT_TYPE_DESCRIPTION_SIZE = sizeof(EVENT_TYPE_DESCRIPTION) / sizeof(EVENT_TYPE_DESCRIPTION[0]);

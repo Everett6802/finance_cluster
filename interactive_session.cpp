@@ -29,6 +29,7 @@ enum InteractiveSessionCommandType
 	InteractiveSessionCommand_StopSystemMonitor,
 	InteractiveSessionCommand_SyncFolder,
 	InteractiveSessionCommand_SyncFile,
+	InteractiveSessionCommand_RemoteSyncFile,
 	InteractiveSessionCommand_GetSimulatorVersion,
 	InteractiveSessionCommand_TransferSimulatorPackage,
 	InteractiveSessionCommand_InstallSimulator,
@@ -100,6 +101,7 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
 	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the Receiver  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
 	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the Receiver\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)\n Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute filepath in Follower"},
+	{.command="remote_sync_file", .authority=AUTHORITY_LEADER, .description="Request remote node to synchronize a specific file of the folder to the Receiver\n  Param: filepath (ex. /home/super/text.txt)\n  Param: Node ID\n Caution: Only Leader can request Follower to synchorinize a specific file to Leader\n Caution: It's required to use absolute filepath"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
 	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
 	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
@@ -1046,6 +1048,7 @@ unsigned short InteractiveSession::handle_command(int argc, char **argv)
 		&InteractiveSession::handle_stop_system_monitor_command,
 		&InteractiveSession::handle_sync_folder_command,
 		&InteractiveSession::handle_sync_file_command,
+		&InteractiveSession::handle_remote_sync_file_command,
 		&InteractiveSession::handle_get_simulator_version_command,
 		&InteractiveSession::handle_trasnfer_simulator_package_command,
 		&InteractiveSession::handle_install_simulator_command,
@@ -1607,9 +1610,60 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	cluster_file_transfer_param.session_id = session_id;
     ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
     // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
- 	if (CHECK_FAILURE(ret))
-		return ret;
 	return RET_SUCCESS;
+}
+
+unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, char **argv)
+{
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (argc != 3)
+	{
+		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
+		print_to_console(incorrect_command_phrases);
+		return RET_WARN_INTERACTIVE_COMMAND;
+	}
+	unsigned short ret = RET_SUCCESS;
+	int follower_node_id = atoi(argv[1]);
+	const char* remote_filepath = (char*)argv[2];
+	char* follower_node_token;
+	ret = manager->get(PARAM_NODE_TOKEN_LOOKUP, (void*)&follower_node_id, (void*)&follower_node_token);
+	WRITE_FORMAT_DEBUG("Trigger remote sync file in Follower[%s]: %s", follower_node_token, remote_filepath);
+	ret = manager->set(PARAM_REMOTE_SYNC_FILE, (void*)&follower_node_id, (void*)remote_filepath);
+	manager->set(PARAM_REMOTE_SYNC_FILE_FLAG_OFF);
+	if (CHECK_FAILURE(ret))
+	{
+		WRITE_FORMAT_DEBUG("Error occur while triggering remote sync file[%s] in Follower[%s], due to: %s", remote_filepath, follower_node_token, GetErrorDescription(ret));
+		// WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
+		return ret;
+	}
+	unsigned short remote_sync_file_ret;
+	manager->get(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	char buf[DEF_LONG_STRING_SIZE];
+	if (CHECK_FAILURE(remote_sync_file_ret))
+	{
+		if (remote_sync_file_ret == RET_FAILURE_RESOURCE_BUSY)
+		{
+			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
+			WRITE_WARN(buf);
+			print_to_console(string(buf));
+		}
+		else
+		{
+			snprintf(buf, DEF_LONG_STRING_SIZE, "Error occurs while transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
+			WRITE_WARN(buf);
+			print_to_console(string(buf));
+			ret = RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
+		}
+	}
+	else
+	{
+		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_filepath, follower_node_token);
+		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully\n", remote_filepath, follower_node_token);
+		WRITE_DEBUG(buf);
+		print_to_console(string(buf));
+	}
+		
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_get_simulator_version_command(int argc, char **argv)

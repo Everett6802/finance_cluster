@@ -45,6 +45,8 @@ const int ClusterMgr::TRY_TIMES = 3;
 const int ClusterMgr::WAIT_MESSAGE_RESPONSE_TIME = 20; // 20 seconds
 const int ClusterMgr::WAIT_FILE_TRANSFER_TIME = 60; // 60 seconds
 
+enum FakeInteractiveSessionID{FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID=MAX_INTERACTIVE_SESSION, FAKE_INTERACTIVE_SESESSION_ID_SIZE};
+
 unsigned short ClusterMgr::parse_config()
 {
 	unsigned short ret = RET_SUCCESS;
@@ -324,14 +326,20 @@ ClusterMgr::ClusterMgr() :
 	file_tx_type(TX_NONE),
 	cluster_node(NULL),
 	file_tx(NULL),
+	remote_sync_file_enable(0),
+	remote_sync_file_ret(RET_SUCCESS),
 	interactive_server(NULL),
+	interactive_session_param(NULL),
 	simulator_handler(NULL),
 	simulator_installed(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 	IMPLEMENT_EVT_RECORDER()
 	// memset(interactive_session_event_count, 0x0, sizeof(int) / MAX_INTERACTIVE_SESSION);
-	for (int i = 0 ; i < MAX_INTERACTIVE_SESSION ; i++)
+	interactive_session_param = new InteractiveSessionConcurrentParam[FAKE_INTERACTIVE_SESESSION_ID_SIZE/*MAX_INTERACTIVE_SESSION*/];
+	if (interactive_session_param == NULL)
+		throw bad_alloc();
+	for (int i = 0 ; i < FAKE_INTERACTIVE_SESESSION_ID_SIZE/*MAX_INTERACTIVE_SESSION*/ ; i++)
 	{
 		interactive_session_param[i].event_count = 0;
 		interactive_session_param[i].follower_node_amount = 0;
@@ -364,12 +372,16 @@ ClusterMgr::~ClusterMgr()
 		delete[] cluster_token;
 		cluster_token = NULL;
 	}
-
 	if (node_token != NULL)
 	{
 		// delete[] local_token;
 		free(node_token);
 		node_token = NULL;
+	}
+	if (interactive_session_param != NULL)
+	{
+		delete[] interactive_session_param;
+		interactive_session_param = NULL;
 	}
 
 	RELEASE_EVT_RECORDER()
@@ -1145,12 +1157,6 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     {
     	case PARAM_FILE_TRANSFER:
     	{
-// // Only leader can do the file transfer to the follower
-// 	    	if (node_type != LEADER)
-// 			{
-// 	    		WRITE_FORMAT_ERROR("The node_type[%d] is Incorrect, should be Leader", node_type);
-// 	    		return RET_FAILURE_INCORRECT_OPERATION;
-// 			}
         	if (param1 == NULL || param2 == NULL)
     		{
     			WRITE_ERROR("The param1/param2 should NOT be NULL");
@@ -1179,6 +1185,33 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				return RET_SUCCESS;
 			}
 			int session_id = cluster_file_transfer_param->session_id;
+			if (session_id == -1)
+			{
+// Remote sync file
+				WRITE_FORMAT_DEBUG("Remote request transfers the file: %s", filepath);
+				if (remote_sync_file_enable == 0)
+				{
+					session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
+					if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
+					{
+// Got the lock
+						__sync_fetch_and_add(&remote_sync_file_enable, 1);
+						usleep(500);
+						pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+					} 
+					else 
+					{
+// Failed to get the lock
+						WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", filepath);
+						return RET_FAILURE_RESOURCE_BUSY;
+					}
+				}
+				else
+				{
+					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", filepath);
+					return RET_FAILURE_RESOURCE_BUSY;
+				}
+			}
 // Start the file transfer sender
 			FileTransferParam file_transfer_param;
 			file_transfer_param.session_id = session_id;
@@ -1200,7 +1233,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				return ret;
 			ret = file_tx->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
 			if (CHECK_FAILURE(ret))
-				return ret;		
+				return ret;
 // Reset the counter 
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
@@ -1209,7 +1242,6 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 // Nodify the remote Node to connect to
 			usleep(100000);
 			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
-			if (CHECK_FAILURE(ret))
 				return ret;
 // Receive the response
 			// bool found = false;
@@ -1222,11 +1254,15 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			// ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
 			ret = file_tx->set(PARAM_FILE_TRANSFER_DONE);
 			if (CHECK_FAILURE(ret))
+			{
+				pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 				return ret;
+			}
 
 			if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
 			{
 		    	WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+				pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 				return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 			}
 
@@ -1292,8 +1328,32 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				iter_file_transfer++;
 				SAFE_RELEASE(notify_file_transfer_cfg)
 			}
-    	}
+		}
     	break;
+		case PARAM_REMOTE_SYNC_FILE_FLAG_OFF:
+		{
+			if (remote_sync_file_enable == 1)
+			{
+				__sync_fetch_and_sub(&remote_sync_file_enable, 1);
+				WRITE_FORMAT_DEBUG("Turn off the flags: remote_sync_file_enable[%d]", remote_sync_file_enable);
+			}
+		}
+		break;
+		case PARAM_REMOTE_SYNC_FILE_RETURN_VALUE:
+		{
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1/param2 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			remote_sync_file_ret = *(unsigned short*)param1;
+			int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			// usleep(1000); // A MUST
+			pthread_cond_signal(&interactive_session_param[session_id].cond);
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+		}
+		break;
     	case PARAM_CLUSTER_SETUP_NETWORK:
     	{
         	if (param1 == NULL)
@@ -1331,9 +1391,70 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     			WRITE_ERROR("The param1 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-			printf("Old  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
+			// printf("Old  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
 	    	current_cluster_config.sync_folderpath = *(string*)param1;
-			printf("New  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
+			// printf("New  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
+		}
+		break;
+		case PARAM_REMOTE_SYNC_FILE:
+		{
+			if (!is_leader())
+			{
+				WRITE_ERROR("Remote-sync-file only supports Leader -> Follower");
+				return RET_FAILURE_INTERNAL_ERROR;	
+			}
+        	if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_ERROR("The param1/param2 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+// Send the request
+			int follower_node_id = *(int*)param1;
+			const char* remote_filepath = (char*)param2;
+			if (remote_sync_file_enable == 0)
+			{
+				struct timespec ts;
+				clock_gettime(CLOCK_REALTIME, &ts);
+				ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
+				int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
+				if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
+				{
+// Got the lock
+					__sync_fetch_and_add(&remote_sync_file_enable, 1);
+					ret = cluster_node->send(MSG_REMOTE_SYNC_FILE, (void*)&follower_node_id, (void*)remote_filepath);
+					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+					if (CHECK_FAILURE(ret))
+					{
+						goto OUT;
+						// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+						// return ret;
+					}
+		
+					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+					{
+						WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+						// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+						// return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+						ret = RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
+						goto OUT;
+					}
+OUT:
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+					if (CHECK_FAILURE(ret))
+						return ret;
+				} 
+				else 
+				{
+// Failed to get the lock
+					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", remote_filepath);
+					return RET_FAILURE_RESOURCE_BUSY;
+				}
+			}
+			else
+			{
+				WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", remote_filepath);
+				return RET_FAILURE_RESOURCE_BUSY;
+			}			
 		}
 		break;
     	default:
@@ -1375,6 +1496,19 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     		*((char**)param1) = node_token_tmp;
     	}
     	break;
+	    case PARAM_NODE_TOKEN_LOOKUP:
+    	{
+    		if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_FORMAT_ERROR("The param1/param2 of the param_type[%d] should NOT be NULL", param_type);
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+			ret = cluster_node->get(PARAM_NODE_TOKEN_LOOKUP, param1, param2);
+			if (CHECK_FAILURE(ret))
+				return ret;
+    	}
+    	break;
     	case PARAM_CLUSTER_MAP:
     	{
         	if (param1 == NULL)
@@ -1382,6 +1516,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
+			assert(cluster_node != NULL && "cluster_node should NOT be NULL");
     		PCLUSTER_MAP cluster_map = (ClusterMap*)param1;
  		    ret = cluster_node->get(PARAM_CLUSTER_MAP, (void*)cluster_map);
 			if (CHECK_FAILURE(ret))
@@ -2309,6 +2444,16 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			*(int*)param1 = current_cluster_config.system_monitor_period;
 		}
 		break;
+		case PARAM_REMOTE_SYNC_FILE_RETURN_VALUE:
+		{
+	        if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}	
+			*(unsigned short*)param1 = remote_sync_file_ret;
+		}
+		break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2680,6 +2825,16 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		// case NOTIFY_REMOTE_SYNC_FILE:
+		// {
+    	// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    	// 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+    	// 	assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    	// 	WRITE_DEBUG("Receive the notification of remote-synchronizing file......");
+    	// 	ret = notify_thread->add_event(notify_cfg);
+		// }
+		// break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
@@ -2956,6 +3111,21 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     		}
     	}
     	break;
+		// case NOTIFY_REMOTE_SYNC_FILE:
+		// {
+		// 	PNOTIFY_REMOTE_SYNC_FILE_CFG notify_remote_sync_file_cfg = (PNOTIFY_REMOTE_SYNC_FILE_CFG)notify_cfg;
+        // 	if (param1 == NULL || param2 == NULL)
+    	// 	{
+    	// 		WRITE_ERROR("The param1/param2 should NOT be NULL");
+    	// 		return RET_FAILURE_INVALID_ARGUMENT;
+    	// 	}
+	    // 	assert(file_tx == NULL && "file_tx should be NULL");
+	    // 	ClusterFileTransferParam cluster_file_transfer_param;
+	    // 	assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
+	    // 	const char* filepath = notify_remote_sync_file_cfg->get_filepath();
+		// 	ret = set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+		// }
+		// break;
     	default:
     	{
     		static const int BUF_SIZE = 256;
