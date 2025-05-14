@@ -1203,13 +1203,13 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 					{
 // Failed to get the lock
 						WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", filepath);
-						return RET_FAILURE_RESOURCE_BUSY;
+						return RET_WARN_REMOTE_RESOURCE_BUSY;
 					}
 				}
 				else
 				{
 					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", filepath);
-					return RET_FAILURE_RESOURCE_BUSY;
+					return RET_WARN_REMOTE_RESOURCE_BUSY;
 				}
 			}
 // Start the file transfer sender
@@ -1447,13 +1447,13 @@ OUT:
 				{
 // Failed to get the lock
 					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", remote_filepath);
-					return RET_FAILURE_RESOURCE_BUSY;
+					return RET_WARN_REMOTE_RESOURCE_BUSY;
 				}
 			}
 			else
 			{
 				WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", remote_filepath);
-				return RET_FAILURE_RESOURCE_BUSY;
+				return RET_WARN_REMOTE_RESOURCE_BUSY;
 			}			
 		}
 		break;

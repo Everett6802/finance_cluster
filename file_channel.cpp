@@ -79,7 +79,7 @@ unsigned short FileChannel::initialize(const char* filepath, const char* channel
 	{
 		if (!file_exist)
 		{
-			WRITE_FORMAT_WARN("The simulator package file[%s] does NOT exist", filepath);
+			WRITE_FORMAT_WARN("The file[%s] does NOT exist", filepath);
 			return RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 		}
 	}

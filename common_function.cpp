@@ -32,8 +32,7 @@ const char *GetErrorDescription(unsigned short ret)
 		"Failure Handle Thread",
 		"Failure System API",
 		"Failure Internal Error",
-		"Failure Incorrect Value",
-		"Failure Resource Busy"
+		"Failure Incorrect Value"
 	};
 	static const char *connection_ret_failure_description[] =
 	{
@@ -57,7 +56,8 @@ const char *GetErrorDescription(unsigned short ret)
 		"Warn Simulator Package Not Found",
 		"Warn File Transfer in Process",
 		"Warn Cluster Not Single",
-		"Warn Remote File Transfer Failure",
+		"Warn Remote Resource Busy",
+		"Warn Remote File Transfer Failure"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
 	static int connection_ret_failure_description_len = sizeof(connection_ret_failure_description) / sizeof(connection_ret_failure_description[0]);

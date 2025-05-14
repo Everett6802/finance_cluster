@@ -1037,6 +1037,7 @@ unsigned short LeaderNode::recv_remote_sync_file(const char* message_data, int m
 // EventType | return value | EOD
 	unsigned short ret = RET_SUCCESS;
 	unsigned short remote_sync_file_ret = (unsigned short)atoi(message_data);
+	WRITE_FORMAT_DEBUG("Receive the return value of remote sync file: %d", remote_sync_file_ret);
 	ret = observer->set(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
 	return ret;
 }

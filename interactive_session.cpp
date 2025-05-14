@@ -1324,7 +1324,7 @@ unsigned short InteractiveSession::handle_search_event_command(int argc, char **
 	if (CHECK_SUCCESS(ret))
 	{
 		// list<EventEntry*>::iterator iter_event = event_list.begin();
-		int event_line_size = event_line_list.size();
+		// int event_line_size = event_line_list.size();
 		print_to_console(string("\n"));
 		list<string>::iterator iter_event_line = event_line_list.begin();
 		int event_count = 0;
@@ -1497,7 +1497,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 	assert(observer != NULL && "observer should NOT be NULL");
 
 	unsigned short ret = RET_SUCCESS;
-	char folderpath[DEF_LONG_STRING_SIZE]; 
+	// char folderpath[DEF_LONG_STRING_SIZE]; 
 	string sync_folderpath;
 	if (argc == 1)
 	{
@@ -1532,7 +1532,6 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
-	WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
 	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
 	list<string> full_filepath_in_folder_list;
 	get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
@@ -1553,6 +1552,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 			return ret;
 		iter++;
 	}
+	WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
 	return ret;	
 }
 
@@ -1597,7 +1597,6 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		strcpy(filepath, argv1_tmp);
 
 	WRITE_FORMAT_DEBUG("Try to synchorinize the file: %s", filepath);
-	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
 	if (!check_file_exist(filepath))
 	{
 		WRITE_FORMAT_WARN("The file[%s] being synchronized does NOT exist", filepath);
@@ -1610,6 +1609,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	cluster_file_transfer_param.session_id = session_id;
     ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
     // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
 	return RET_SUCCESS;
 }
 
@@ -1623,11 +1623,27 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
 	unsigned short ret = RET_SUCCESS;
+	char buf[DEF_LONG_STRING_SIZE];
 	int follower_node_id = atoi(argv[1]);
 	const char* remote_filepath = (char*)argv[2];
 	char* follower_node_token;
 	ret = manager->get(PARAM_NODE_TOKEN_LOOKUP, (void*)&follower_node_id, (void*)&follower_node_token);
-	WRITE_FORMAT_DEBUG("Trigger remote sync file in Follower[%s]: %s", follower_node_token, remote_filepath);
+	if (CHECK_FAILURE(ret))
+	{
+		if (ret == RET_FAILURE_NOT_FOUND)
+		{
+			snprintf(buf, DEF_LONG_STRING_SIZE, "The Follower ID[%d] does NOT exist", follower_node_id);
+			WRITE_WARN(buf);
+			print_to_console(string(buf) + string("\n"));
+			return RET_WARN_INTERACTIVE_COMMAND;
+		}
+		else
+		{
+			WRITE_FORMAT_ERROR("Error occur while looking-up the token of Follower[%s], due to: %s", follower_node_id, GetErrorDescription(ret));
+			return ret;
+		}
+	}
+	WRITE_FORMAT_DEBUG("Trigger remote sync file[%s] in Follower[%s]", remote_filepath, follower_node_token);
 	ret = manager->set(PARAM_REMOTE_SYNC_FILE, (void*)&follower_node_id, (void*)remote_filepath);
 	manager->set(PARAM_REMOTE_SYNC_FILE_FLAG_OFF);
 	if (CHECK_FAILURE(ret))
@@ -1638,14 +1654,22 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 	}
 	unsigned short remote_sync_file_ret;
 	manager->get(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
-	char buf[DEF_LONG_STRING_SIZE];
+	WRITE_FORMAT_DEBUG("Return value of synchorizing the file[%s] from Follower[%s]: %d, %s", remote_filepath, follower_node_token, remote_sync_file_ret, GetErrorDescription(remote_sync_file_ret));
 	if (CHECK_FAILURE(remote_sync_file_ret))
 	{
-		if (remote_sync_file_ret == RET_FAILURE_RESOURCE_BUSY)
+		if (remote_sync_file_ret == RET_WARN_REMOTE_RESOURCE_BUSY)
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
+			print_to_console(string(buf) + string("\n"));
+			ret = RET_WARN_REMOTE_RESOURCE_BUSY;
+		}
+		else if (remote_sync_file_ret == RET_FAILURE_NOT_FOUND)
+		{
+			snprintf(buf, DEF_LONG_STRING_SIZE, "The file[%s] does NOT exist in Follower[%s]", remote_filepath, follower_node_token);
+			WRITE_WARN(buf);
 			print_to_console(string(buf));
+			ret = RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 		}
 		else
 		{
@@ -2471,7 +2495,7 @@ OUT:
 		if (SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE != EVENT_TYPE_SIZE)
 		{
 			static const char* errmsg = "ERROR!!! The definitions of event type are NOT identical. Terminate the process...";
-			fprintf(stderr, errmsg);
+			fprintf(stderr, "%s", errmsg);
 			throw runtime_error(errmsg);
 		}
 		bool found = false;
@@ -2503,7 +2527,7 @@ OUT:
 		if (SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE != EVENT_SEVERITY_SIZE)
 		{
 			static const char* errmsg = "ERROR!!! The definitions of event severity are NOT identical. Terminate the process...";
-			fprintf(stderr, errmsg);
+			fprintf(stderr, "%s", errmsg);
 			throw runtime_error(errmsg);
 		}
 		bool found = false;
@@ -2535,7 +2559,7 @@ OUT:
 		if (SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE != EVENT_CATEGORY_SIZE)
 		{
 			static const char* errmsg = "ERROR!!! The definitions of event category are NOT identical. Terminate the process...";
-			fprintf(stderr, errmsg);
+			fprintf(stderr, "%s", errmsg);
 			throw runtime_error(errmsg);
 		}
 		bool found = false;

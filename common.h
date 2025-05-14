@@ -176,7 +176,6 @@ extern const unsigned short RET_FAILURE_HANDLE_THREAD;
 extern const unsigned short RET_FAILURE_SYSTEM_API;
 extern const unsigned short RET_FAILURE_INTERNAL_ERROR;
 extern const unsigned short RET_FAILURE_INCORRECT_VALUE;
-extern const unsigned short RET_FAILURE_RESOURCE_BUSY;
 ///// Connection Related /////
 extern const unsigned short RET_FAILURE_CONNECTION_BASE;
 extern const unsigned short RET_FAILURE_CONNECTION_ERROR;
@@ -199,6 +198,7 @@ extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
 extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
 extern const unsigned short RET_WARN_CLUSTER_NOT_SINGLE;
+extern const unsigned short RET_WARN_REMOTE_RESOURCE_BUSY;
 extern const unsigned short RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 extern const unsigned short RET_WARN_END;
 
