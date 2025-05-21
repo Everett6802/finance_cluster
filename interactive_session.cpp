@@ -1748,12 +1748,12 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The file[%s] does NOT exist in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
-			print_to_console(string(buf));
+			print_to_console(string(buf) + string("\n"));
 			ret = RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 		}
 		else
 		{
-			snprintf(buf, DEF_LONG_STRING_SIZE, "Error occurs while transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
+			snprintf(buf, DEF_LONG_STRING_SIZE, "Error occurs while transfering a file[%s] in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
 			print_to_console(string(buf));
 			ret = RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
@@ -2818,7 +2818,7 @@ unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_p
     	{
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
-    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
     		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
@@ -2838,7 +2838,7 @@ unsigned short InteractiveSession::async_handle(NotifyCfg* notify_cfg)
     	{
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
-    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
     		// fprintf(stderr, "%s in InteractiveSession::async_handle()", buf);
 		    fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);

@@ -67,7 +67,7 @@ private:
 	unsigned short recv_switch_leader(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short recv_remove_follower(const char* message_data, int message_size);//{UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short recv_remote_sync_file(const char* message_data, int message_size);
-	// send
+// send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_update_cluster_map(void* param1=NULL, void* param2=NULL, void* param3=NULL); //{UNDEFINED_MSG_EXCEPTION("Follower", "Send", MSG_UPDATE_CLUSUTER_MAP);}
 	unsigned short send_transmit_text(void* param1=NULL, void* param2=NULL, void* param3=NULL);

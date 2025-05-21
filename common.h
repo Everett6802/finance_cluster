@@ -442,6 +442,8 @@ typedef CHAR_LIST* PCHAR_LIST;
 // Functions
 
 const char* GetErrorDescription(unsigned short ret);
+const char* GetMessageDescription(MessageType message_type);
+const char* GetNotifyDescription(NotifyType notify_type);
 const char* GetEventTypeDescription(EventType event_type);
 EventType GetEventTypeFromDescription(const char* event_type_description);
 const char* GetEventSeverityDescription(EventSeverity event_severity);

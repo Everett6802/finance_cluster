@@ -90,6 +90,68 @@ const char *GetErrorDescription(unsigned short ret)
 	throw runtime_error(buf);
 }
 
+static char* MESSAGE_DESCRIPTION[] = {
+	"Can Not Use",
+	"Check Keepalive",
+	"Update Cluster Map",
+	"Transmit Text",
+	"Get System Info",
+	"Get Simulator Version",
+	"Install Simulator",
+	"ApplyFakeAcsptConfig",
+	"ApplyFakeUsreptConfig",
+	"ControlFakeAcspt",
+	"ControlFakeUsrept",
+	"GetFakeAcsptStates",
+	"GetFakeAcsptDetail",
+	"RequestFileTransfer",
+	"CompleteFileTransfer",
+	"SwitchLeader",
+	"RemoveFollower",
+	"RemoteSyncFile"
+};
+static int MESSAGE_DESCRIPTION_SIZE = sizeof(MESSAGE_DESCRIPTION) / sizeof(MESSAGE_DESCRIPTION[0]);
+
+const char* GetMessageDescription(MessageType message_type)
+{
+	assert(message_type >= 0 && message_type < MSG_SIZE && "message type is out of range");
+	assert(MESSAGE_DESCRIPTION_SIZE == MSG_SIZE && "MESSAGE_DESCRIPTION_SIZE != MSG_SIZE");
+	return MESSAGE_DESCRIPTION[message_type];
+}
+
+static char* NOTIFY_DESCRIPTION[] = {
+	"CheckKeepalive",
+	"NodeDie",
+	"Session_exit",
+	"GetSystemInfo",
+	"GetSystemMonitor",
+	"GetSimulatorVersion",
+	"InstallSimulator",
+	"ApplyFakeAcsptConfig",
+	"ApplyFakeUsreptConfig",
+	"ControlFakeAcspt",
+	"ControlFakeUsrept",
+	"GetFakeAcsptStates",
+	"GetFakeAcsptDetail",
+	"RunMultiClis",
+	"ConnectFileTransfer",  // Receiver of file transfer
+	"AbortFileTransfer",  // Receiver of file transfer
+	"CompleteFileTransfer",  // Sender of file transfer
+	"SendFileDone",
+	"ReceiveFileDone",
+	"SwitchLeader",
+	"RemoteFollower",
+	"AddEvent"
+};
+static int NOTIFY_DESCRIPTION_SIZE = sizeof(NOTIFY_DESCRIPTION) / sizeof(NOTIFY_DESCRIPTION[0]);
+
+const char* GetNotifyDescription(NotifyType notify_type)
+{
+	assert(notify_type >= 0 && notify_type < NOTIFY_SIZE && "notify type is out of range");
+	assert(NOTIFY_DESCRIPTION_SIZE == NOTIFY_SIZE && "NOTIFY_DESCRIPTION_SIZE != NOTIFY_SIZE");
+	return NOTIFY_DESCRIPTION[notify_type];
+}
+
 static char* EVENT_TYPE_DESCRIPTION[] = {
 	"Operate Node",
 	"Telnet Console",

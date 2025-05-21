@@ -1778,7 +1778,7 @@ unsigned short LeaderNode::notify(NotifyType notify_type, void* notify_param)
     	{
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
-    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
     		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
@@ -1820,7 +1820,7 @@ unsigned short LeaderNode::async_handle(NotifyCfg* notify_cfg)
     	{
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
-    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d", notify_type);
+    		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
     		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
