@@ -224,8 +224,8 @@ struct sm_ipc_roam_data
 
 unsigned short get_disk_usage(std::string& disk_usage)
 {
-	static char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
-	static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
+	static const char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
+	static const char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
 	// static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | cut -d '%' -F 1";  Doesn't work 
 	unsigned short ret = RET_SUCCESS;
 // Find the partition which is mounted to /

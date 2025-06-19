@@ -189,7 +189,7 @@ unsigned short SystemOperator::get_disk_info(std::string& disk_info)
 		goto OUT;
 	}
 	data_info = string(line);
-	printf("line: %s", line);
+	// printf("line: %s", line);
 	disk_info += (data_info /*+ string("\n")*/);
 OUT:
 	if (line != NULL)
@@ -409,7 +409,7 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 	// }
 	// cpu_usage_value = (float)(jiffies_count[1][1] - jiffies_count[0][1]) * 100.0 / (jiffies_count[1][0] - jiffies_count[0][0]);
 
-	static char *CMD = "grep 'cpu ' /proc/stat | awk '{print $2, $3, $4, $5, $6, $7, $8}'";
+	static const char *CMD = "grep 'cpu ' /proc/stat | awk '{print $2, $3, $4, $5, $6, $7, $8}'";
 	// static char *CMD = "grep 'cpu ' /proc/stat | awk '{printf \"%d %d\", $2+$3+$4+$5+$6+$7+$8, $2+$3+$8}'";
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp[CMD_COUNT];
@@ -468,7 +468,7 @@ OUT:
 
 unsigned short SystemOperator::get_memory_usage(string& memory_usage)
 {
-	static char *CMD = "free -m | grep 'Mem' | awk '{print $3/$2}'";
+	static const char *CMD = "free -m | grep 'Mem' | awk '{print $3/$2}'";
 	unsigned short ret = RET_SUCCESS;
 	FILE* fp = popen(CMD, "r");
 	char *line = NULL;
@@ -503,8 +503,8 @@ OUT:
 
 unsigned short SystemOperator::get_disk_usage(string& disk_usage)
 {
-	static char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
-	static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
+	static const char *CMD1 = "df -h | grep '/' | awk '{print $6}' | grep -nvE '/.+' | awk -F ':' '{print $1}'";
+	static const char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | grep -o -E '[0-9]+'";
 	// static char *CMD2_FORMAT = "df -h | grep '/' | sed -n '%dp' | awk '{print $5}' | cut -d '%' -F 1";  Doesn't work 
 	unsigned short ret = RET_SUCCESS;
 // Find the partition which is mounted to /

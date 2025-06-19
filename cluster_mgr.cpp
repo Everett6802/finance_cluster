@@ -326,8 +326,9 @@ ClusterMgr::ClusterMgr() :
 	file_tx_type(TX_NONE),
 	cluster_node(NULL),
 	file_tx(NULL),
-	remote_sync_file_enable(0),
-	remote_sync_file_ret(RET_SUCCESS),
+	file_transfer_token_ret(RET_SUCCESS),
+	// remote_sync_enable(0),
+	remote_sync_ret(RET_SUCCESS),
 	interactive_server(NULL),
 	interactive_session_param(NULL),
 	simulator_handler(NULL),
@@ -341,6 +342,7 @@ ClusterMgr::ClusterMgr() :
 		throw bad_alloc();
 	for (int i = 0 ; i < FAKE_INTERACTIVE_SESESSION_ID_SIZE/*MAX_INTERACTIVE_SESSION*/ ; i++)
 	{
+		interactive_session_param[i].mtx = PTHREAD_MUTEX_INITIALIZER;
 		interactive_session_param[i].event_count = 0;
 		interactive_session_param[i].follower_node_amount = 0;
 	}
@@ -570,6 +572,26 @@ unsigned short ClusterMgr::close_console()
 		// delete interactive_server;
 		// interactive_server = NULL;
 		deinitialize_components(COMPONENT_MASK_INTERACTIVE_SESSION);
+	}
+	return RET_SUCCESS;
+}
+
+unsigned short ClusterMgr::send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1, void* param2)const
+{
+	assert(cluster_node != NULL && "cluster_node should NOT be NULL");
+// Send the request
+	unsigned short ret = cluster_node->send(message_type, param1, param2);
+	if (CHECK_FAILURE(ret))
+		return ret;
+// Wait for the response
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	ts.tv_sec += wait_response_time;
+	int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+	if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+	{
+		WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails in [%s, %d], due to: %s", GetMessageDescription(message_type), session_id, pthread_cond_timedwait_err(timedwait_ret));
+		return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
 	}
 	return RET_SUCCESS;
 }
@@ -875,10 +897,7 @@ unsigned short ClusterMgr::extract_interactive_session_data_list(int session_id,
 		iter_remove++;
 	}
 	if (!found)
-	{
-		// WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], only got: %d", session_id, interactive_session_system_info_data.size());
 		return RET_FAILURE_NOT_FOUND;
-	}
 	return RET_SUCCESS;
 }
 
@@ -1004,6 +1023,7 @@ unsigned short ClusterMgr::initialize()
 	ret = initialize_components(component_mask);
 	if (CHECK_FAILURE(ret))
 		return ret;
+	file_tx_mtx = PTHREAD_MUTEX_INITIALIZER;
 	WRITE_EVT_RECORDER(OperateNodeEventCfg, EVENT_OPERATE_NODE_START, node_type, node_token);
 	return ret;
 }
@@ -1155,8 +1175,102 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     unsigned short ret = RET_SUCCESS;
     switch(param_type)
     {
+		case PARAM_FILE_TRANSFER_TOKEN_REQUEST:
+		{
+			if (file_tx_token.empty())
+			{
+				if(pthread_mutex_trylock(&file_tx_mtx) == 0)
+				{
+					file_tx_token = gen_random_string();
+					if (param1 != NULL)
+						*(string*)param1 = file_tx_token;	
+					WRITE_FORMAT_DEBUG("Request file transfer token: %s", file_tx_token.c_str());				
+				}
+				else
+				{
+					ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
+				}
+			}
+			else
+			{
+				ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
+			}
+		}
+		break;
+		case PARAM_FILE_TRANSFER_TOKEN_RELEASE:
+		{
+			if (file_tx_token.empty())
+    		{
+    			WRITE_ERROR("The file transfer token is NOT locked");
+    			return RET_FAILURE_INCORRECT_OPERATION;
+    		}
+			file_tx_token.clear();
+			pthread_mutex_unlock(&file_tx_mtx);
+			WRITE_DEBUG("Release file transfer token");
+		}
+		break;
+		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST:
+		{
+			if (is_leader())
+			{
+				WRITE_ERROR("Remote token request is only required for file transfer: Follower -> Leader");
+				return RET_FAILURE_INCORRECT_OPERATION;	
+			}
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			int session_id = *(int*)param1;
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_REQUEST_FILE_TRANSFER_TOKEN, (void*)&session_id);
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+		}
+		break;
+		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE:
+		{
+			if (is_leader())
+			{
+				WRITE_ERROR("Remote token release is only required for file transfer: Follower -> Leader");
+				return RET_FAILURE_INCORRECT_OPERATION;	
+			}
+        	// if (param1 == NULL)
+    		// {
+    		// 	WRITE_ERROR("The param1 should NOT be NULL");
+    		// 	return RET_FAILURE_INVALID_ARGUMENT;
+    		// }
+			// int session_id = *(int*)param1;
+			// ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_RELEASE_FILE_TRANSFER_TOKEN, (void*)&session_id);
+			ret = cluster_node->send(MSG_RELEASE_FILE_TRANSFER_TOKEN);
+		}
+		break;
+		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN:
+		{
+			if (is_leader())
+			{
+				WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
+				return RET_FAILURE_INCORRECT_OPERATION;	
+			}
+        	if (param1 == NULL || param2 == NULL)
+    		{
+    			WRITE_ERROR("The param1/param2 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			int session_id = *(int*)param1;
+			file_transfer_token_ret = *(unsigned short*)param2;
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			// usleep(1000); // A MUST
+			pthread_cond_signal(&interactive_session_param[session_id].cond);
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+		}
+		break;
     	case PARAM_FILE_TRANSFER:
     	{
+			if (file_tx_token.empty())
+    		{
+    			WRITE_ERROR("The file transfer token is NOT locked. Incorrect operation !!!");
+    			return RET_FAILURE_INCORRECT_OPERATION;
+    		}
         	if (param1 == NULL || param2 == NULL)
     		{
     			WRITE_ERROR("The param1/param2 should NOT be NULL");
@@ -1186,32 +1300,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			}
 			int session_id = cluster_file_transfer_param->session_id;
 			if (session_id == -1)
-			{
-// Remote sync file
-				WRITE_FORMAT_DEBUG("Remote request transfers the file: %s", filepath);
-				if (remote_sync_file_enable == 0)
-				{
-					session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
-					if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
-					{
-// Got the lock
-						__sync_fetch_and_add(&remote_sync_file_enable, 1);
-						usleep(500);
-						pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					} 
-					else 
-					{
-// Failed to get the lock
-						WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", filepath);
-						return RET_WARN_REMOTE_RESOURCE_BUSY;
-					}
-				}
-				else
-				{
-					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", filepath);
-					return RET_WARN_REMOTE_RESOURCE_BUSY;
-				}
-			}
+				session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 // Start the file transfer sender
 			FileTransferParam file_transfer_param;
 			file_transfer_param.session_id = session_id;
@@ -1238,34 +1327,32 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
 			interactive_session_param[session_id].event_count = 0;
-			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Nodify the remote Node to connect to
 			usleep(100000);
-			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
-				return ret;
-// Receive the response
-			// bool found = false;
-			struct timespec ts;
-			clock_gettime(CLOCK_REALTIME, &ts);
-			ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
-			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-			int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-// Stop the listening thread
-			// ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+// 			ret = cluster_node->set(PARAM_FILE_TRANSFER, (void*)&file_transfer_param);
+// 			if (CHECK_FAILURE(ret))
+// 				return ret;
+// // Receive the response
+// 			// bool found = false;
+// 			struct timespec ts;
+// 			clock_gettime(CLOCK_REALTIME, &ts);
+// 			ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
+// 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// 			int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// // Stop the listening thread
+// 			// ret = cluster_node->set(PARAM_FILE_TRANSFER_DONE);
+// 			if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 			{
+// 		    	WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 				pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// 				return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 			}
+			ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, MSG_REQUEST_FILE_TRANSFER, (void*)&file_transfer_param);
+			// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 			ret = file_tx->set(PARAM_FILE_TRANSFER_DONE);
-			if (CHECK_FAILURE(ret))
-			{
-				pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			if (CHECK_FAILURE(ret))				
 				return ret;
-			}
-
-			if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-			{
-		    	WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-				pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-				return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-			}
-
 // Release the resource of Sender
 			WRITE_DEBUG("Complete transferring the file. Release the sender....");
 			assert(file_tx != NULL && "file_tx(Sender) should NOT be NULL");
@@ -1274,32 +1361,9 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			file_tx = NULL;
 			file_tx_type = TX_NONE;
 
-			// // dump_interactive_session_data_list(session_id);
-			// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-			// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
 			std::list<PNOTIFY_CFG> interactive_session_file_transfer_data;
-			// while (iter != interactive_session_data.end())
-			// {
-			// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-			// 	if (notify_cfg->get_notify_type() == NOTIFY_COMPLETE_FILE_TRANSFER)
-			// 	{
-			// 		interactive_session_file_transfer_data.push_back(notify_cfg);
-			// 		interactive_session_data.erase(iter);
-			// 		if ((int)interactive_session_file_transfer_data.size() == interactive_session_param[session_id].follower_node_amount)
-			// 		{
-			// 			found = true;
-			// 			break;
-			// 		}
-			// 	}
-			// 	iter++;
-			// }
 			ret = extract_interactive_session_data_list(session_id, NOTIFY_COMPLETE_FILE_TRANSFER, interactive_session_file_transfer_data);
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-			// if (!found)
-			// {
-			// 	WRITE_FORMAT_ERROR("Lack of file transfer complete notification from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_file_transfer_data.size());
-			// 	return RET_FAILURE_NOT_FOUND;
-			// }
 			if (CHECK_FAILURE(ret))
 			{
 				if (ret == RET_FAILURE_NOT_FOUND)
@@ -1330,23 +1394,23 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			}
 		}
     	break;
-		case PARAM_REMOTE_SYNC_FILE_FLAG_OFF:
-		{
-			if (remote_sync_file_enable == 1)
-			{
-				__sync_fetch_and_sub(&remote_sync_file_enable, 1);
-				WRITE_FORMAT_DEBUG("Turn off the flags: remote_sync_file_enable[%d]", remote_sync_file_enable);
-			}
-		}
-		break;
-		case PARAM_REMOTE_SYNC_FILE_RETURN_VALUE:
+		// case PARAM_REMOTE_SYNC_FLAG_OFF:
+		// {
+		// 	if (remote_sync_enable == 1)
+		// 	{
+		// 		__sync_fetch_and_sub(&remote_sync_enable, 1);
+		// 		WRITE_FORMAT_DEBUG("Turn off the flags: remote_sync_enable[%d]", remote_sync_enable);
+		// 	}
+		// }
+		// break;
+		case PARAM_REMOTE_SYNC_RETURN_VALUE:
 		{
         	if (param1 == NULL)
     		{
     			WRITE_ERROR("The param1/param2 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
-			remote_sync_file_ret = *(unsigned short*)param1;
+			remote_sync_ret = *(unsigned short*)param1;
 			int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			// usleep(1000); // A MUST
@@ -1396,11 +1460,13 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			// printf("New  initial: %s, current: %s\n", initial_cluster_config.sync_folderpath.c_str(), current_cluster_config.sync_folderpath.c_str());
 		}
 		break;
+		case PARAM_REMOTE_SYNC_FOLDER:
 		case PARAM_REMOTE_SYNC_FILE:
 		{
+			bool is_folder = ((param_type == PARAM_REMOTE_SYNC_FOLDER) ? true : false);
 			if (!is_leader())
 			{
-				WRITE_ERROR("Remote-sync-file only supports Leader -> Follower");
+				WRITE_FORMAT_ERROR("Remote-sync-%s only supports Leader -> Follower", (is_folder ? "folder" : "file"));
 				return RET_FAILURE_INTERNAL_ERROR;	
 			}
         	if (param1 == NULL || param2 == NULL)
@@ -1410,51 +1476,54 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     		}
 // Send the request
 			int follower_node_id = *(int*)param1;
-			const char* remote_filepath = (char*)param2;
-			if (remote_sync_file_enable == 0)
-			{
-				struct timespec ts;
-				clock_gettime(CLOCK_REALTIME, &ts);
-				ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
-				int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
-				if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
-				{
-// Got the lock
-					__sync_fetch_and_add(&remote_sync_file_enable, 1);
-					ret = cluster_node->send(MSG_REMOTE_SYNC_FILE, (void*)&follower_node_id, (void*)remote_filepath);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (CHECK_FAILURE(ret))
-					{
-						goto OUT;
-						// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-						// return ret;
-					}
-		
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-						WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-						// return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-						ret = RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
-						goto OUT;
-					}
-OUT:
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					if (CHECK_FAILURE(ret))
-						return ret;
-				} 
-				else 
-				{
-// Failed to get the lock
-					WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 1", remote_filepath);
-					return RET_WARN_REMOTE_RESOURCE_BUSY;
-				}
-			}
-			else
-			{
-				WRITE_FORMAT_WARN("The resource of tranferring the file[%s] is busy... 2", remote_filepath);
-				return RET_WARN_REMOTE_RESOURCE_BUSY;
-			}			
+			const char* remote_path = (char*)param2;
+			int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			MessageType mesage_type = (is_folder ? MSG_REMOTE_SYNC_FOLDER : MSG_REMOTE_SYNC_FILE);
+			ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, mesage_type, (void*)&follower_node_id, (void*)remote_path);
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			if (CHECK_FAILURE(ret))
+				return ret;
+
+// 			if (remote_sync_enable == 0)
+// 			{
+// 				int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
+// 				if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
+// 				{
+// // Got the lock
+// 					__sync_fetch_and_add(&remote_sync_enable, 1);
+// 					MessageType mesage_type = (is_folder ? MSG_REMOTE_SYNC_FOLDER : MSG_REMOTE_SYNC_FILE);
+// // 					struct timespec ts;
+// // 					clock_gettime(CLOCK_REALTIME, &ts);
+// // 					ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
+// // 					ret = cluster_node->send(mesage_type, (void*)&follower_node_id, (void*)remote_path);
+// // 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// // 					if (CHECK_FAILURE(ret))
+// // 						goto OUT;
+// // 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// // 					{
+// // 						WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// // 						ret = RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
+// // 						goto OUT;
+// // 					}
+// // OUT:
+// 					ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, mesage_type, (void*)&follower_node_id, (void*)remote_path);
+// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// 				} 
+// 				else 
+// 				{
+// // Failed to get the lock
+// 					WRITE_FORMAT_WARN("The resource of tranferring the %s[%s] is busy... 1", (is_folder ? "folder" : "file"), remote_path);
+// 					return RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
+// 				}
+// 			}
+// 			else
+// 			{
+// 				WRITE_FORMAT_WARN("The resource of tranferring the %s[%s] is busy... 2", (is_folder ? "folder" : "file"), remote_path);
+// 				return RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
+// 			}
 		}
 		break;
     	default:
@@ -1601,73 +1670,37 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 				{
 					int session_id = cluster_system_info_param->session_id;
 // Not one node cluster, send notification to the followers
-// Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// Reset the counter 
 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// Send the request
-				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&session_id);
-					if (CHECK_FAILURE(ret))
-						return ret;
-// Receive the response
-					// bool found = false;
-				    struct timespec ts;
-				    clock_gettime(CLOCK_REALTIME, &ts);
-				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-					}
-					// dump_interactive_session_data_list(session_id);
-					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+// Send the request and wait for the response
+// // Send the request
+// 				    ret = cluster_node->send(MSG_GET_SYSTEM_INFO, (void*)&session_id);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// // Receive the response
+// 				    struct timespec ts;
+// 				    clock_gettime(CLOCK_REALTIME, &ts);
+// 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 					{
+// 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 					}
+					ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_GET_SYSTEM_INFO, (void*)&session_id);
 					std::list<PNOTIFY_CFG> interactive_session_system_info_data;
-					// int remove_index = 0;
-					// std::list<int> remove_index_list;
-					// while (iter != interactive_session_data.end())
-					// {
-					// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					// 	if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_INFO)
-					// 	{
-					// 		// found = true;
-					// 		interactive_session_system_info_data.push_back(notify_cfg);
-					// 		// interactive_session_data.erase(iter);
-					// 		remove_index_list.push_front(remove_index);
-					// 		if ((int)interactive_session_system_info_data.size() == interactive_session_param[session_id].follower_node_amount)
-					// 		{
-					// 			found = true;
-					// 			break;
-					// 		}
-					// 	}
-					// 	remove_index++;
-					// 	iter++;
-					// }
-					// std::list<int>::iterator iter_remove = remove_index_list.begin();
-					// while (iter_remove != remove_index_list.end())
-					// {
-					// 	int index = (int)*iter_remove;
-					// 	std::list<PNOTIFY_CFG>::const_iterator iter_tmp = interactive_session_data.begin();
-					// 	std::advance(iter_tmp, index);
-					// 	interactive_session_data.erase(iter_tmp);
-					// 	iter_remove++;
-					// }
-					ret = extract_interactive_session_data_list(session_id, NOTIFY_GET_SYSTEM_INFO, interactive_session_system_info_data);
+					unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_GET_SYSTEM_INFO, interactive_session_system_info_data);
 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					// if (!found)
-					// {
-					// 	WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_info_data.size());
-					// 	return RET_FAILURE_NOT_FOUND;
-					// }
 					if (CHECK_FAILURE(ret))
-					{
-						if (ret == RET_FAILURE_NOT_FOUND)
-							WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_info_data.size());
 						return ret;
+					if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+					{
+						WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_info_data.size());
+						return ret_seesion_data;
 					}
+// Parse the data
 					std::list<PNOTIFY_CFG>::iterator iter_system_info = interactive_session_system_info_data.begin();
 					while (iter_system_info != interactive_session_system_info_data.end())
 					{
@@ -1929,57 +1962,35 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
-					interactive_session_param[session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// Send the request
-				    ret = cluster_node->send(MSG_GET_SYSTEM_MONITOR, (void*)&session_id);
-					if (CHECK_FAILURE(ret))
-						return ret;
-// Receive the response
-					// bool found = false;
-				    struct timespec ts;
-				    clock_gettime(CLOCK_REALTIME, &ts);
-				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-					}
-					// // dump_interactive_session_data_list(session_id);
-					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+// 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+// 					interactive_session_param[session_id].event_count = 0;
+// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// // Send the request
+// 				    ret = cluster_node->send(MSG_GET_SYSTEM_MONITOR, (void*)&session_id);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// // Receive the response
+// 					// bool found = false;
+// 				    struct timespec ts;
+// 				    clock_gettime(CLOCK_REALTIME, &ts);
+// 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 					{
+// 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 					}
+					ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_GET_SYSTEM_MONITOR, (void*)&session_id);
 					std::list<PNOTIFY_CFG> interactive_session_system_monitor_data;
-					// while (iter != interactive_session_data.end())
-					// {
-					// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					// 	if (notify_cfg->get_notify_type() == NOTIFY_GET_SYSTEM_MONITOR)
-					// 	{
-					// 		// found = true;
-					// 		interactive_session_system_monitor_data.push_back(notify_cfg);
-					// 		interactive_session_data.erase(iter);
-					// 		if ((int)interactive_session_system_monitor_data.size() == interactive_session_param[session_id].follower_node_amount)
-					// 		{
-					// 			found = true;
-					// 			break;
-					// 		}
-					// 	}
-					// 	iter++;
-					// }
-					ret = extract_interactive_session_data_list(session_id, NOTIFY_GET_SYSTEM_MONITOR, interactive_session_system_monitor_data);
+					unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_GET_SYSTEM_MONITOR, interactive_session_system_monitor_data);
 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					// if (!found)
-					// {
-					// 	WRITE_FORMAT_ERROR("Lack of system monitor from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_monitor_data.size());
-					// 	return RET_FAILURE_NOT_FOUND;
-					// }
 					if (CHECK_FAILURE(ret))
-					{
-						if (ret == RET_FAILURE_NOT_FOUND)
-							WRITE_FORMAT_ERROR("Lack of system monitor from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_monitor_data.size());
 						return ret;
+					if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+					{
+						WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_system_monitor_data.size());
+						return ret_seesion_data;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_system_monitor = interactive_session_system_monitor_data.begin();
 					while (iter_system_monitor != interactive_session_system_monitor_data.end())
@@ -2059,55 +2070,32 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// Send the request
-				    ret = cluster_node->send(MSG_GET_SIMULATOR_VERSION, (void*)&session_id);
-					if (CHECK_FAILURE(ret))
-						return ret;
-// Receive the response
-					// bool found = false;
-				    struct timespec ts;
-				    clock_gettime(CLOCK_REALTIME, &ts);
-				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-					}
-					// // dump_interactive_session_data_list(session_id);
-					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// // Send the request
+// 				    ret = cluster_node->send(MSG_GET_SIMULATOR_VERSION, (void*)&session_id);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// // Receive the response
+// 				    struct timespec ts;
+// 				    clock_gettime(CLOCK_REALTIME, &ts);
+// 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 					{
+// 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 					}
+					ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_GET_SIMULATOR_VERSION, (void*)&session_id);
 					std::list<PNOTIFY_CFG> interactive_session_simulator_version_data;
-					// while (iter != interactive_session_data.end())
-					// {
-					// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					// 	if (notify_cfg->get_notify_type() == NOTIFY_GET_SIMULATOR_VERSION)
-					// 	{
-					// 		// found = true;
-					// 		interactive_session_simulator_version_data.push_back(notify_cfg);
-					// 		interactive_session_data.erase(iter);
-					// 		if ((int)interactive_session_simulator_version_data.size() == interactive_session_param[session_id].follower_node_amount)
-					// 		{
-					// 			found = true;
-					// 			break;
-					// 		}
-					// 	}
-					// 	iter++;
-					// }
-					ret = extract_interactive_session_data_list(session_id, NOTIFY_GET_SIMULATOR_VERSION, interactive_session_simulator_version_data);
+					unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_GET_SIMULATOR_VERSION, interactive_session_simulator_version_data);
 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					// if (!found)
-					// {
-					// 	WRITE_FORMAT_ERROR("Lack of simulator version from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_simulator_version_data.size());
-					// 	return RET_FAILURE_NOT_FOUND;
-					// }
 					if (CHECK_FAILURE(ret))
-					{
-						if (ret == RET_FAILURE_NOT_FOUND)
-							WRITE_FORMAT_ERROR("Lack of simulator version from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_simulator_version_data.size());
 						return ret;
+					if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+					{
+						WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_simulator_version_data.size());
+						return ret_seesion_data;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_simulator_version = interactive_session_simulator_version_data.begin();
 					while (iter_simulator_version != interactive_session_simulator_version_data.end())
@@ -2210,55 +2198,33 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// Send the request
-				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_STATE, (void*)&session_id);
-					if (CHECK_FAILURE(ret))
-						return ret;
-// Receive the response
-					// bool found = false;
-				    struct timespec ts;
-				    clock_gettime(CLOCK_REALTIME, &ts);
-				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-					}
-					// // dump_interactive_session_data_list(session_id);
-					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// // Send the request
+// 				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_STATE, (void*)&session_id);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// // Receive the response
+// 					// bool found = false;
+// 				    struct timespec ts;
+// 				    clock_gettime(CLOCK_REALTIME, &ts);
+// 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 					{
+// 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 					}
+					ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_GET_FAKE_ACSPT_STATE, (void*)&session_id);
 					std::list<PNOTIFY_CFG> interactive_session_fake_acspt_state_data;
-					// while (iter != interactive_session_data.end())
-					// {
-					// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					// 	if (notify_cfg->get_notify_type() == NOTIFY_GET_FAKE_ACSPT_STATE)
-					// 	{
-					// 		// found = true;
-					// 		interactive_session_fake_acspt_state_data.push_back(notify_cfg);
-					// 		interactive_session_data.erase(iter);
-					// 		if ((int)interactive_session_fake_acspt_state_data.size() == interactive_session_param[session_id].follower_node_amount)
-					// 		{
-					// 			found = true;
-					// 			break;
-					// 		}
-					// 	}
-					// 	iter++;
-					// }
-					ret = extract_interactive_session_data_list(session_id, NOTIFY_GET_FAKE_ACSPT_STATE, interactive_session_fake_acspt_state_data);
+					unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_GET_FAKE_ACSPT_STATE, interactive_session_fake_acspt_state_data);
 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					// if (!found)
-					// {
-					// 	WRITE_FORMAT_ERROR("Lack of fake acspt state from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_state_data.size());
-					// 	return RET_FAILURE_NOT_FOUND;
-					// }
 					if (CHECK_FAILURE(ret))
-					{
-						if (ret == RET_FAILURE_NOT_FOUND)
-							WRITE_FORMAT_ERROR("Lack of fake acspt state from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_state_data.size());
 						return ret;
+					if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+					{
+						WRITE_FORMAT_ERROR("Lack of system info from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_state_data.size());
+						return ret_seesion_data;
 					}
 					std::list<PNOTIFY_CFG>::iterator iter_fake_acspt_state = interactive_session_fake_acspt_state_data.begin();
 					while (iter_fake_acspt_state != interactive_session_fake_acspt_state_data.end())
@@ -2336,55 +2302,34 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
-					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// Send the request
-				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_DETAIL, (void*)&session_id);
-					if (CHECK_FAILURE(ret))
-						return ret;
-// Receive the response
-					// bool found = false;
-				    struct timespec ts;
-				    clock_gettime(CLOCK_REALTIME, &ts);
-				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
-					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-					{
-		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
-					}
-					// dump_interactive_session_data_list(session_id);
-					// std::list<PNOTIFY_CFG>& interactive_session_data = interactive_session_param[session_id].data_list;
-					// std::list<PNOTIFY_CFG>::iterator iter = interactive_session_data.begin();
+// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+// // Send the request and wait for the response
+// 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+// // Send the request
+// 				    ret = cluster_node->send(MSG_GET_FAKE_ACSPT_DETAIL, (void*)&session_id);
+// 					if (CHECK_FAILURE(ret))
+// 						return ret;
+// // Receive the response
+// 					// bool found = false;
+// 				    struct timespec ts;
+// 				    clock_gettime(CLOCK_REALTIME, &ts);
+// 				    ts.tv_sec += WAIT_MESSAGE_RESPONSE_TIME;
+// 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
+// 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
+// 					{
+// 		    			WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
+// 						return RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;						
+// 					}
+					ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_GET_FAKE_ACSPT_DETAIL, (void*)&session_id);
 					std::list<PNOTIFY_CFG> interactive_session_fake_acspt_detail_data;
-					// while (iter != interactive_session_data.end())
-					// {
-					// 	PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)*iter;
-					// 	if (notify_cfg->get_notify_type() == NOTIFY_GET_FAKE_ACSPT_DETAIL)
-					// 	{
-					// 		// found = true;
-					// 		interactive_session_fake_acspt_detail_data.push_back(notify_cfg);
-					// 		interactive_session_data.erase(iter);
-					// 		if ((int)interactive_session_fake_acspt_detail_data.size() == interactive_session_param[session_id].follower_node_amount)
-					// 		{
-					// 			found = true;
-					// 			break;
-					// 		}
-					// 	}
-					// 	iter++;
-					// }
-					ret = extract_interactive_session_data_list(session_id, NOTIFY_GET_FAKE_ACSPT_DETAIL, interactive_session_fake_acspt_detail_data);
+					unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_GET_FAKE_ACSPT_DETAIL, interactive_session_fake_acspt_detail_data);
 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-					// if (!found)
-					// {
-					// 	WRITE_FORMAT_ERROR("Lack of fake acspt detail from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_detail_data.size());
-					// 	return RET_FAILURE_NOT_FOUND;
-					// }
 					if (CHECK_FAILURE(ret))
-					{
-						if (ret == RET_FAILURE_NOT_FOUND)
-							WRITE_FORMAT_ERROR("Lack of fake acspt detail from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_detail_data.size());
 						return ret;
+					if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+					{
+						WRITE_FORMAT_ERROR("Lack of fake acspt detail from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_fake_acspt_detail_data.size());
+						return ret_seesion_data;
 					}
 
 					std::list<PNOTIFY_CFG>::iterator iter_fake_acspt_detail = interactive_session_fake_acspt_detail_data.begin();
@@ -2413,6 +2358,21 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
+		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN:
+		{
+			if (is_leader())
+			{
+				WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
+				return RET_FAILURE_INCORRECT_OPERATION;	
+			}
+        	if (param1 == NULL)
+    		{
+    			WRITE_ERROR("The param1 should NOT be NULL");
+    			return RET_FAILURE_INVALID_ARGUMENT;
+    		}
+			*(unsigned short*)param1 = file_transfer_token_ret;
+		}
+		break;
     	case PARAM_FILE_TX_TYPE:
     	{
         	if (param1 == NULL)
@@ -2444,14 +2404,14 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 			*(int*)param1 = current_cluster_config.system_monitor_period;
 		}
 		break;
-		case PARAM_REMOTE_SYNC_FILE_RETURN_VALUE:
+		case PARAM_REMOTE_SYNC_RETURN_VALUE:
 		{
 	        if (param1 == NULL)
     		{
     			WRITE_ERROR("The param1 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}	
-			*(unsigned short*)param1 = remote_sync_file_ret;
+			*(unsigned short*)param1 = remote_sync_ret;
 		}
 		break;
     	default:
@@ -3091,13 +3051,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 					return ret;
 				usleep(1000);
 // Leader remove the Follower from the cluster
-			    ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)follower_node_token.c_str());
+			    ret = cluster_node->set(PARA_FOLLOWERM_REMOVAL, (void*)follower_node_token.c_str());
 				if (CHECK_FAILURE(ret))
 					return ret;
     		}
     		else if (node_type == FOLLOWER)
     		{
-    			ret = cluster_node->set(PARAM_REMOVE_FOLLOWER, (void*)&follower_node_id);
+    			ret = cluster_node->set(PARA_FOLLOWERM_REMOVAL, (void*)&follower_node_id);
 				if (CHECK_FAILURE(ret))
 				{
 					WRITE_FORMAT_ERROR("Rebuild cluster fails while removing follower, due to: %s", GetErrorDescription(ret));
@@ -3107,13 +3067,13 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     		else
     		{
 				WRITE_FORMAT_ERROR("Unknown node type: %d while removing follower", node_type);
-				return RET_FAILURE_INCORRECT_OPERATION;    			
+				return RET_FAILURE_INCORRECT_OPERATION; 			
     		}
     	}
     	break;
 		// case NOTIFY_REMOTE_SYNC_FILE:
 		// {
-		// 	PNOTIFY_REMOTE_SYNC_FILE_CFG notify_remote_sync_file_cfg = (PNOTIFY_REMOTE_SYNC_FILE_CFG)notify_cfg;
+		// 	PNOTIFY_REMOTE_SYNC_FILE_CFG notify_remote_sync_cfg = (PNOTIFY_REMOTE_SYNC_FILE_CFG)notify_cfg;
         // 	if (param1 == NULL || param2 == NULL)
     	// 	{
     	// 		WRITE_ERROR("The param1/param2 should NOT be NULL");
@@ -3122,7 +3082,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 	    // 	assert(file_tx == NULL && "file_tx should be NULL");
 	    // 	ClusterFileTransferParam cluster_file_transfer_param;
 	    // 	assert(cluster_file_transfer_param != NULL && "cluster_file_transfer_param should NOT be NULL");
-	    // 	const char* filepath = notify_remote_sync_file_cfg->get_filepath();
+	    // 	const char* filepath = notify_remote_sync_cfg->get_filepath();
 		// 	ret = set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
 		// }
 		// break;

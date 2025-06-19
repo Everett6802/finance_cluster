@@ -784,8 +784,11 @@ unsigned short LeaderNode::recv(MessageType message_type, const char* message_da
 		&LeaderNode::recv_get_fake_acspt_detail,
 		&LeaderNode::recv_request_file_transfer,
 		&LeaderNode::recv_complete_file_transfer,
+		&LeaderNode::recv_request_file_transfer_token,
+		&LeaderNode::recv_release_file_transfer_token,
 		&LeaderNode::recv_switch_leader,
 		&LeaderNode::recv_remove_follower,
+		&LeaderNode::recv_remote_sync_folder,
 		&LeaderNode::recv_remote_sync_file
 	};
 	if (message_type < 1 || message_type >= MSG_SIZE)
@@ -818,8 +821,11 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_fake_acspt_detail,
 		&LeaderNode::send_request_file_transfer,
 		&LeaderNode::send_complete_file_transfer,
+		&LeaderNode::send_request_file_transfer_token,
+		&LeaderNode::send_release_file_transfer_token,
 		&LeaderNode::send_switch_leader,
 		&LeaderNode::send_remove_follower,
+		&LeaderNode::send_remote_sync_folder,
 		&LeaderNode::send_remote_sync_file
 	};
 
@@ -1027,9 +1033,45 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 	return ret;
 }
 
+unsigned short LeaderNode::recv_request_file_transfer_token(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|followe token) | EOD
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+    unsigned short ret = RET_SUCCESS;
+// Serialize: convert the type of session id from integer to string  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, message_data, PAYLOAD_SESSION_ID_DIGITS);
+	int session_id = atoi(session_id_buf);
+	char* follower_token = (char*)(message_data + PAYLOAD_SESSION_ID_DIGITS);
+	ret = send_request_file_transfer_token((void*)&session_id, (void*)follower_token);
+	return ret;
+}
+
+unsigned short LeaderNode::recv_release_file_transfer_token(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	unsigned short ret = observer->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
+	return ret;
+}
+
 unsigned short LeaderNode::recv_switch_leader(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_SWITCH_LEADER);}
 
 unsigned short LeaderNode::recv_remove_follower(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Leader", "Recv", MSG_REMOVE_FOLLOWER);}
+
+unsigned short LeaderNode::recv_remote_sync_folder(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | return value | EOD
+	unsigned short ret = RET_SUCCESS;
+	unsigned short remote_sync_file_ret = (unsigned short)atoi(message_data);
+	WRITE_FORMAT_DEBUG("Receive the return value of remote sync folder: %d", remote_sync_file_ret);
+	ret = observer->set(PARAM_REMOTE_SYNC_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	return ret;
+}
 
 unsigned short LeaderNode::recv_remote_sync_file(const char* message_data, int message_size)
 {
@@ -1038,7 +1080,7 @@ unsigned short LeaderNode::recv_remote_sync_file(const char* message_data, int m
 	unsigned short ret = RET_SUCCESS;
 	unsigned short remote_sync_file_ret = (unsigned short)atoi(message_data);
 	WRITE_FORMAT_DEBUG("Receive the return value of remote sync file: %d", remote_sync_file_ret);
-	ret = observer->set(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	ret = observer->set(PARAM_REMOTE_SYNC_RETURN_VALUE, (void*)&remote_sync_file_ret);
 	return ret;
 }
 
@@ -1449,6 +1491,36 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	return ret;
 }
 
+unsigned short LeaderNode::send_request_file_transfer_token(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: follower session id
+// param2: follower token
+// Message format:
+// EventType | follower session id | file transfer token return code | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (param1 == NULL || param2 == NULL)
+	{
+		WRITE_ERROR("param1/param2 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	static const int BUF_SIZE = sizeof(int) + sizeof(unsigned short);
+	unsigned short ret = RET_SUCCESS;
+	int session_id = *(int*)param1;
+	char* follower_token = (char*)param2;
+	unsigned short ret_file_transfer = observer->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST);
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, BUF_SIZE);
+	char* buf_ptr = buf;
+	memcpy(buf_ptr, &session_id, PAYLOAD_SESSION_ID_DIGITS);
+	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+	memcpy(buf_ptr, &ret_file_transfer, sizeof(unsigned short));
+	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_TOKEN, buf, BUF_SIZE, follower_token);
+	return ret;
+}
+
+unsigned short LeaderNode::send_release_file_transfer_token(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Leader", "Send", MSG_RELEASE_FILE_TRANSFER_TOKEN);}
+
 unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* param3)
 {
 // Parameters:
@@ -1493,6 +1565,33 @@ unsigned short LeaderNode::send_remove_follower(void* param1, void* param2, void
 	return send_raw_data(MSG_REMOVE_FOLLOWER, buf, BUF_SIZE);
 }
 
+unsigned short LeaderNode::send_remote_sync_folder(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: follower node id
+// param2: folder path in follower
+// Message format:
+// EventType | text | EOD
+	if (param1 == NULL || param2 == NULL)
+	{
+		WRITE_ERROR("param1/param2 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	unsigned short ret = RET_SUCCESS;
+	int follower_node_id = *(int*)param1;
+	const char* remote_folderpath = (char*)param2;
+	string follower_node_token;
+	pthread_mutex_lock(&node_channel_mtx);
+	ret = cluster_map.get_node_token(follower_node_id, follower_node_token);
+	pthread_mutex_unlock(&node_channel_mtx);
+	if (ret == RET_FAILURE_NOT_FOUND)
+	{
+		WRITE_FORMAT_ERROR("Fail to find the node token from node id[%d]", follower_node_id);
+		return ret;
+	}
+	return send_raw_data(MSG_REMOTE_SYNC_FOLDER, remote_folderpath, strlen((char*)remote_folderpath) + 1, follower_node_token.c_str());
+}
+
 unsigned short LeaderNode::send_remote_sync_file(void* param1, void* param2, void* param3)
 {
 // Parameters:
@@ -1517,16 +1616,6 @@ unsigned short LeaderNode::send_remote_sync_file(void* param1, void* param2, voi
 		WRITE_FORMAT_ERROR("Fail to find the node token from node id[%d]", follower_node_id);
 		return ret;
 	}
-
-	// int buf_size = sizeof(int) + strlen((char*)remote_filepath) + 1;
-	// char* buf = new char[buf_size];
-	// if (buf == NULL)
-	// 	throw bad_alloc();
-	// memset(buf, 0x0, sizeof(char) * buf_size);
-	// char* buf_ptr = buf;
-	// memcpy(buf_ptr, param1, sizeof(int));
-	// buf_ptr += sizeof(int);
-	// memcpy(buf_ptr, (char*)param2, strlen((char*)remote_filepath));
 	return send_raw_data(MSG_REMOTE_SYNC_FILE, remote_filepath, strlen((char*)remote_filepath) + 1, follower_node_token.c_str());
 }
 
@@ -1540,37 +1629,37 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
     		local_cluster = *(bool*)param1;
     	}
     	break;
-    	case PARAM_FILE_TRANSFER:
-    	{
-    		if (param1 == NULL)
-    		{
-    			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
-    		// PFILE_TRANSFER_PARAM file_transfer_param = (PFILE_TRANSFER_PARAM)param1; 
-    		// assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
-			// tx_session_id = file_transfer_param->session_id;
-			// if (tx_session_id == -1)
-			// {
-			// 	WRITE_ERROR("tx_session_id should NOT be -1");
-			// 	return RET_FAILURE_SYSTEM_API;
-			// }			
-			// tx_filepath = strdup(file_transfer_param->filepath);
-			// if (tx_filepath == NULL)
-			// {
-			// 	WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));		
-			// 	return RET_FAILURE_SYSTEM_API;
-			// }
-// // Start a thread for listening the connection request of file tranfer from the folower
-//     		ret = start_file_transfer();
+//     	case PARAM_FILE_TRANSFER:
+//     	{
+//     		if (param1 == NULL)
+//     		{
+//     			WRITE_FORMAT_ERROR("The param1 of the param_type[%d] should NOT be NULL", param_type);
+//     			return RET_FAILURE_INVALID_ARGUMENT;
+//     		}
+//     		// PFILE_TRANSFER_PARAM file_transfer_param = (PFILE_TRANSFER_PARAM)param1; 
+//     		// assert(file_transfer_param != NULL && "file_transfer_param should NOT be NULL");
+// 			// tx_session_id = file_transfer_param->session_id;
+// 			// if (tx_session_id == -1)
+// 			// {
+// 			// 	WRITE_ERROR("tx_session_id should NOT be -1");
+// 			// 	return RET_FAILURE_SYSTEM_API;
+// 			// }			
+// 			// tx_filepath = strdup(file_transfer_param->filepath);
+// 			// if (tx_filepath == NULL)
+// 			// {
+// 			// 	WRITE_FORMAT_ERROR("strdup() fails, due to: %s", strerror(errno));		
+// 			// 	return RET_FAILURE_SYSTEM_API;
+// 			// }
+// // // Start a thread for listening the connection request of file tranfer from the folower
+// //     		ret = start_file_transfer();
+// // 			if (CHECK_FAILURE(ret))
+// // 				return ret;
+// // Notify the folower to connect to the sender and become a receiver
+// 			ret = send_request_file_transfer(param1);
 // 			if (CHECK_FAILURE(ret))
-// 				return ret;
-// Notify the folower to connect to the sender and become a receiver
-			ret = send_request_file_transfer(param1);
-			if (CHECK_FAILURE(ret))
-				return ret;	
-    	}
-    	break;
+// 				return ret;	
+//     	}
+//     	break;
 //     	case PARAM_FILE_TRANSFER_DONE:
 //     	{
 //     		// ret = stop_file_transfer();
@@ -1609,7 +1698,7 @@ unsigned short LeaderNode::set(ParamType param_type, void* param1, void* param2)
 			}
     	}
     	break;
-      	case PARAM_REMOVE_FOLLOWER:
+      	case PARA_FOLLOWERM_REMOVAL:
     	{
     		char* follower_token = (char*)param1;
     		WRITE_FORMAT_WARN("Remove the follower[%s] from the cluster", follower_token);

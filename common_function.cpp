@@ -54,9 +54,9 @@ const char *GetErrorDescription(unsigned short ret)
 		"Warn Interactive Configuration Command",
 		"Warn Simulator Not Installed",
 		"Warn Simulator Package Not Found",
-		"Warn File Transfer in Process",
 		"Warn Cluster Not Single",
-		"Warn Remote Resource Busy",
+		"Warn File Transfer in Process",
+		"Warn File Transfer Resource Busy",
 		"Warn Remote File Transfer Failure"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
@@ -90,7 +90,7 @@ const char *GetErrorDescription(unsigned short ret)
 	throw runtime_error(buf);
 }
 
-static char* MESSAGE_DESCRIPTION[] = {
+static const char* MESSAGE_DESCRIPTION[] = {
 	"Can Not Use",
 	"Check Keepalive",
 	"Update Cluster Map",
@@ -106,6 +106,8 @@ static char* MESSAGE_DESCRIPTION[] = {
 	"GetFakeAcsptDetail",
 	"RequestFileTransfer",
 	"CompleteFileTransfer",
+	"RequestFileTransferToken",
+	"ReleaseFileTransferToken",
 	"SwitchLeader",
 	"RemoveFollower",
 	"RemoteSyncFile"
@@ -119,7 +121,7 @@ const char* GetMessageDescription(MessageType message_type)
 	return MESSAGE_DESCRIPTION[message_type];
 }
 
-static char* NOTIFY_DESCRIPTION[] = {
+static const char* NOTIFY_DESCRIPTION[] = {
 	"CheckKeepalive",
 	"NodeDie",
 	"Session_exit",
@@ -152,7 +154,7 @@ const char* GetNotifyDescription(NotifyType notify_type)
 	return NOTIFY_DESCRIPTION[notify_type];
 }
 
-static char* EVENT_TYPE_DESCRIPTION[] = {
+static const char* EVENT_TYPE_DESCRIPTION[] = {
 	"Operate Node",
 	"Telnet Console",
 	"Sync Data",
@@ -184,7 +186,7 @@ EventType GetEventTypeFromDescription(const char* event_type_description)
 	throw invalid_argument(buf);
 }
 
-static char* EVENT_SEVERITY_DESCRIPTION[] = {
+static const char* EVENT_SEVERITY_DESCRIPTION[] = {
 	"Critical",
 	"Warning",
 	"Informational"
@@ -214,7 +216,7 @@ EventSeverity GetEventSeverityFromDescription(const char* event_severity_descrip
 	throw invalid_argument(buf);
 }
 
-static char* EVENT_CATEGORY_DESCRIPTION[] = {
+static const char* EVENT_CATEGORY_DESCRIPTION[] = {
 	"Cluter",
 	"Console"
 };
@@ -676,4 +678,23 @@ string join(const char *string_list[], int string_list_len, const char* delimite
 		new_string_list[i] = string(string_list[i]);
 	string new_delimiter = string(delimiter);
 	return join(new_string_list, string_list_len, new_delimiter);
+}
+
+std::string gen_random_string(const int len) 
+{
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+	static const int alphanum_len = sizeof(alphanum) / sizeof(alphanum[0]);
+    std::string tmp_s;
+    tmp_s.reserve(len);
+	int index;
+    for (int i = 0; i < len; ++i) 
+	{
+		index = rand() % alphanum_len;
+        tmp_s += alphanum[index];
+    }
+    
+    return tmp_s;
 }

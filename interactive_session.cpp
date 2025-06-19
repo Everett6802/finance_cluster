@@ -1535,27 +1535,45 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	WRITE_FORMAT_DEBUG("Try to synchorinize the folder: %s", sync_folderpath.c_str());
-	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
-	list<string> full_filepath_in_folder_list;
-	get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
-	list<string>::iterator iter = full_filepath_in_folder_list.begin();
-	while (iter != full_filepath_in_folder_list.end())
+	if (!check_file_exist(sync_folderpath.c_str()))
 	{
-		string full_filepath = (string)(*iter);
-		// printf("* %s\n", full_filepath.c_str());
-		WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
-		print_to_console(string(" *** file synchorinization: ") + full_filepath + string("  ***\n"));
-		ClusterFileTransferParam cluster_file_transfer_param;
-	// Start to transfer the file
-		cluster_file_transfer_param.session_id = session_id;
-	    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
-	    usleep(100000);
-	    // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
-	 	if (CHECK_FAILURE(ret))
-			return ret;
-		iter++;
+		WRITE_FORMAT_WARN("The folder[%s] being synchronized does NOT exist", sync_folderpath.c_str());
+		return RET_FAILURE_NOT_FOUND;
 	}
-	WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
+	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
+
+	string file_tx_token = gen_random_string();
+	ret = manager->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST, (void*)&file_tx_token);
+	if (ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+	{
+		print_to_console(string("File transfer resource busy !!! Try later......\n"));
+		return ret;
+	}
+	else
+	{
+		list<string> full_filepath_in_folder_list;
+		get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
+		list<string>::iterator iter = full_filepath_in_folder_list.begin();
+		while (iter != full_filepath_in_folder_list.end())
+		{
+			string full_filepath = (string)(*iter);
+			// printf("* %s\n", full_filepath.c_str());
+			WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
+			print_to_console(string(" *** file synchorinization: ") + full_filepath + string("  ***\n"));
+			ClusterFileTransferParam cluster_file_transfer_param;
+		// Start to transfer the file
+			cluster_file_transfer_param.session_id = session_id;
+			ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
+			usleep(100000);
+			// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+			if (CHECK_FAILURE(ret))
+				return ret;
+			iter++;
+		}
+		manager->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
+		WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
+	}
+
 	return ret;	
 }
 
@@ -1568,8 +1586,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		print_to_console(incorrect_command_phrases);
 		return RET_WARN_INTERACTIVE_COMMAND;
 	}
-
-	unsigned short ret = RET_SUCCESS;
+	unsigned short ret = RET_SUCCESS;	
 	char filepath[DEF_LONG_STRING_SIZE]; 
 	const char* argv1_tmp = (const char*)argv[1];
 	if (strchr(argv1_tmp, '/') == NULL)
@@ -1606,14 +1623,43 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		return RET_FAILURE_NOT_FOUND;
 	}
 
-	print_to_console(string(" *** file synchorinization  ***\n"));
+	string file_tx_token = gen_random_string();
+	ret = manager->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST, (void*)&file_tx_token);
+	if (ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+	{
+		print_to_console(string("File transfer resource busy !!! Try later......\n"));
+		return ret;
+	}
+	unsigned short ret_file_tx_token;
 	ClusterFileTransferParam cluster_file_transfer_param;
+	if (!is_leader)
+	{
+		ret = manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
+		if (CHECK_FAILURE(ret))
+		{
+			WRITE_FORMAT_ERROR("Error occur while requesting file transfer remote token, due to: %s", GetErrorDescription(ret));
+			goto OUT;
+		}
+		manager->get(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&ret_file_tx_token);
+		if (CHECK_FAILURE(ret_file_tx_token))
+		{
+			if (ret_file_tx_token == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+				print_to_console(string("Remote file transfer resource busy !!! Try later......"));
+			ret = ret_file_tx_token;
+			goto OUT;
+		}
+	}
 // Start to transfer the file
+	print_to_console(string(" *** file synchorinization  ***\n"));
 	cluster_file_transfer_param.session_id = session_id;
-    ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
-    // printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
 	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
-	return RET_SUCCESS;
+	if (!is_leader)
+		manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
+OUT:
+	manager->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
+	return ret;
 }
 
 unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, char **argv)
@@ -1648,7 +1694,7 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 	}
 	WRITE_FORMAT_DEBUG("Trigger remote sync folder[%s] in Follower[%s]", remote_folderpath, follower_node_token);
 	ret = manager->set(PARAM_REMOTE_SYNC_FOLDER, (void*)&follower_node_id, (void*)remote_folderpath);
-	manager->set(PARAM_REMOTE_SYNC_FILE_FLAG_OFF);
+	// manager->set(PARAM_REMOTE_SYNC_FLAG_OFF);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_DEBUG("Error occur while triggering remote sync folder[%s] in Follower[%s], due to: %s", remote_folderpath, follower_node_token, GetErrorDescription(ret));
@@ -1656,16 +1702,16 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 		return ret;
 	}
 	unsigned short remote_sync_file_ret;
-	manager->get(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	manager->get(PARAM_REMOTE_SYNC_RETURN_VALUE, (void*)&remote_sync_file_ret);
 	WRITE_FORMAT_DEBUG("Return value of synchorizing the folder[%s] from Follower[%s]: %d, %s", remote_folderpath, follower_node_token, remote_sync_file_ret, GetErrorDescription(remote_sync_file_ret));
 	if (CHECK_FAILURE(remote_sync_file_ret))
 	{
-		if (remote_sync_file_ret == RET_WARN_REMOTE_RESOURCE_BUSY)
+		if (remote_sync_file_ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a folder[%s] is busy in Follower[%s]", remote_folderpath, follower_node_token);
 			WRITE_WARN(buf);
 			print_to_console(string(buf) + string("\n"));
-			ret = RET_WARN_REMOTE_RESOURCE_BUSY;
+			ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 		}
 		else if (remote_sync_file_ret == RET_FAILURE_NOT_FOUND)
 		{
@@ -1684,7 +1730,7 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 	}
 	else
 	{
-		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_folderpath, follower_node_token);
+		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_folderpath, follower_node_token, true);
 		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully\n", remote_folderpath, follower_node_token);
 		WRITE_DEBUG(buf);
 		print_to_console(string(buf));
@@ -1725,7 +1771,7 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 	}
 	WRITE_FORMAT_DEBUG("Trigger remote sync file[%s] in Follower[%s]", remote_filepath, follower_node_token);
 	ret = manager->set(PARAM_REMOTE_SYNC_FILE, (void*)&follower_node_id, (void*)remote_filepath);
-	manager->set(PARAM_REMOTE_SYNC_FILE_FLAG_OFF);
+	// manager->set(PARAM_REMOTE_SYNC_FLAG_OFF);
 	if (CHECK_FAILURE(ret))
 	{
 		WRITE_FORMAT_DEBUG("Error occur while triggering remote sync file[%s] in Follower[%s], due to: %s", remote_filepath, follower_node_token, GetErrorDescription(ret));
@@ -1733,16 +1779,16 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 		return ret;
 	}
 	unsigned short remote_sync_file_ret;
-	manager->get(PARAM_REMOTE_SYNC_FILE_RETURN_VALUE, (void*)&remote_sync_file_ret);
+	manager->get(PARAM_REMOTE_SYNC_RETURN_VALUE, (void*)&remote_sync_file_ret);
 	WRITE_FORMAT_DEBUG("Return value of synchorizing the file[%s] from Follower[%s]: %d, %s", remote_filepath, follower_node_token, remote_sync_file_ret, GetErrorDescription(remote_sync_file_ret));
 	if (CHECK_FAILURE(remote_sync_file_ret))
 	{
-		if (remote_sync_file_ret == RET_WARN_REMOTE_RESOURCE_BUSY)
+		if (remote_sync_file_ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
 			print_to_console(string(buf) + string("\n"));
-			ret = RET_WARN_REMOTE_RESOURCE_BUSY;
+			ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 		}
 		else if (remote_sync_file_ret == RET_FAILURE_NOT_FOUND)
 		{
@@ -1761,7 +1807,7 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 	}
 	else
 	{
-		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_filepath, follower_node_token);
+		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_filepath, follower_node_token, false);
 		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully\n", remote_filepath, follower_node_token);
 		WRITE_DEBUG(buf);
 		print_to_console(string(buf));
