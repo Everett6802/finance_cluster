@@ -196,9 +196,9 @@ extern const unsigned short RET_WARN_INTERACTIVE_COMMAND;
 extern const unsigned short RET_WARN_INTERACTIVE_CONFIG_COMMAND;
 extern const unsigned short RET_WARN_SIMULATOR_NOT_INSTALLED;
 extern const unsigned short RET_WARN_SIMULATOR_PACKAGE_NOT_FOUND;
-extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
 extern const unsigned short RET_WARN_CLUSTER_NOT_SINGLE;
-extern const unsigned short RET_WARN_REMOTE_RESOURCE_BUSY;
+extern const unsigned short RET_WARN_FILE_TRANSFER_IN_PROCESS;
+extern const unsigned short RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 extern const unsigned short RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 extern const unsigned short RET_WARN_END;
 
@@ -277,9 +277,12 @@ enum MessageType{
 	MSG_GET_FAKE_ACSPT_DETAIL, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Sender -> Receiver
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
+	MSG_REQUEST_FILE_TRANSFER_TOKEN, // Bi-Direction, Follower(Sender) -> Leader(Receiver), then Leader -> Follower
+	MSG_RELEASE_FILE_TRANSFER_TOKEN, // Bi-Direction, Follower(Sender) -> Leader(Receiver), then Leader -> Follower
 	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
 	MSG_REMOVE_FOLLOWER, // Uni-Direction, Leader -> Follower
-	MSG_REMOTE_SYNC_FILE, // Uni-Direction, Leader -> Follower
+	MSG_REMOTE_SYNC_FOLDER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
+	MSG_REMOTE_SYNC_FILE, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
 	MSG_SIZE
 };
 
@@ -306,6 +309,11 @@ enum ParamType{
 	PARAM_FAKE_ACSPT_CONFIG_VALUE,
 	PARAM_FAKE_ACSPT_STATE,
 	PARAM_FAKE_ACSPT_DETAIL,
+	PARAM_FILE_TRANSFER_TOKEN_REQUEST,
+	PARAM_FILE_TRANSFER_TOKEN_RELEASE,
+	PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST,  // Only required for transferring data from Follower to Leader
+	PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE,  // Only required for transferring data from Follower to Leader
+	PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN,  // Only required for transferring data from Follower to Leader
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
 	PARAM_REMOVE_FILE_CHANNEL,
@@ -314,15 +322,15 @@ enum ParamType{
 	// PARAM_GET_LOCAL_TOKEN,
 	PARAM_SENDER_TOKEN,
 	PARAM_ACTION_FREEZE,
-	PARAM_REMOVE_FOLLOWER,
+	PARA_FOLLOWERM_REMOVAL,
 	PARAM_CLUSTER_SETUP_NETWORK,
 	PARAM_CLUSTER_SETUP_NETMASK_DIGITS,
 	PARAM_SYSTEM_MONITOR_PERIOD,
 	PARAM_CLUSTER_SYNC_FOLDERPATH,
 	PARAM_REMOTE_SYNC_FOLDER,
 	PARAM_REMOTE_SYNC_FILE,
-	PARAM_REMOTE_SYNC_FILE_FLAG_OFF,
-	PARAM_REMOTE_SYNC_FILE_RETURN_VALUE,
+	// PARAM_REMOTE_SYNC_FLAG_OFF,
+	PARAM_REMOTE_SYNC_RETURN_VALUE,
 	PARAM_SIZE
 };
 
@@ -472,6 +480,7 @@ unsigned short create_folder_recursive(const char* full_folderpath);
 unsigned short get_filepath_in_folder_recursive(std::list<std::string>& full_filepath_in_folder_list, const std::string& parent_full_folderpath);
 std::string join(const std::string string_list[], int string_list_len, const std::string& delimiter=std::string(", "));
 std::string join(const char *string_list[], int string_list_len, const char* delimiter=", ");
+std::string gen_random_string(const int len=7);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interface
@@ -879,6 +888,7 @@ public:
 // 	int session_id;
 // // (cluster id, system info)
 // 	std::map<int, std::string> clusuter_file_transfer_map;
+	std::string control_token;
 
 	ClusterFileTransferParam();
 	virtual ~ClusterFileTransferParam();
@@ -1417,7 +1427,7 @@ struct RemoteSyncDataEventData
 	char data_path[DEF_LONG_STRING_SIZE];
 	// NodeType node_type;
 	char remote_node_token[DEF_LONG_STRING_SIZE];
-	// char is_folder;
+	char is_folder;
 }__attribute__ ((packed));
 typedef RemoteSyncDataEventData* PREMOTE_SYNC_DATA_EVENT_DATA;
 
@@ -1428,7 +1438,7 @@ class RemoteSyncDataEventCfg : public EventCfg
 	virtual ~RemoteSyncDataEventCfg();
 
 public:
-	static unsigned short generate_obj(RemoteSyncDataEventCfg **obj, const char* data_path, const char* remote_node_token/*, char is_folder*/);
+	static unsigned short generate_obj(RemoteSyncDataEventCfg **obj, const char* data_path, const char* remote_node_token, char is_folder);
 };
 typedef RemoteSyncDataEventCfg* PREMOTE_SYNC_DATA_EVENT_CFG;
 

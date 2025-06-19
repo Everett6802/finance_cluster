@@ -459,7 +459,7 @@ SyncDataEventCfg::~SyncDataEventCfg(){}
 
 const int RemoteSyncDataEventCfg::EVENT_DATA_SIZE = sizeof(RemoteSyncDataEventData);
 
-unsigned short RemoteSyncDataEventCfg::generate_obj(RemoteSyncDataEventCfg **obj, const char* data_path, const char* remote_node_token/*, char is_folder*/)
+unsigned short RemoteSyncDataEventCfg::generate_obj(RemoteSyncDataEventCfg **obj, const char* data_path, const char* remote_node_token, char is_folder)
 {
 	assert(obj != NULL && "obj should NOT be NULL");
 	assert(remote_node_token != NULL && "remote_node_token should NOT be NULL");
@@ -469,7 +469,7 @@ unsigned short RemoteSyncDataEventCfg::generate_obj(RemoteSyncDataEventCfg **obj
 	// data.node_type = node_type;
 	memset(data.remote_node_token, 0x0, sizeof(char) * DEF_LONG_STRING_SIZE);
 	strcpy(data.remote_node_token, remote_node_token);
-	// data.is_folder = is_folder;
+	data.is_folder = is_folder;
 	RemoteSyncDataEventCfg *obj_tmp = new RemoteSyncDataEventCfg((void*)&data, EVENT_DATA_SIZE);
 	if (obj_tmp == NULL)
 		throw bad_alloc();
@@ -484,7 +484,7 @@ RemoteSyncDataEventCfg::RemoteSyncDataEventCfg(const void* param, size_t param_s
 	char buf[DEF_LONG_STRING_SIZE];
 	PREMOTE_SYNC_DATA_EVENT_DATA event_data = (PREMOTE_SYNC_DATA_EVENT_DATA)get_data();
 	assert(event_data != NULL && "event_data should NOT be NULL");
-	snprintf(buf, LONG_STRING_SIZE, "LEADER remote-sync file[%s] in Follower[%s]", event_data->data_path, event_data->remote_node_token/*, (event_data->is_folder != 0 ? "folder" : "file")*/);
+	snprintf(buf, LONG_STRING_SIZE, "LEADER remote-sync %s[%s] in Follower[%s]", (event_data->is_folder ? "folder" : "file"), event_data->data_path, event_data->remote_node_token/*, (event_data->is_folder != 0 ? "folder" : "file")*/);
 	string content_description = string(buf);
 	event_description += content_description;
 }

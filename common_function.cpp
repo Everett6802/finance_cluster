@@ -54,9 +54,9 @@ const char *GetErrorDescription(unsigned short ret)
 		"Warn Interactive Configuration Command",
 		"Warn Simulator Not Installed",
 		"Warn Simulator Package Not Found",
-		"Warn File Transfer in Process",
 		"Warn Cluster Not Single",
-		"Warn Remote Resource Busy",
+		"Warn File Transfer in Process",
+		"Warn File Transfer Resource Busy",
 		"Warn Remote File Transfer Failure"
 	};
 	static int ret_failure_description_len = sizeof(ret_failure_description) / sizeof(ret_failure_description[0]);
@@ -106,6 +106,8 @@ static char* MESSAGE_DESCRIPTION[] = {
 	"GetFakeAcsptDetail",
 	"RequestFileTransfer",
 	"CompleteFileTransfer",
+	"RequestFileTransferToken",
+	"ReleaseFileTransferToken",
 	"SwitchLeader",
 	"RemoveFollower",
 	"RemoteSyncFile"
@@ -676,4 +678,23 @@ string join(const char *string_list[], int string_list_len, const char* delimite
 		new_string_list[i] = string(string_list[i]);
 	string new_delimiter = string(delimiter);
 	return join(new_string_list, string_list_len, new_delimiter);
+}
+
+std::string gen_random_string(const int len) 
+{
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+	static const int alphanum_len = sizeof(alphanum) / sizeof(alphanum[0]);
+    std::string tmp_s;
+    tmp_s.reserve(len);
+	int index;
+    for (int i = 0; i < len; ++i) 
+	{
+		index = rand() % alphanum_len;
+        tmp_s += alphanum[index];
+    }
+    
+    return tmp_s;
 }

@@ -54,10 +54,14 @@ private:
 	char* cluster_token; // Only for the follower
 	NodeType node_type;
 	PINODE cluster_node;
+	std::string file_tx_token;
+	pthread_mutex_t file_tx_mtx;
 	FileTxType file_tx_type;
 	PIFILE_TX file_tx;
-	int remote_sync_file_enable;
-	unsigned short remote_sync_file_ret;
+	// int remote_sync_enable;
+	std::string file_transfer_control_token;
+	unsigned short file_transfer_token_ret;  // Only for the follower
+	unsigned short remote_sync_ret;
 
 // parameters related to session
 	InteractiveServer* interactive_server;
@@ -88,6 +92,7 @@ private:
 	void dump_interactive_session_data_list(int session_id)const;
 	unsigned short extract_interactive_session_data_list(int session_id, NotifyType notify_type, std::list<PNOTIFY_CFG> &interactive_session_system_info_data);
 	unsigned short close_console();
+	unsigned short send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1=NULL, void* param2=NULL)const;
 
 public:
 	ClusterMgr();

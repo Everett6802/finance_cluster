@@ -82,8 +82,11 @@ private:
 	unsigned short recv_get_fake_acspt_detail(const char* message_data, int message_size);
 	unsigned short recv_request_file_transfer(const char* message_data, int message_size);
 	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
+	unsigned short recv_request_file_transfer_token(const char* message_data, int message_size);
+	unsigned short recv_release_file_transfer_token(const char* message_data, int message_size);
 	unsigned short recv_switch_leader(const char* message_data, int message_size);
 	unsigned short recv_remove_follower(const char* message_data, int message_size);
+	unsigned short recv_remote_sync_folder(const char* message_data, int message_size);
 	unsigned short recv_remote_sync_file(const char* message_data, int message_size);
 // send
 	unsigned short send_check_keepalive(void* param1=NULL, void* param2=NULL, void* param3=NULL);
@@ -101,8 +104,11 @@ private:
 	unsigned short send_get_fake_acspt_detail(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_request_file_transfer_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_release_file_transfer_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_switch_leader(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_remove_follower(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_remote_sync_folder(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_remote_sync_file(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 
 	void dump_node_channel_map()const;
