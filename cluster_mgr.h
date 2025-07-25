@@ -27,7 +27,7 @@ class ClusterMgr : public IManager
 		pthread_cond_t cond;
 		std::list<PNOTIFY_CFG> data_list;
 		int event_count;
-		int follower_node_amount;
+		int event_amount;
 	};
 
 	struct ClusterConfig
@@ -60,7 +60,7 @@ private:
 	PIFILE_TX file_tx;
 	// int remote_sync_enable;
 	std::string file_transfer_control_token;
-	unsigned short file_transfer_token_ret;  // Only for the follower
+	unsigned short file_transfer_token_ret;
 	unsigned short remote_sync_ret;
 
 // parameters related to session

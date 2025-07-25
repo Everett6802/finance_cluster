@@ -483,8 +483,9 @@ unsigned short FollowerNode::recv(MessageType message_type, const char* message_
 		&FollowerNode::recv_get_fake_acspt_detail,
 		&FollowerNode::recv_request_file_transfer,
 		&FollowerNode::recv_complete_file_transfer,
-		&FollowerNode::recv_request_file_transfer_token,
-		&FollowerNode::recv_release_file_transfer_token,
+		&FollowerNode::recv_request_file_transfer_leader_remote_token,
+		&FollowerNode::recv_request_file_transfer_follower_remote_token,
+		&FollowerNode::recv_release_file_transfer_remote_token,
 		&FollowerNode::recv_switch_leader,
 		&FollowerNode::recv_remove_follower,
 		&FollowerNode::recv_remote_sync_folder,
@@ -519,8 +520,9 @@ unsigned short FollowerNode::send(MessageType message_type, void* param1, void* 
 		&FollowerNode::send_get_fake_acspt_detail,
 		&FollowerNode::send_request_file_transfer,
 		&FollowerNode::send_complete_file_transfer,
-		&FollowerNode::send_request_file_transfer_token,
-		&FollowerNode::send_release_file_transfer_token,
+		&FollowerNode::send_request_file_transfer_leader_remote_token,
+		&FollowerNode::send_request_file_transfer_follower_remote_token,
+		&FollowerNode::send_release_file_transfer_remote_token,
 		&FollowerNode::send_switch_leader,
 		&FollowerNode::send_remove_follower,
 		&FollowerNode::send_remote_sync_folder,
@@ -820,27 +822,58 @@ unsigned short FollowerNode::recv_complete_file_transfer(const char* message_dat
 	return ret;
 }
 
-unsigned short FollowerNode::recv_request_file_transfer_token(const char* message_data, int message_size)
+unsigned short FollowerNode::recv_request_file_transfer_leader_remote_token(const char* message_data, int message_size)
 {
 // Message format:
-// EventType | session ID | file transfer token return code | EOD
+// EventType | session ID | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
-	static const int FILE_TRANSFER_TOKEN_BUF_SIZE = sizeof(unsigned short) + 1;
 	unsigned short ret = RET_SUCCESS;
 	char session_id_buf[SESSION_ID_BUF_SIZE];
 	memset(session_id_buf, 0x0, SESSION_ID_BUF_SIZE);
 	memcpy(session_id_buf, message_data, PAYLOAD_SESSION_ID_DIGITS);
 	int session_id = atoi(session_id_buf);
-	char file_transfer_token_buf[FILE_TRANSFER_TOKEN_BUF_SIZE];
-	memset(file_transfer_token_buf, 0x0, FILE_TRANSFER_TOKEN_BUF_SIZE);
-	memcpy(file_transfer_token_buf, (message_data + PAYLOAD_SESSION_ID_DIGITS), sizeof(unsigned short));
-	unsigned short file_transfer_token_ret = atoi(file_transfer_token_buf);
-	ret = observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&session_id, (void*)&file_transfer_token_ret);
+	ret = send_request_file_transfer_leader_remote_token((void*)&session_id);
 	return ret;
 }
 
-unsigned short FollowerNode::recv_release_file_transfer_token(const char* message_data, int message_size){UNDEFINED_MSG_EXCEPTION("Follower", "Recv", MSG_RELEASE_FILE_TRANSFER_TOKEN);}
+unsigned short FollowerNode::recv_request_file_transfer_follower_remote_token(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | session ID | file transfer token return code | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	// static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	// static const int FILE_TRANSFER_TOKEN_BUF_SIZE = sizeof(unsigned short) + 1;
+	// unsigned short ret = RET_SUCCESS;
+	// char session_id_buf[SESSION_ID_BUF_SIZE];
+	// memset(session_id_buf, 0x0, SESSION_ID_BUF_SIZE);
+	// memcpy(session_id_buf, message_data, PAYLOAD_SESSION_ID_DIGITS);
+	// int session_id = atoi(session_id_buf);
+	// char file_transfer_token_buf[FILE_TRANSFER_TOKEN_BUF_SIZE];
+	// memset(file_transfer_token_buf, 0x0, FILE_TRANSFER_TOKEN_BUF_SIZE);
+	// memcpy(file_transfer_token_buf, (message_data + PAYLOAD_SESSION_ID_DIGITS), sizeof(unsigned short));
+	// unsigned short file_transfer_token_ret = atoi(file_transfer_token_buf);
+	// ret = observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&session_id, (void*)&file_transfer_token_ret);
+	// return ret;
+	PNOTIFY_CFG notify_cfg = new NotifyRequestFileTransferRemoteTokenCfg((void*)message_data, (size_t)message_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, notify_cfg);
+	// printf("recv_get_system_info()\n");
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short FollowerNode::recv_release_file_transfer_remote_token(const char* message_data, int message_size)
+{
+	// UNDEFINED_MSG_EXCEPTION("Follower", "Recv", MSG_RELEASE_FILE_TRANSFER_TOKEN);
+// Message format:
+// EventType | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	unsigned short ret = observer->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
+	return ret;
+}
 
 unsigned short FollowerNode::recv_switch_leader(const char* message_data, int message_size)
 {
@@ -1292,11 +1325,36 @@ unsigned short FollowerNode::send_complete_file_transfer(void* param1, void* par
 	return ret;
 }
 
-unsigned short FollowerNode::send_request_file_transfer_token(void* param1, void* param2, void* param3)
+unsigned short FollowerNode::send_request_file_transfer_leader_remote_token(void* param1, void* param2, void* param3)
 {
 // Parameters:
 // param1: session id
-// param1: local token
+// Message format:
+// EventType | session id | file transfer token return code | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	if (param1 == NULL/* || param2 == NULL*/)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;
+	}
+	static const int BUF_SIZE = sizeof(int) + sizeof(unsigned short);
+	unsigned short ret = RET_SUCCESS;
+	int session_id = *(int*)param1;
+	unsigned short ret_file_transfer = observer->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST);
+	char buf[BUF_SIZE];
+	memset(buf, 0x0, BUF_SIZE);
+	char* buf_ptr = buf;
+	memcpy(buf_ptr, &session_id, PAYLOAD_SESSION_ID_DIGITS);
+	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+	memcpy(buf_ptr, &ret_file_transfer, sizeof(unsigned short));
+	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN, buf, BUF_SIZE);
+	return ret;
+}
+
+unsigned short FollowerNode::send_request_file_transfer_follower_remote_token(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
 // Message format:
 // EventType | session id | local token | EOD
 	if (param1 == NULL)
@@ -1314,15 +1372,15 @@ unsigned short FollowerNode::send_request_file_transfer_token(void* param1, void
 	memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
 	memcpy(buf_ptr, local_token, strlen(local_token));
-	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_TOKEN, buf, buf_size);
+	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, buf, buf_size);
 	return ret;
 }
 
-unsigned short FollowerNode::send_release_file_transfer_token(void* param1, void* param2, void* param3)
+unsigned short FollowerNode::send_release_file_transfer_remote_token(void* param1, void* param2, void* param3)
 {
 // Message format:
 // EventType | EOD
-	unsigned short ret = send_raw_data(MSG_RELEASE_FILE_TRANSFER_TOKEN);
+	unsigned short ret = send_raw_data(MSG_RELEASE_FILE_TRANSFER_REMOTE_TOKEN);
 	return ret;
 }
 

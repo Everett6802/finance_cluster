@@ -784,8 +784,9 @@ unsigned short LeaderNode::recv(MessageType message_type, const char* message_da
 		&LeaderNode::recv_get_fake_acspt_detail,
 		&LeaderNode::recv_request_file_transfer,
 		&LeaderNode::recv_complete_file_transfer,
-		&LeaderNode::recv_request_file_transfer_token,
-		&LeaderNode::recv_release_file_transfer_token,
+		&LeaderNode::recv_request_file_transfer_leader_remote_token,
+		&LeaderNode::recv_request_file_transfer_follower_remote_token,
+		&LeaderNode::recv_release_file_transfer_remote_token,
 		&LeaderNode::recv_switch_leader,
 		&LeaderNode::recv_remove_follower,
 		&LeaderNode::recv_remote_sync_folder,
@@ -821,8 +822,9 @@ unsigned short LeaderNode::send(MessageType message_type, void* param1, void* pa
 		&LeaderNode::send_get_fake_acspt_detail,
 		&LeaderNode::send_request_file_transfer,
 		&LeaderNode::send_complete_file_transfer,
-		&LeaderNode::send_request_file_transfer_token,
-		&LeaderNode::send_release_file_transfer_token,
+		&LeaderNode::send_request_file_transfer_leader_remote_token,
+		&LeaderNode::send_request_file_transfer_follower_remote_token,
+		&LeaderNode::send_release_file_transfer_remote_token,
 		&LeaderNode::send_switch_leader,
 		&LeaderNode::send_remove_follower,
 		&LeaderNode::send_remote_sync_folder,
@@ -1033,10 +1035,25 @@ unsigned short LeaderNode::recv_complete_file_transfer(const char* message_data,
 	return ret;
 }
 
-unsigned short LeaderNode::recv_request_file_transfer_token(const char* message_data, int message_size)
+unsigned short LeaderNode::recv_request_file_transfer_leader_remote_token(const char* message_data, int message_size)
 {
 // Message format:
-// EventType | playload: (session ID[2 digits]|followe token) | EOD
+// EventType | session ID | file transfer token return code | EOD
+	assert(observer != NULL && "observer should NOT be NULL");
+	PNOTIFY_CFG notify_cfg = new NotifyRequestFileTransferRemoteTokenCfg((void*)message_data, (size_t)message_size);
+	if (notify_cfg == NULL)
+		throw bad_alloc();
+// Asynchronous event
+	observer->notify(NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, notify_cfg);
+	// printf("recv_get_system_info()\n");
+	SAFE_RELEASE(notify_cfg)
+	return RET_SUCCESS;
+}
+
+unsigned short LeaderNode::recv_request_file_transfer_follower_remote_token(const char* message_data, int message_size)
+{
+// Message format:
+// EventType | playload: (session ID[2 digits]|follower token) | EOD
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
     unsigned short ret = RET_SUCCESS;
 // Serialize: convert the type of session id from integer to string  
@@ -1045,11 +1062,11 @@ unsigned short LeaderNode::recv_request_file_transfer_token(const char* message_
 	memcpy(session_id_buf, message_data, PAYLOAD_SESSION_ID_DIGITS);
 	int session_id = atoi(session_id_buf);
 	char* follower_token = (char*)(message_data + PAYLOAD_SESSION_ID_DIGITS);
-	ret = send_request_file_transfer_token((void*)&session_id, (void*)follower_token);
+	ret = send_request_file_transfer_follower_remote_token((void*)&session_id, (void*)follower_token);
 	return ret;
 }
 
-unsigned short LeaderNode::recv_release_file_transfer_token(const char* message_data, int message_size)
+unsigned short LeaderNode::recv_release_file_transfer_remote_token(const char* message_data, int message_size)
 {
 // Message format:
 // EventType | EOD
@@ -1439,9 +1456,9 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 				WRITE_ERROR("param1 should NOT be NULL");
 				return RET_FAILURE_INVALID_ARGUMENT;		
 			}
-			static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
-			static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
-			static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+			// static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+			// static const int CLUSTER_ID_BUF_SIZE = PAYLOAD_CLUSTER_ID_DIGITS + 1;
+			// static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
 //     // unsigned short ret = RET_SUCCESS;
 // // Serialize: convert the type of session id from integer to string  
 // 	char session_id_buf[SESSION_ID_BUF_SIZE];
@@ -1491,7 +1508,28 @@ unsigned short LeaderNode::send_complete_file_transfer(void* param1, void* param
 	return ret;
 }
 
-unsigned short LeaderNode::send_request_file_transfer_token(void* param1, void* param2, void* param3)
+unsigned short LeaderNode::send_request_file_transfer_leader_remote_token(void* param1, void* param2, void* param3)
+{
+// Parameters:
+// param1: session id
+// Message format:
+// EventType | session id | EOD
+	if (param1 == NULL)
+	{
+		WRITE_ERROR("param1 should NOT be NULL");
+		return RET_FAILURE_INVALID_ARGUMENT;		
+	}
+	unsigned short ret = RET_SUCCESS;
+	char* buf = new char[PAYLOAD_SESSION_ID_DIGITS];
+	if (buf == NULL)
+		throw bad_alloc();
+	memset(buf, 0x0, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	memcpy(buf, param1, PAYLOAD_SESSION_ID_DIGITS);
+	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN, buf, PAYLOAD_SESSION_ID_DIGITS);
+	return ret;
+}
+
+unsigned short LeaderNode::send_request_file_transfer_follower_remote_token(void* param1, void* param2, void* param3)
 {
 // Parameters:
 // param1: follower session id
@@ -1515,11 +1553,18 @@ unsigned short LeaderNode::send_request_file_transfer_token(void* param1, void* 
 	memcpy(buf_ptr, &session_id, PAYLOAD_SESSION_ID_DIGITS);
 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
 	memcpy(buf_ptr, &ret_file_transfer, sizeof(unsigned short));
-	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_TOKEN, buf, BUF_SIZE, follower_token);
+	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, buf, BUF_SIZE, follower_token);
 	return ret;
 }
 
-unsigned short LeaderNode::send_release_file_transfer_token(void* param1, void* param2, void* param3){UNDEFINED_MSG_EXCEPTION("Leader", "Send", MSG_RELEASE_FILE_TRANSFER_TOKEN);}
+unsigned short LeaderNode::send_release_file_transfer_remote_token(void* param1, void* param2, void* param3)
+{
+	// UNDEFINED_MSG_EXCEPTION("Leader", "Send", MSG_RELEASE_FILE_TRANSFER_TOKEN);
+// Message format:
+// EventType | EOD
+	unsigned short ret = send_raw_data(MSG_RELEASE_FILE_TRANSFER_REMOTE_TOKEN);
+	return ret;
+}
 
 unsigned short LeaderNode::send_switch_leader(void* param1, void* param2, void* param3)
 {

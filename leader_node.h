@@ -56,7 +56,7 @@ private:
 	unsigned short become_leader();
 // If the message_size is -1, the message argument is treated as a string
 // Don't treat the data content as string. It's required to know the data size
-	unsigned short send_raw_data(MessageType message_type, const char* data, int data_size, const char* remote_token=NULL);
+	unsigned short send_raw_data(MessageType message_type, const char* data=NULL, int data_size=0, const char* remote_token=NULL);
 // Treat the data content as string. Calculate the size via strlen()
 	unsigned short send_string_data(MessageType message_type, const char* data=NULL, const char* remote_token=NULL);
 	unsigned short remove_follower(const std::string& node_token);
@@ -82,8 +82,9 @@ private:
 	unsigned short recv_get_fake_acspt_detail(const char* message_data, int message_size);
 	unsigned short recv_request_file_transfer(const char* message_data, int message_size);
 	unsigned short recv_complete_file_transfer(const char* message_data, int message_size);
-	unsigned short recv_request_file_transfer_token(const char* message_data, int message_size);
-	unsigned short recv_release_file_transfer_token(const char* message_data, int message_size);
+	unsigned short recv_request_file_transfer_leader_remote_token(const char* message_data, int message_size);
+	unsigned short recv_request_file_transfer_follower_remote_token(const char* message_data, int message_size);
+	unsigned short recv_release_file_transfer_remote_token(const char* message_data, int message_size);
 	unsigned short recv_switch_leader(const char* message_data, int message_size);
 	unsigned short recv_remove_follower(const char* message_data, int message_size);
 	unsigned short recv_remote_sync_folder(const char* message_data, int message_size);
@@ -104,8 +105,9 @@ private:
 	unsigned short send_get_fake_acspt_detail(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_request_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_complete_file_transfer(void* param1=NULL, void* param2=NULL, void* param3=NULL);
-	unsigned short send_request_file_transfer_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
-	unsigned short send_release_file_transfer_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_request_file_transfer_leader_remote_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_request_file_transfer_follower_remote_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
+	unsigned short send_release_file_transfer_remote_token(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_switch_leader(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_remove_follower(void* param1=NULL, void* param2=NULL, void* param3=NULL);
 	unsigned short send_remote_sync_folder(void* param1=NULL, void* param2=NULL, void* param3=NULL);

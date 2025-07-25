@@ -1255,7 +1255,7 @@ unsigned short NotifyThread::notify_thread_handler_internal()
 				PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_execute_vector[i];
 				assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 				notify_execute_vector[i] = NULL;
-				WRITE_FORMAT_DEBUG("Handle asynchronous event: %d", notify_cfg->get_notify_type());
+				WRITE_FORMAT_DEBUG("Handle asynchronous event: %s[%d]", GetNotifyDescription(notify_cfg->get_notify_type()), notify_cfg->get_notify_type());
 				ret = notify_observer->async_handle(notify_cfg);
 // Remove the old notification
 				// delete notify_cfg;

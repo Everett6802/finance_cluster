@@ -96,6 +96,7 @@ static const char* MESSAGE_DESCRIPTION[] = {
 	"Update Cluster Map",
 	"Transmit Text",
 	"Get System Info",
+	"Get System Monitor",
 	"Get Simulator Version",
 	"Install Simulator",
 	"ApplyFakeAcsptConfig",
@@ -106,10 +107,12 @@ static const char* MESSAGE_DESCRIPTION[] = {
 	"GetFakeAcsptDetail",
 	"RequestFileTransfer",
 	"CompleteFileTransfer",
-	"RequestFileTransferToken",
-	"ReleaseFileTransferToken",
+	"RequestFileTransferLeaderRemoteToken",
+	"RequestFileTransferFollowerRemoteToken",
+	"ReleaseFileTransferRemoteToken",
 	"SwitchLeader",
 	"RemoveFollower",
+	"RemoteSyncFolder",
 	"RemoteSyncFile"
 };
 static int MESSAGE_DESCRIPTION_SIZE = sizeof(MESSAGE_DESCRIPTION) / sizeof(MESSAGE_DESCRIPTION[0]);
@@ -136,6 +139,7 @@ static const char* NOTIFY_DESCRIPTION[] = {
 	"GetFakeAcsptStates",
 	"GetFakeAcsptDetail",
 	"RunMultiClis",
+	"RequestFileTransferRemoteToken",
 	"ConnectFileTransfer",  // Receiver of file transfer
 	"AbortFileTransfer",  // Receiver of file transfer
 	"CompleteFileTransfer",  // Sender of file transfer
@@ -249,7 +253,7 @@ EventCategory GetEventCategoryFromDescription(const char* event_category_descrip
 
 const char* GetEventDeviceDescription(EventDevice event_device)
 {
-	static char* event_device_description[] = {
+	static const char* event_device_description[] = {
 		"File",
 		"Shared Memory",
 		"Database"
@@ -449,7 +453,7 @@ unsigned short get_process_id_list(const char* process_name, list<int>& process_
 	}
 	char *line = NULL;
 	size_t line_len = 0;
-    char* token; 
+    // char* token; 
     char* rest = NULL;
     char* line_tmp = NULL; 
     char* pid_str = NULL;
@@ -493,7 +497,7 @@ unsigned short get_process_count(const char* process_name, int& process_count)
 	}
 	char *line = NULL;
 	size_t line_len = 0;
-    char* token; 
+    // char* token; 
     char* rest = NULL;
     char* line_tmp = NULL; 
     char* count_str = NULL;

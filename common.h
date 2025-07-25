@@ -277,8 +277,9 @@ enum MessageType{
 	MSG_GET_FAKE_ACSPT_DETAIL, // Bi-Direction, Leader -> Follower, then Follower -> Leader
 	MSG_REQUEST_FILE_TRANSFER, // Uni-Direction, Sender -> Receiver
 	MSG_COMPLETE_FILE_TRANSFER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
-	MSG_REQUEST_FILE_TRANSFER_TOKEN, // Bi-Direction, Follower(Sender) -> Leader(Receiver), then Leader -> Follower
-	MSG_RELEASE_FILE_TRANSFER_TOKEN, // Bi-Direction, Follower(Sender) -> Leader(Receiver), then Leader -> Follower
+	MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN, // Bi-Direction, Sender(Leader) -> Receiver(Follower), then Receiver(Follower) -> Sender(Leader)
+	MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, // Bi-Direction, Sender(Follower) -> Receiver(Leader), then Receiver(Leader) -> Sender(Follower)
+	MSG_RELEASE_FILE_TRANSFER_REMOTE_TOKEN, // Bi-Direction, Sender(Leader/Follower) -> Receiver(Follower/Leader)
 	MSG_SWITCH_LEADER, // Uni-Direction, Leader -> Follower
 	MSG_REMOVE_FOLLOWER, // Uni-Direction, Leader -> Follower
 	MSG_REMOTE_SYNC_FOLDER, // Bi-Direction, Sender -> Receiver, then Receiver -> Sender
@@ -311,8 +312,8 @@ enum ParamType{
 	PARAM_FAKE_ACSPT_DETAIL,
 	PARAM_FILE_TRANSFER_TOKEN_REQUEST,
 	PARAM_FILE_TRANSFER_TOKEN_RELEASE,
-	PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST,  // Only required for transferring data from Follower to Leader
-	PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE,  // Only required for transferring data from Follower to Leader
+	PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST,  
+	PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE, 
 	PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN,  // Only required for transferring data from Follower to Leader
 	PARAM_FILE_TRANSFER,
 	PARAM_FILE_TRANSFER_DONE,
@@ -351,6 +352,7 @@ enum NotifyType{
 	NOTIFY_GET_FAKE_ACSPT_STATE,
 	NOTIFY_GET_FAKE_ACSPT_DETAIL,
 	NOTIFY_RUN_MULTI_CLIS,
+	NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN,  // Only required for transferring data from Leader to Follower
 	NOTIFY_CONNECT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_ABORT_FILE_TRANSFER,  // Receiver of file transfer
 	NOTIFY_COMPLETE_FILE_TRANSFER,  // Sender of file transfer
@@ -1146,6 +1148,23 @@ public:
 	const char* get_fake_acspt_detail()const;
 };
 typedef NotifyFakeAcsptDetailCfg* PNOTIFY_FAKE_ACSPT_DETAIL_CFG;
+
+///////////////////////////
+
+class NotifyRequestFileTransferRemoteTokenCfg : public NotifyCfg
+{
+private:
+	int session_id;
+	unsigned short return_code;
+
+public:
+	NotifyRequestFileTransferRemoteTokenCfg(const void* param, size_t param_size);
+	virtual ~NotifyRequestFileTransferRemoteTokenCfg();
+
+	int get_session_id()const;
+	unsigned short get_return_code()const;
+};
+typedef NotifyRequestFileTransferRemoteTokenCfg* PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG;
 
 ///////////////////////////
 

@@ -555,6 +555,38 @@ const char* NotifyFakeAcsptDetailCfg::get_fake_acspt_detail()const
 
 ///////////////////////////
 
+NotifyRequestFileTransferRemoteTokenCfg::NotifyRequestFileTransferRemoteTokenCfg(const void* param, size_t param_size) :
+	NotifyCfg(NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, param, param_size)
+{
+	assert(param != NULL && "param should NOT be NULL");
+	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
+	static const int RETURN_CODE_BUF_SIZE = sizeof(unsigned short) + 1;
+// De-Serialize: convert the type of session id from string to integer  
+	char session_id_buf[SESSION_ID_BUF_SIZE];
+	memset(session_id_buf, 0x0, sizeof(char) * SESSION_ID_BUF_SIZE);
+	memcpy(session_id_buf, notify_param, sizeof(char) * PAYLOAD_SESSION_ID_DIGITS);
+	session_id = atoi(session_id_buf);
+// De-Serialize: convert the type of return code from string to integer  
+	char return_code_buf[RETURN_CODE_BUF_SIZE];
+	memset(return_code_buf, 0x0, sizeof(char) * RETURN_CODE_BUF_SIZE);
+	memcpy(return_code_buf, (notify_param + PAYLOAD_SESSION_ID_DIGITS), sizeof(char) * RETURN_CODE_BUF_SIZE);
+	return_code = (unsigned short)atoi(return_code_buf);
+}
+
+NotifyRequestFileTransferRemoteTokenCfg::~NotifyRequestFileTransferRemoteTokenCfg(){}
+
+int NotifyRequestFileTransferRemoteTokenCfg::get_session_id()const
+{
+	return session_id;
+}
+
+unsigned short NotifyRequestFileTransferRemoteTokenCfg::get_return_code()const
+{
+	return return_code;
+}
+
+///////////////////////////
+
 NotifyFileTransferConnectCfg::NotifyFileTransferConnectCfg(const void* param, size_t param_size) :
 	NotifyCfgEx(NOTIFY_CONNECT_FILE_TRANSFER, param, param_size)
 {
@@ -691,6 +723,7 @@ unsigned short NotifySendFileDoneCfg::generate_obj(NotifySendFileDoneCfg **obj, 
 	delete[] buf;
 	// fprintf(stderr, "[generate_obj], session_id: %d, remote_token: %s, remote_token len: %d\n", session_id_param, remote_token_param, strlen(remote_token_param));
 	// fprintf(stderr, "[NotifySendFileDoneCfg::generate_obj]  session_id: %d, remote_token: %s, remote_token len: %d\n", obj_tmp->get_session_id(), obj_tmp->get_remote_token(), strlen(remote_token_param));
+	return RET_SUCCESS;
 }
 
 NotifySendFileDoneCfg::NotifySendFileDoneCfg(const void* param, size_t param_size) :

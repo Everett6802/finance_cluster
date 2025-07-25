@@ -1559,7 +1559,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 			string full_filepath = (string)(*iter);
 			// printf("* %s\n", full_filepath.c_str());
 			WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
-			print_to_console(string(" *** file synchorinization: ") + full_filepath + string("  ***\n"));
+			print_to_console(string(" *** file synchorinization: ") + full_filepath + string(" ***\n"));
 			ClusterFileTransferParam cluster_file_transfer_param;
 		// Start to transfer the file
 			cluster_file_transfer_param.session_id = session_id;
@@ -1632,25 +1632,22 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	}
 	unsigned short ret_file_tx_token;
 	ClusterFileTransferParam cluster_file_transfer_param;
-	if (!is_leader)
+	ret = manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
+	if (CHECK_FAILURE(ret))
 	{
-		ret = manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
-		if (CHECK_FAILURE(ret))
-		{
-			WRITE_FORMAT_ERROR("Error occur while requesting file transfer remote token, due to: %s", GetErrorDescription(ret));
-			goto OUT;
-		}
-		manager->get(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&ret_file_tx_token);
-		if (CHECK_FAILURE(ret_file_tx_token))
-		{
-			if (ret_file_tx_token == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
-				print_to_console(string("Remote file transfer resource busy !!! Try later......"));
-			ret = ret_file_tx_token;
-			goto OUT;
-		}
+		WRITE_FORMAT_ERROR("Error occur while requesting file transfer remote token, due to: %s", GetErrorDescription(ret));
+		goto OUT;
+	}
+	manager->get(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&ret_file_tx_token);
+	if (CHECK_FAILURE(ret_file_tx_token))
+	{
+		if (ret_file_tx_token == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+			print_to_console(string("Remote file transfer resource busy !!! Try later......"));
+		ret = ret_file_tx_token;
+		goto OUT;
 	}
 // Start to transfer the file
-	print_to_console(string(" *** file synchorinization  ***\n"));
+	print_to_console(string(" *** file synchorinization ***\n"));
 	cluster_file_transfer_param.session_id = session_id;
 	ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
 	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));

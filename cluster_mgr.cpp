@@ -344,7 +344,7 @@ ClusterMgr::ClusterMgr() :
 	{
 		interactive_session_param[i].mtx = PTHREAD_MUTEX_INITIALIZER;
 		interactive_session_param[i].event_count = 0;
-		interactive_session_param[i].follower_node_amount = 0;
+		interactive_session_param[i].event_amount = 0;
 	}
 }
 
@@ -878,7 +878,7 @@ unsigned short ClusterMgr::extract_interactive_session_data_list(int session_id,
 
 			interactive_session_system_info_data.push_back(notify_cfg);
 			remove_index_list.push_front(remove_index);
-			if ((int)interactive_session_system_info_data.size() == interactive_session_param[session_id].follower_node_amount)
+			if ((int)interactive_session_system_info_data.size() == interactive_session_param[session_id].event_amount)
 			{
 				found = true;
 				break;
@@ -1211,29 +1211,63 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 		break;
 		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST:
 		{
-			if (is_leader())
-			{
-				WRITE_ERROR("Remote token request is only required for file transfer: Follower -> Leader");
-				return RET_FAILURE_INCORRECT_OPERATION;	
-			}
         	if (param1 == NULL)
     		{
     			WRITE_ERROR("The param1 should NOT be NULL");
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
 			int session_id = *(int*)param1;
+			int cluster_node_amount;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-			ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_REQUEST_FILE_TRANSFER_TOKEN, (void*)&session_id);
+			if (node_type == LEADER)
+			{
+				ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
+				if (CHECK_FAILURE(ret))
+					return ret;
+				interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
+			}
+			else
+			{
+				cluster_node_amount = 1;
+				interactive_session_param[session_id].event_amount = 1;
+			}
+			interactive_session_param[session_id].event_count = 0;
+			ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN, (void*)&session_id);
+			std::list<PNOTIFY_CFG> interactive_session_file_transfer_remote_token_data;
+			unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, interactive_session_file_transfer_remote_token_data);
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			if (CHECK_FAILURE(ret))
+				return ret;
+			if (ret_seesion_data == RET_FAILURE_NOT_FOUND)
+			{
+				if (node_type == LEADER)
+					WRITE_FORMAT_ERROR("Lack of file transfer remote token from some followers in the session[%d], expected: %d, actual: %d", session_id, cluster_node_amount - 1, interactive_session_file_transfer_remote_token_data.size());
+				else
+					WRITE_FORMAT_ERROR("Lack of file transfer remote token from Leader in the session[%d]", session_id);
+				return ret_seesion_data;
+			}
+	// Parse the data
+			bool resource_busy = false;
+			std::list<PNOTIFY_CFG>::iterator iter_file_transfer_remote_token = interactive_session_file_transfer_remote_token_data.begin();
+			while (iter_file_transfer_remote_token != interactive_session_file_transfer_remote_token_data.end())
+			{
+				PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG notify_file_transfer_remote_token_cfg = (PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG)*iter_file_transfer_remote_token;
+				assert(session_id == notify_file_transfer_remote_token_cfg->get_session_id() && "The session ID is NOT identical");
+				if (notify_file_transfer_remote_token_cfg->get_return_code() == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+					resource_busy = true;
+				iter_file_transfer_remote_token++;
+				SAFE_RELEASE(notify_file_transfer_remote_token_cfg)
+			}
+			file_transfer_token_ret = resource_busy ? RET_SUCCESS : RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 		}
 		break;
 		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE:
 		{
-			if (is_leader())
-			{
-				WRITE_ERROR("Remote token release is only required for file transfer: Follower -> Leader");
-				return RET_FAILURE_INCORRECT_OPERATION;	
-			}
+			// if (is_leader())
+			// {
+			// 	WRITE_ERROR("Remote token release is only required for file transfer: Follower -> Leader");
+			// 	return RET_FAILURE_INCORRECT_OPERATION;	
+			// }
         	// if (param1 == NULL)
     		// {
     		// 	WRITE_ERROR("The param1 should NOT be NULL");
@@ -1241,29 +1275,30 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     		// }
 			// int session_id = *(int*)param1;
 			// ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_RELEASE_FILE_TRANSFER_TOKEN, (void*)&session_id);
-			ret = cluster_node->send(MSG_RELEASE_FILE_TRANSFER_TOKEN);
+			ret = cluster_node->send(MSG_RELEASE_FILE_TRANSFER_REMOTE_TOKEN);
 		}
 		break;
-		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN:
-		{
-			if (is_leader())
-			{
-				WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
-				return RET_FAILURE_INCORRECT_OPERATION;	
-			}
-        	if (param1 == NULL || param2 == NULL)
-    		{
-    			WRITE_ERROR("The param1/param2 should NOT be NULL");
-    			return RET_FAILURE_INVALID_ARGUMENT;
-    		}
-			int session_id = *(int*)param1;
-			file_transfer_token_ret = *(unsigned short*)param2;
-			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-			// usleep(1000); // A MUST
-			pthread_cond_signal(&interactive_session_param[session_id].cond);
-			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-		}
-		break;
+		// case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN:
+		// {
+        // 	if (param1 == NULL || param2 == NULL)
+    	// 	{
+    	// 		WRITE_ERROR("The param1/param2 should NOT be NULL");
+    	// 		return RET_FAILURE_INVALID_ARGUMENT;
+    	// 	}
+		// 	int session_id = *(int*)param1;
+		// 	file_transfer_token_ret = *(unsigned short*)param2;
+		// 	pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+		// 	// usleep(1000); // A MUST
+		// 	if (is_leader())
+		// 	{
+		// 		WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
+		// 		return RET_FAILURE_INCORRECT_OPERATION;	
+		// 	}
+		// 	else
+		// 		pthread_cond_signal(&interactive_session_param[session_id].cond);
+		// 	pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+		// }
+		// break;
     	case PARAM_FILE_TRANSFER:
     	{
 			if (file_tx_token.empty())
@@ -1325,7 +1360,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				return ret;
 // Reset the counter 
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-			interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+			interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 			interactive_session_param[session_id].event_count = 0;
 			// pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // Nodify the remote Node to connect to
@@ -1672,7 +1707,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 // Reset the counter 
-					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
 // Send the request and wait for the response
 // // Send the request
@@ -1962,7 +1997,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-// 					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+// 					interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 // 					interactive_session_param[session_id].event_count = 0;
 // 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // // Send the request
@@ -2068,7 +2103,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
 // 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // // Send the request
@@ -2196,7 +2231,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
 // 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // // Send the request
@@ -2300,7 +2335,7 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
 // Not one node cluster, send notification to the followers
 // Reset the counter 
 					pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-					interactive_session_param[session_id].follower_node_amount = cluster_node_amount - 1;
+					interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 					interactive_session_param[session_id].event_count = 0;
 // 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 // // Send the request and wait for the response
@@ -2360,11 +2395,11 @@ unsigned short ClusterMgr::get(ParamType param_type, void* param1, void* param2)
     	break;
 		case PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN:
 		{
-			if (is_leader())
-			{
-				WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
-				return RET_FAILURE_INCORRECT_OPERATION;	
-			}
+			// if (is_leader())
+			// {
+			// 	WRITE_ERROR("Remote token request return is only required for file transfer: Follower -> Leader");
+			// 	return RET_FAILURE_INCORRECT_OPERATION;	
+			// }
         	if (param1 == NULL)
     		{
     			WRITE_ERROR("The param1 should NOT be NULL");
@@ -2727,6 +2762,17 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		ret = notify_thread->add_event(notify_cfg);
 		}
 		break;
+		case NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN:
+		{
+    		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
+    		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
+
+     		assert(node_type == LEADER && "node type should be LEADER");
+    		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
+    		WRITE_DEBUG("Receive the notification of requesting file transfer remote token for session......");
+    		ret = notify_thread->add_event(notify_cfg);
+		}
+		break;
 		case NOTIFY_CONNECT_FILE_TRANSFER:
 		{
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
@@ -2833,8 +2879,8 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_system_info_cfg);
 			interactive_session_param[session_id].event_count++;
-			// printf("event_count: %d, follower_node_amount: %d\n", interactive_session_param[session_id].event_count, interactive_session_param[session_id].follower_node_amount);
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			// printf("event_count: %d, event_amount: %d\n", interactive_session_param[session_id].event_count, interactive_session_param[session_id].event_amount);
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 // It's required to sleep for a while before notifying to accessing the list in another thread
 				usleep(1000); // A MUST
@@ -2854,7 +2900,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_system_monitor_cfg);
 			interactive_session_param[session_id].event_count++;
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 // It's required to sleep for a while before notifying to accessing the list in another thread
 				usleep(1000); // A MUST
@@ -2875,7 +2921,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_simulator_version_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
@@ -2895,7 +2941,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_state_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
@@ -2915,7 +2961,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_fake_acspt_detail_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to accessing the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
@@ -2923,6 +2969,26 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
     	}
     	break;
+		case NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN:
+		{
+    		PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG notify_request_file_transfer_remote_token_cfg = (PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG)notify_cfg;
+			// assert(notify_request_file_transfer_remote_token_cfg != NULL && "notify_request_file_transfer_remote_token_cfg should NOT be NULL");
+// Caution: Required to add reference count, since another thread will access it
+			notify_request_file_transfer_remote_token_cfg->addref(__FILE__, __LINE__);
+			int session_id = notify_request_file_transfer_remote_token_cfg->get_session_id();
+			// const char* fake_acspt_detail = notify_fake_acspt_detail_cfg->get_fake_acspt_detail();
+			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			interactive_session_param[session_id].data_list.push_back(notify_request_file_transfer_remote_token_cfg);
+			interactive_session_param[session_id].event_count++;
+// It's required to sleep for a while before notifying to accessing the list in another thread
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
+			{
+				usleep(1000); // A MUST
+				pthread_cond_signal(&interactive_session_param[session_id].cond);
+			}
+			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+		}
+		break;
     	case NOTIFY_CONNECT_FILE_TRANSFER:
     	{
 			unsigned short ret = RET_SUCCESS;
@@ -2956,7 +3022,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			interactive_session_param[session_id].data_list.push_back(notify_file_transfer_complete_cfg);
 			interactive_session_param[session_id].event_count++;
 // It's required to sleep for a while before notifying to access the list in another thread
-			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].follower_node_amount)
+			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
