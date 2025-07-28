@@ -1218,6 +1218,7 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     		}
 			int session_id = *(int*)param1;
 			int cluster_node_amount;
+			MessageType message_type;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			if (node_type == LEADER)
 			{
@@ -1225,14 +1226,16 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 				if (CHECK_FAILURE(ret))
 					return ret;
 				interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
+				message_type = MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN;
 			}
 			else
 			{
 				cluster_node_amount = 1;
 				interactive_session_param[session_id].event_amount = 1;
+				message_type = MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN;
 			}
 			interactive_session_param[session_id].event_count = 0;
-			ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN, (void*)&session_id);
+			ret = send_msg_and_wait_response(session_id, WAIT_MESSAGE_RESPONSE_TIME, message_type, (void*)&session_id);
 			std::list<PNOTIFY_CFG> interactive_session_file_transfer_remote_token_data;
 			unsigned short ret_seesion_data = extract_interactive_session_data_list(session_id, NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, interactive_session_file_transfer_remote_token_data);
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
@@ -2971,22 +2974,30 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	break;
 		case NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN:
 		{
+			printf("Check01\n");
     		PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG notify_request_file_transfer_remote_token_cfg = (PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG)notify_cfg;
 			// assert(notify_request_file_transfer_remote_token_cfg != NULL && "notify_request_file_transfer_remote_token_cfg should NOT be NULL");
 // Caution: Required to add reference count, since another thread will access it
 			notify_request_file_transfer_remote_token_cfg->addref(__FILE__, __LINE__);
 			int session_id = notify_request_file_transfer_remote_token_cfg->get_session_id();
 			// const char* fake_acspt_detail = notify_fake_acspt_detail_cfg->get_fake_acspt_detail();
+			printf("Check02: %d\n", session_id);
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
+			printf("Check03\n");
 			interactive_session_param[session_id].data_list.push_back(notify_request_file_transfer_remote_token_cfg);
 			interactive_session_param[session_id].event_count++;
+			printf("Check04: %d\n", interactive_session_param[session_id].event_count);
 // It's required to sleep for a while before notifying to accessing the list in another thread
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
+				printf("Check05\n");
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
+				printf("Check06\n");
 			}
+			printf("Check07\n");
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
+			printf("Check08\n");
 		}
 		break;
     	case NOTIFY_CONNECT_FILE_TRANSFER:
