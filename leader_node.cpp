@@ -1547,6 +1547,7 @@ unsigned short LeaderNode::send_request_file_transfer_follower_remote_token(void
 	int session_id = *(int*)param1;
 	char* follower_token = (char*)param2;
 	unsigned short ret_file_transfer = observer->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST);
+	printf("LeaderNode::send_request_file_transfer_follower_remote_token session_id: %d, follower_token: %s, ret_file_transfer: %d", session_id, follower_token, ret_file_transfer);
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, BUF_SIZE);
 	char* buf_ptr = buf;

@@ -2770,7 +2770,7 @@ unsigned short ClusterMgr::notify(NotifyType notify_type, void* notify_param)
     		PNOTIFY_CFG notify_cfg = (PNOTIFY_CFG)notify_param;
     		assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 
-     		assert(node_type == LEADER && "node type should be LEADER");
+     		// assert(node_type == LEADER && "node type should be LEADER");
     		assert(notify_thread != NULL && "notify_thread should NOT be NULL");
     		WRITE_DEBUG("Receive the notification of requesting file transfer remote token for session......");
     		ret = notify_thread->add_event(notify_cfg);
@@ -2974,30 +2974,22 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
     	break;
 		case NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN:
 		{
-			printf("Check01\n");
     		PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG notify_request_file_transfer_remote_token_cfg = (PNOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN_CFG)notify_cfg;
 			// assert(notify_request_file_transfer_remote_token_cfg != NULL && "notify_request_file_transfer_remote_token_cfg should NOT be NULL");
 // Caution: Required to add reference count, since another thread will access it
 			notify_request_file_transfer_remote_token_cfg->addref(__FILE__, __LINE__);
 			int session_id = notify_request_file_transfer_remote_token_cfg->get_session_id();
 			// const char* fake_acspt_detail = notify_fake_acspt_detail_cfg->get_fake_acspt_detail();
-			printf("Check02: %d\n", session_id);
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
-			printf("Check03\n");
 			interactive_session_param[session_id].data_list.push_back(notify_request_file_transfer_remote_token_cfg);
 			interactive_session_param[session_id].event_count++;
-			printf("Check04: %d\n", interactive_session_param[session_id].event_count);
 // It's required to sleep for a while before notifying to accessing the list in another thread
 			if (interactive_session_param[session_id].event_count == interactive_session_param[session_id].event_amount)
 			{
 				usleep(1000); // A MUST
-				printf("Check05\n");
 				pthread_cond_signal(&interactive_session_param[session_id].cond);
-				printf("Check06\n");
 			}
-			printf("Check07\n");
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-			printf("Check08\n");
 		}
 		break;
     	case NOTIFY_CONNECT_FILE_TRANSFER:

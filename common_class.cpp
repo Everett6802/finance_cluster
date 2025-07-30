@@ -1774,6 +1774,7 @@ unsigned short EventFileAccess::remove_space_from_sides(string& new_string, cons
 	char* new_string_tmp = new char[new_string_len + 1];
 	if (new_string_tmp == NULL)
 		throw bad_alloc();
+	memset(new_string_tmp, 0x0, sizeof(char) * (new_string_len + 1));
 	strncpy(new_string_tmp, &old_string[start_index], new_string_len);
 	// *new_string = new_string_tmp;
 	new_string = std::string(new_string_tmp);
@@ -1896,6 +1897,14 @@ unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string
 				case EVENT_ENTRY_FIELD_TYPE:
 				{
 					event_entry->event_type = GetEventTypeFromDescription(line_field.c_str());
+					// try
+					// {
+					// 	event_entry->event_type = GetEventTypeFromDescription(line_field.c_str());
+					// }
+					// catch(invalid_argument& e)
+					// {
+					// 	printf("data: %s, %s\n", line, line_field.c_str());
+					// }					
 				}
 				break;
 				case EVENT_ENTRY_FIELD_SEVERITY:

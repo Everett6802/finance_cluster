@@ -1549,31 +1549,48 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		print_to_console(string("File transfer resource busy !!! Try later......\n"));
 		return ret;
 	}
-	else
+	unsigned short ret_file_tx_token;
+	ClusterFileTransferParam cluster_file_transfer_param;
+	list<string> full_filepath_in_folder_list;
+	list<string>::iterator iter;
+	ret = manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
+	if (CHECK_FAILURE(ret))
 	{
-		list<string> full_filepath_in_folder_list;
-		get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
-		list<string>::iterator iter = full_filepath_in_folder_list.begin();
-		while (iter != full_filepath_in_folder_list.end())
-		{
-			string full_filepath = (string)(*iter);
-			// printf("* %s\n", full_filepath.c_str());
-			WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
-			print_to_console(string(" *** file synchorinization: ") + full_filepath + string(" ***\n"));
-			ClusterFileTransferParam cluster_file_transfer_param;
-		// Start to transfer the file
-			cluster_file_transfer_param.session_id = session_id;
-			ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
-			usleep(100000);
-			// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
-			if (CHECK_FAILURE(ret))
-				return ret;
-			iter++;
-		}
-		manager->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
-		WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
+		WRITE_FORMAT_ERROR("Error occur while requesting file transfer remote token, due to: %s", GetErrorDescription(ret));
+		goto OUT;
 	}
-
+	manager->get(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&ret_file_tx_token);
+	if (CHECK_FAILURE(ret_file_tx_token))
+	{
+		if (ret_file_tx_token == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+			print_to_console(string("Remote file transfer resource busy !!! Try later......"));
+		ret = ret_file_tx_token;
+		goto OUT1;
+	}
+		
+	get_filepath_in_folder_recursive(full_filepath_in_folder_list, sync_folderpath);
+	iter = full_filepath_in_folder_list.begin();
+	while (iter != full_filepath_in_folder_list.end())
+	{
+		string full_filepath = (string)(*iter);
+		// printf("* %s\n", full_filepath.c_str());
+		WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
+		print_to_console(string(" *** file synchorinization: ") + full_filepath + string(" ***\n"));
+		ClusterFileTransferParam cluster_file_transfer_param;
+// Start to transfer the file
+		cluster_file_transfer_param.session_id = session_id;
+		ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)full_filepath.c_str());
+		usleep(100000);
+		// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+		if (CHECK_FAILURE(ret))
+			return ret;
+		iter++;
+	}
+	WRITE_EVT_RECORDER(SyncDataEventCfg, sync_folderpath.c_str(), (is_leader ? LEADER : FOLLOWER), node_token, 1);
+OUT1:
+	manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
+OUT:
+	manager->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
 	return ret;	
 }
 
@@ -1644,7 +1661,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		if (ret_file_tx_token == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
 			print_to_console(string("Remote file transfer resource busy !!! Try later......"));
 		ret = ret_file_tx_token;
-		goto OUT;
+		goto OUT1;
 	}
 // Start to transfer the file
 	print_to_console(string(" *** file synchorinization ***\n"));
@@ -1652,8 +1669,8 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
 	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
 	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
-	if (!is_leader)
-		manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
+OUT1:
+	manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
 OUT:
 	manager->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
 	return ret;

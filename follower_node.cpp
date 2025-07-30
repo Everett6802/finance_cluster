@@ -860,7 +860,6 @@ unsigned short FollowerNode::recv_request_file_transfer_follower_remote_token(co
 		throw bad_alloc();
 // Asynchronous event
 	observer->notify(NOTIFY_REQUEST_FILE_TRANSFER_REMOTE_TOKEN, notify_cfg);
-	// printf("recv_get_system_info()\n");
 	SAFE_RELEASE(notify_cfg)
 	return RET_SUCCESS;
 }
