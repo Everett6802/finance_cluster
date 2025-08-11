@@ -1217,6 +1217,8 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
 			int session_id = *(int*)param1;
+			if (session_id == -1)
+				session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 			int cluster_node_amount;
 			MessageType message_type;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);

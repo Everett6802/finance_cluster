@@ -1668,7 +1668,8 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	cluster_file_transfer_param.session_id = session_id;
 	ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
 	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
-	WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
+	if (CHECK_SUCCESS(ret))
+		WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, (is_leader ? LEADER : FOLLOWER), node_token, 0);
 OUT1:
 	manager->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
 OUT:

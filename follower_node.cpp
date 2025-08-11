@@ -922,7 +922,66 @@ unsigned short FollowerNode::recv_remote_sync_file(const char* message_data, int
 {
 // Message format:
 // EventType | filepath | EOD
-	return send_remote_sync_file((void*)message_data);
+// // Parameters:
+// // param1: filepath
+// // Message format:
+// // EventType | return value | EOD
+// 	if (param1 == NULL)
+// 	{
+// 		WRITE_ERROR("param1 should NOT be NULL");
+// 		return RET_FAILURE_INVALID_ARGUMENT;
+// 	}
+// Check file exist
+	unsigned short ret = RET_SUCCESS;
+	const char* filepath = (const char*)message_data;
+	unsigned short remote_sync_file_ret = RET_SUCCESS;
+	string file_tx_token = gen_random_string();
+	int session_id = -1;
+	ClusterFileTransferParam cluster_file_transfer_param;
+	if (!check_file_exist(filepath))
+	{
+		WRITE_FORMAT_ERROR("(Remote) The file[%s] does NOT exist and fails to sync to Leader", filepath);
+		remote_sync_file_ret = RET_FAILURE_NOT_FOUND;
+		goto OUT;
+	}
+// Check the resource is busy
+	remote_sync_file_ret = observer->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST, (void*)&file_tx_token);
+	if (remote_sync_file_ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+	{
+		WRITE_WARN("(Remote) File transfer resource busy (Follower) !!! Try later......");
+		goto OUT;
+	}
+	ret = observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
+	if (CHECK_FAILURE(ret))
+	{	
+		remote_sync_file_ret = ret;
+		WRITE_FORMAT_ERROR("(Remote) Error occur while requesting file transfer remote token, due to: %s", GetErrorDescription(ret));
+		goto OUT1;
+	}
+	observer->get(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST_RETURN, (void*)&remote_sync_file_ret);
+	if (CHECK_FAILURE(remote_sync_file_ret))
+	{
+		if (remote_sync_file_ret != RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
+		{
+			static char buf[DEF_LONG_STRING_SIZE];
+			snprintf(buf, DEF_LONG_STRING_SIZE, "(Remote) Unexpected error return: %s", GetErrorDescription(ret));
+			throw runtime_error(string(buf));
+		} 
+		WRITE_WARN("(Remote) File transfer resource busy (Leader) !!! Try later......");
+		goto OUT2;
+	}
+// Start to transfer the file
+	cluster_file_transfer_param.session_id = session_id;
+	ret = observer->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
+	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
+	if (CHECK_SUCCESS(ret))
+		WRITE_EVT_RECORDER(SyncDataEventCfg, filepath, FOLLOWER, local_token, 0);
+OUT2:
+	observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_RELEASE);
+OUT1:
+	observer->set(PARAM_FILE_TRANSFER_TOKEN_RELEASE);
+OUT:
+	return send_remote_sync_file((void*)remote_sync_file_ret);
 }
 
 unsigned short FollowerNode::send_check_keepalive(void* param1, void* param2, void* param3)
@@ -1441,44 +1500,13 @@ unsigned short FollowerNode::send_remote_sync_folder(void* param1, void* param2,
 
 unsigned short FollowerNode::send_remote_sync_file(void* param1, void* param2, void* param3)
 {
-// Parameters:
-// param1: filepath
-// Message format:
-// EventType | return value | EOD
-	if (param1 == NULL)
-	{
-		WRITE_ERROR("param1 should NOT be NULL");
-		return RET_FAILURE_INVALID_ARGUMENT;
-	}
-
-	unsigned short ret = RET_SUCCESS;
-	const char* filepath = (const char*)param1;
-	unsigned short remote_sync_file_ret = RET_SUCCESS;
-	if (check_file_exist(filepath))
-	{
-// Start to transfer the file
-		ClusterFileTransferParam cluster_file_transfer_param;
-		cluster_file_transfer_param.control_token = gen_random_string();
-		cluster_file_transfer_param.session_id = -1;
-		WRITE_FORMAT_DEBUG("Synchronize the file[%s] to Leader", filepath);
-		ret = observer->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
-		// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
-		usleep(100000);
-		// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
-		// observer->set(PARAM_REMOTE_SYNC_FLAG_OFF);
-	}
-	else
-	{
-		WRITE_FORMAT_ERROR("The file[%s] does NOT exist and fails to sync to Leader", filepath);
-		remote_sync_file_ret = RET_FAILURE_NOT_FOUND;
-	}
-	static const int BUF_SIZE = sizeof(unsigned short) + 1;
+	static const int BUF_SIZE = sizeof(unsigned short);
 	char buf[BUF_SIZE];
-	memset(buf, 0x0, BUF_SIZE);
-	snprintf(buf, BUF_SIZE, "%hu", remote_sync_file_ret);
-	// memcpy(buf, &ret, sizeof(unsigned short));
-	ret = send_raw_data(MSG_REMOTE_SYNC_FILE, buf, BUF_SIZE);
-	return ret;
+	unsigned short remote_sync_file_ret = *(unsigned short*)param1;
+	// memset(buf, 0x0, BUF_SIZE);
+	// snprintf(buf, BUF_SIZE, "%hu", remote_sync_file_ret);
+	memcpy(buf, &remote_sync_file_ret, BUF_SIZE);
+	return send_raw_data(MSG_REMOTE_SYNC_FILE, buf, BUF_SIZE);
 }
 
 unsigned short FollowerNode::set(ParamType param_type, void* param1, void* param2)
