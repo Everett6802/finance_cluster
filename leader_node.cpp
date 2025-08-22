@@ -1053,7 +1053,7 @@ unsigned short LeaderNode::recv_request_file_transfer_leader_remote_token(const 
 unsigned short LeaderNode::recv_request_file_transfer_follower_remote_token(const char* message_data, int message_size)
 {
 // Message format:
-// EventType | playload: (session ID[2 digits]|follower token) | EOD
+// EventType | playload: (session id | follower token) | EOD
 	static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
     unsigned short ret = RET_SUCCESS;
 // Serialize: convert the type of session id from integer to string  
@@ -1062,6 +1062,7 @@ unsigned short LeaderNode::recv_request_file_transfer_follower_remote_token(cons
 	memcpy(session_id_buf, message_data, PAYLOAD_SESSION_ID_DIGITS);
 	int session_id = atoi(session_id_buf);
 	char* follower_token = (char*)(message_data + PAYLOAD_SESSION_ID_DIGITS);
+	// printf("LeaderNode::recv_request_file_transfer_follower_remote_token() session_id: %d, follower_token: %s\n", session_id, follower_token);
 	ret = send_request_file_transfer_follower_remote_token((void*)&session_id, (void*)follower_token);
 	return ret;
 }
@@ -1536,8 +1537,8 @@ unsigned short LeaderNode::send_request_file_transfer_leader_remote_token(void* 
 unsigned short LeaderNode::send_request_file_transfer_follower_remote_token(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: follower session id
-// param2: follower token
+// param1: session id
+// param1: follower token
 // Message format:
 // EventType | follower session id | file transfer token return code | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
@@ -1551,15 +1552,17 @@ unsigned short LeaderNode::send_request_file_transfer_follower_remote_token(void
 	int session_id = *(int*)param1;
 	char* follower_token = (char*)param2;
 	unsigned short ret_file_transfer = observer->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST);
-	printf("LeaderNode::send_request_file_transfer_follower_remote_token session_id: %d, follower_token: %s, ret_file_transfer: %d", session_id, follower_token, ret_file_transfer);
+	// printf("LeaderNode::send_request_file_transfer_follower_remote_token() session_id: %d, follower_token: %s, ret_file_transfer: %d\n", session_id, follower_token, ret_file_transfer);
+	// printf("LeaderNode::send_request_file_transfer_follower_remote_token() follower_token: %s, ret_file_transfer: %d\n", follower_token, ret_file_transfer);
 	char buf[BUF_SIZE];
 	memset(buf, 0x0, BUF_SIZE);
 	char* buf_ptr = buf;
 	memcpy(buf_ptr, &session_id, PAYLOAD_SESSION_ID_DIGITS);
 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
+	// printf("Check03\n");
 	memcpy(buf_ptr, &ret_file_transfer, sizeof(unsigned short));
-	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, buf, BUF_SIZE, follower_token);
-	return ret;
+	return send_raw_data(MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, buf, BUF_SIZE, follower_token);
+	// printf("Check04\n");
 }
 
 unsigned short LeaderNode::send_release_file_transfer_remote_token(void* param1, void* param2, void* param3)

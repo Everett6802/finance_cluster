@@ -92,7 +92,7 @@ private:
 	void dump_interactive_session_data_list(int session_id)const;
 	unsigned short extract_interactive_session_data_list(int session_id, NotifyType notify_type, std::list<PNOTIFY_CFG> &interactive_session_system_info_data);
 	unsigned short close_console();
-	unsigned short send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1=NULL, void* param2=NULL)const;
+	unsigned short send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1=NULL, void* param2=NULL, void* param3=NULL)const;
 
 public:
 	ClusterMgr();

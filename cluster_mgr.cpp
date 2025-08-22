@@ -45,8 +45,6 @@ const int ClusterMgr::TRY_TIMES = 3;
 const int ClusterMgr::WAIT_MESSAGE_RESPONSE_TIME = 20; // 20 seconds
 const int ClusterMgr::WAIT_FILE_TRANSFER_TIME = 60; // 60 seconds
 
-enum FakeInteractiveSessionID{FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID=MAX_INTERACTIVE_SESSION, FAKE_INTERACTIVE_SESESSION_ID_SIZE};
-
 unsigned short ClusterMgr::parse_config()
 {
 	unsigned short ret = RET_SUCCESS;
@@ -576,11 +574,11 @@ unsigned short ClusterMgr::close_console()
 	return RET_SUCCESS;
 }
 
-unsigned short ClusterMgr::send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1, void* param2)const
+unsigned short ClusterMgr::send_msg_and_wait_response(int session_id, int wait_response_time, MessageType message_type, void* param1, void* param2, void* param3)const
 {
 	assert(cluster_node != NULL && "cluster_node should NOT be NULL");
 // Send the request
-	unsigned short ret = cluster_node->send(message_type, param1, param2);
+	unsigned short ret = cluster_node->send(message_type, param1, param2, param3);
 	if (CHECK_FAILURE(ret))
 		return ret;
 // Wait for the response
@@ -1217,8 +1215,6 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
     			return RET_FAILURE_INVALID_ARGUMENT;
     		}
 			int session_id = *(int*)param1;
-			if (session_id == -1)
-				session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 			int cluster_node_amount;
 			MessageType message_type;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
@@ -1226,7 +1222,10 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			{
 				ret = cluster_node->get(PARAM_CLUSTER_NODE_AMOUNT, (void*)&cluster_node_amount);
 				if (CHECK_FAILURE(ret))
+				{
+					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 					return ret;
+				}
 				interactive_session_param[session_id].event_amount = cluster_node_amount - 1;
 				message_type = MSG_REQUEST_FILE_TRANSFER_LEADER_REMOTE_TOKEN;
 			}
@@ -1520,50 +1519,10 @@ unsigned short ClusterMgr::set(ParamType param_type, void* param1, void* param2)
 			int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			MessageType mesage_type = (is_folder ? MSG_REMOTE_SYNC_FOLDER : MSG_REMOTE_SYNC_FILE);
-			ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, mesage_type, (void*)&follower_node_id, (void*)remote_path);
+			ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, mesage_type, (void*)&follower_node_id, (void*)remote_path, (void*)&session_id);
 			pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
 			if (CHECK_FAILURE(ret))
 				return ret;
-
-// 			if (remote_sync_enable == 0)
-// 			{
-// 				int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
-// 				if (pthread_mutex_trylock(&interactive_session_param[session_id].mtx) == 0)
-// 				{
-// // Got the lock
-// 					__sync_fetch_and_add(&remote_sync_enable, 1);
-// 					MessageType mesage_type = (is_folder ? MSG_REMOTE_SYNC_FOLDER : MSG_REMOTE_SYNC_FILE);
-// // 					struct timespec ts;
-// // 					clock_gettime(CLOCK_REALTIME, &ts);
-// // 					ts.tv_sec += WAIT_FILE_TRANSFER_TIME;
-// // 					ret = cluster_node->send(mesage_type, (void*)&follower_node_id, (void*)remote_path);
-// // 					int timedwait_ret = pthread_cond_timedwait(&interactive_session_param[session_id].cond, &interactive_session_param[session_id].mtx, &ts);
-// // 					if (CHECK_FAILURE(ret))
-// // 						goto OUT;
-// // 					if (pthread_cond_timedwait_err(timedwait_ret) != NULL)
-// // 					{
-// // 						WRITE_FORMAT_ERROR("pthread_cond_timedwait() fails, due to: %s", pthread_cond_timedwait_err(timedwait_ret));
-// // 						ret = RET_FAILURE_CONNECTION_MESSAGE_TIMEOUT;
-// // 						goto OUT;
-// // 					}
-// // OUT:
-// 					ret = send_msg_and_wait_response(session_id, WAIT_FILE_TRANSFER_TIME, mesage_type, (void*)&follower_node_id, (void*)remote_path);
-// 					pthread_mutex_unlock(&interactive_session_param[session_id].mtx);
-// 					if (CHECK_FAILURE(ret))
-// 						return ret;
-// 				} 
-// 				else 
-// 				{
-// // Failed to get the lock
-// 					WRITE_FORMAT_WARN("The resource of tranferring the %s[%s] is busy... 1", (is_folder ? "folder" : "file"), remote_path);
-// 					return RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
-// 				}
-// 			}
-// 			else
-// 			{
-// 				WRITE_FORMAT_WARN("The resource of tranferring the %s[%s] is busy... 2", (is_folder ? "folder" : "file"), remote_path);
-// 				return RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
-// 			}
 		}
 		break;
     	default:
@@ -2980,7 +2939,7 @@ unsigned short ClusterMgr::async_handle(NotifyCfg* notify_cfg)
 			// assert(notify_request_file_transfer_remote_token_cfg != NULL && "notify_request_file_transfer_remote_token_cfg should NOT be NULL");
 // Caution: Required to add reference count, since another thread will access it
 			notify_request_file_transfer_remote_token_cfg->addref(__FILE__, __LINE__);
-			int session_id = notify_request_file_transfer_remote_token_cfg->get_session_id();
+			int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID; // notify_request_file_transfer_remote_token_cfg->get_session_id();
 			// const char* fake_acspt_detail = notify_fake_acspt_detail_cfg->get_fake_acspt_detail();
 			pthread_mutex_lock(&interactive_session_param[session_id].mtx);
 			interactive_session_param[session_id].data_list.push_back(notify_request_file_transfer_remote_token_cfg);

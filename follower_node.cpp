@@ -840,7 +840,7 @@ unsigned short FollowerNode::recv_request_file_transfer_leader_remote_token(cons
 unsigned short FollowerNode::recv_request_file_transfer_follower_remote_token(const char* message_data, int message_size)
 {
 // Message format:
-// EventType | session ID | file transfer token return code | EOD
+// EventType | file transfer token return code | EOD
 	assert(observer != NULL && "observer should NOT be NULL");
 	// static const int SESSION_ID_BUF_SIZE = PAYLOAD_SESSION_ID_DIGITS + 1;
 	// static const int FILE_TRANSFER_TOKEN_BUF_SIZE = sizeof(unsigned short) + 1;
@@ -922,21 +922,12 @@ unsigned short FollowerNode::recv_remote_sync_file(const char* message_data, int
 {
 // Message format:
 // EventType | filepath | EOD
-// // Parameters:
-// // param1: filepath
-// // Message format:
-// // EventType | return value | EOD
-// 	if (param1 == NULL)
-// 	{
-// 		WRITE_ERROR("param1 should NOT be NULL");
-// 		return RET_FAILURE_INVALID_ARGUMENT;
-// 	}
 // Check file exist
 	unsigned short ret = RET_SUCCESS;
 	const char* filepath = (const char*)message_data;
 	unsigned short remote_sync_file_ret = RET_SUCCESS;
 	string file_tx_token = gen_random_string();
-	int session_id = -1;
+	int session_id = FAKE_INTERACTIVE_SESESSION_REMOTE_SYNC_ID;
 	ClusterFileTransferParam cluster_file_transfer_param;
 	if (!check_file_exist(filepath))
 	{
@@ -951,7 +942,7 @@ unsigned short FollowerNode::recv_remote_sync_file(const char* message_data, int
 		WRITE_WARN("(Remote) File transfer resource busy (Follower) !!! Try later......");
 		goto OUT;
 	}
-	ret = observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id);
+	ret = observer->set(PARAM_FILE_TRANSFER_REMOTE_TOKEN_REQUEST, (void*)&session_id); // , (void*)local_token);
 	if (CHECK_FAILURE(ret))
 	{	
 		remote_sync_file_ret = ret;
@@ -1412,7 +1403,7 @@ unsigned short FollowerNode::send_request_file_transfer_leader_remote_token(void
 unsigned short FollowerNode::send_request_file_transfer_follower_remote_token(void* param1, void* param2, void* param3)
 {
 // Parameters:
-// param1: session id
+// None
 // Message format:
 // EventType | session id | local token | EOD
 	if (param1 == NULL)
@@ -1421,13 +1412,14 @@ unsigned short FollowerNode::send_request_file_transfer_follower_remote_token(vo
 		return RET_FAILURE_INVALID_ARGUMENT;		
 	}
 	unsigned short ret = RET_SUCCESS;
+	int session_id = *(int*)param1;
 	int buf_size = PAYLOAD_SESSION_ID_DIGITS + strlen(local_token) + 1;
 	char* buf = new char[buf_size];
 	if (buf == NULL)
 		throw bad_alloc();
 	memset(buf, 0x0, sizeof(char) * buf_size);
 	char* buf_ptr = buf;
-	memcpy(buf_ptr, param1, PAYLOAD_SESSION_ID_DIGITS);
+	memcpy(buf_ptr, &session_id, PAYLOAD_SESSION_ID_DIGITS);
 	buf_ptr += PAYLOAD_SESSION_ID_DIGITS;
 	memcpy(buf_ptr, local_token, strlen(local_token));
 	ret = send_raw_data(MSG_REQUEST_FILE_TRANSFER_FOLLOWER_REMOTE_TOKEN, buf, buf_size);
