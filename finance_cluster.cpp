@@ -7,8 +7,6 @@
 #include "cluster_mgr.h"
 #include "common.h"
 
-// extern ClusterMgr cluster_mgr;
-
 // Paramters
 static bool param_help = false;
 static char* param_join = NULL;
@@ -558,6 +556,7 @@ int main(int argc, char** argv)
 	// printf("Number: %d\n", sizeof(event_type_description) / sizeof(event_type_description[0]));
 	// exit(0);
 
+	// printf("check1\n");
 // Register the signals so that the process can exit gracefully
 	struct sigaction sa;
 	memset(&sa, 0x0, sizeof(sa));
@@ -567,15 +566,20 @@ int main(int argc, char** argv)
 		print_errmsg_and_exit("Fail to register the signal: SIGTERM");
 	if (sigaction(SIGINT, &sa, NULL) == -1)
 		print_errmsg_and_exit("Fail to register the signal: SIGINT");
+	// printf("check2\n");
 
 	unsigned short ret = RET_SUCCESS;
 	parse_param(argc, argv);
+	// printf("check3\n");
 	check_param();
+	// printf("check4\n");
 	if (param_help)
 		show_usage_and_exit();
 	if (param_detach)
 		detach_from_terminal();
+	// printf("check5\n");
 	ret = setup_param(cluster_mgr);
+	// printf("check6\n");
 	if (CHECK_FAILURE(ret))
 	{
 		print_errmsg_and_exit(errmsg);

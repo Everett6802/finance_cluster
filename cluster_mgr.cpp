@@ -159,7 +159,7 @@ unsigned short ClusterMgr::generate_config_string(string& config_string, const C
 		// printf("%s\n", CONF_FIELD_LIST[i]);
 		if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_CLUSTER_NETWORK) == 0)
 		{
-			config_string += (string(CONF_FIELD_CLUSTER_NETWORK) + string(": ") + cluster_config.cluster_network + string("\n"));
+			config_string += (string(CONF_FIELD_CLUSTER_NETWORK) + string(": ") + cluster_config.cluster_network + string(CRLF));
 		}
 		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_CLUSTER_NETMASK_DIGITS) == 0)
 		{
@@ -169,21 +169,21 @@ unsigned short ClusterMgr::generate_config_string(string& config_string, const C
 */
 			char buf[DEF_VERY_SHORT_STRING_SIZE];
 			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%d", cluster_config.cluster_netmask_digits);
-			config_string += (string(CONF_FIELD_CLUSTER_NETMASK_DIGITS) + string(": ") + string(buf) + string("\n"));
+			config_string += (string(CONF_FIELD_CLUSTER_NETMASK_DIGITS) + string(": ") + string(buf) + string(CRLF));
 		}
 		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_LOCAL_CLUSTER) == 0)
 		{
-			config_string += (string(CONF_FIELD_LOCAL_CLUSTER) + string(": ") + string((cluster_config.local_cluster ? "yes" : "no")) + string("\n"));
+			config_string += (string(CONF_FIELD_LOCAL_CLUSTER) + string(": ") + string((cluster_config.local_cluster ? "yes" : "no")) + string(CRLF));
 		}
 		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_SYSTEM_MONITOR_PERIOD) == 0)
 		{
 			char buf[DEF_VERY_SHORT_STRING_SIZE];
 			snprintf(buf, DEF_VERY_SHORT_STRING_SIZE, "%d", cluster_config.system_monitor_period);
-			config_string += (string(CONF_FIELD_SYSTEM_MONITOR_PERIOD) + string(": ") + string(buf) + string("\n"));
+			config_string += (string(CONF_FIELD_SYSTEM_MONITOR_PERIOD) + string(": ") + string(buf) + string(CRLF));
 		}
 		else if (strcmp(CONF_FIELD_LIST[i], CONF_FIELD_SYNC_FOLDERPATH) == 0)
 		{
-			config_string += (string(CONF_FIELD_SYNC_FOLDERPATH) + string(": ") + cluster_config.sync_folderpath + string("\n"));
+			config_string += (string(CONF_FIELD_SYNC_FOLDERPATH) + string(": ") + cluster_config.sync_folderpath + string(CRLF));
 		}
 		else
 		{

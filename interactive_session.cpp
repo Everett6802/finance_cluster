@@ -93,32 +93,32 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 	{.command="config", .authority=AUTHORITY_ALL, .description="Switch to configuration mode"},
 	{.command="get_role", .authority=AUTHORITY_ALL, .description="Get the role in the cluster"},
 	{.command="get_cluster_detail", .authority=AUTHORITY_ALL, .description="Get the cluster detail info"},
-	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info\n Caution: Leader get the entire cluster system info. Follower only get the node system info"},
+	{.command="get_system_info", .authority=AUTHORITY_ALL, .description="Get the system info" CRLF " Caution: Leader get the entire cluster system info. Follower only get the node system info"},
 	{.command="search_event", .authority=AUTHORITY_ALL, .description="Search for events"},
 	{.command="list_search_rule", .authority=AUTHORITY_ALL, .description="List the search rules"},
 	{.command="get_configuration_setup", .authority=AUTHORITY_LEADER, .description="Get the configuration setup of the cluster"},
 	{.command="get_running_setup", .authority=AUTHORITY_LEADER, .description="Get the running setup of the cluster"},
 	{.command="start_system_monitor", .authority=AUTHORITY_LEADER, .description="Start system monitor"},
 	{.command="stop_system_monitor", .authority=AUTHORITY_LEADER, .description="Stop system monitor"},
-	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the Receiver  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file\n Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute folderpath in Follower"},
-	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the Receiver\n  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)\n Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader\n Caution: It's required to use absolute filepath in Follower"},
-	{.command="remote_sync_folder", .authority=AUTHORITY_LEADER, .description="Request remote node to synchronize all the files in the folder to the Receiver\n  Param: Node ID\n  Param: folderpath (ex. /home/super/text)\n Caution: Only Leader can request Follower to synchorinize a specific file to Leader\n Caution: It's required to use absolute folderpath in Follower"},
-	{.command="remote_sync_file", .authority=AUTHORITY_LEADER, .description="Request remote node to synchronize a specific file of the folder to the Receiver\n  Param: Node ID\n  Param: filepath (ex. /home/super/text.txt)\n Caution: Only Leader can request Follower to synchorinize a specific file to Leader\n Caution: It's required to use absolute filepath"},
+	{.command="sync_folder", .authority=AUTHORITY_ALL, .description="Synchronize all the files in the folder to the Receiver  Param: folderpath (ex. /home/super/test) or No param: exploit the sync folder in the config file" CRLF " Caution: Leader synchorinize folders to the entire cluster. Follower only synchorinize to Leader" CRLF " Caution: It's required to use absolute folderpath in Follower"},
+	{.command="sync_file", .authority=AUTHORITY_ALL, .description="Synchronize a specific file of the folder to the Receiver" CRLF "  Param: filename (ex. text.txt, exploit the sync folder in the config file) or filepath (ex. /home/super/text.txt)" CRLF " Caution: Leader synchorinize a specific file to the entire cluster. Follower only synchorinize to Leader" CRLF " Caution: It's required to use absolute filepath in Follower"},
+	{.command="remote_sync_folder", .authority=AUTHORITY_LEADER, .description="Request remote node to synchronize all the files in the folder to the Receiver" CRLF "  Param: Node ID" CRLF "  Param: folderpath (ex. /home/super/text)" CRLF " Caution: Only Leader can request Follower to synchorinize a specific file to Leader" CRLF " Caution: It's required to use absolute folderpath in Follower"},
+	{.command="remote_sync_file", .authority=AUTHORITY_LEADER, .description="Request remote node to synchronize a specific file of the folder to the Receiver" CRLF "  Param: Node ID" CRLF "  Param: filepath (ex. /home/super/text.txt)" CRLF " Caution: Only Leader can request Follower to synchorinize a specific file to Leader" CRLF " Caution: It's required to use absolute filepath"},
 	{.command="get_simulator_version", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get simulator version"},
-	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
-	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator\n  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
-	{.command="apply_fake_acspt_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake acepts\n  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)"},
-	{.command="get_fake_acspt_config_value", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the config value from fake acspts config file\n  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)"},
-	{.command="apply_fake_usrept_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake usrepts\n  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)"},
+	{.command="transfer_simulator_package", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader transfers the simulator package to each follower" CRLF "  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
+	{.command="install_simulator", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Install simulator" CRLF "  Param: Simulator package filepath (ex. /home/super/simulator.tar.xz)"},
+	{.command="apply_fake_acspt_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake acepts" CRLF "  Param: Fake acspt config filepath (ex. /home/super/new_fake_acspt_sim.cfg)"},
+	{.command="get_fake_acspt_config_value", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the config value from fake acspts config file" CRLF "  Param: Acspt config list string (ex. CONFIG1,CONFIG2,CONFIG3)"},
+	{.command="apply_fake_usrept_config", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Apply new config to all fake usrepts" CRLF "  Param: Fake usrept config filepath (ex. /home/super/new_fake_usrept.cfg)"},
 	{.command="start_fake_acspt", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Start fake acepts"},
 	{.command="stop_fake_acspt", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Stop fake acepts"},
 	{.command="start_fake_usrept", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Start fake usrepts"},
 	{.command="stop_fake_usrept", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Stop fake usrepts"},
 	{.command="get_fake_acspt_state", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the states of all fake acepts"},
 	{.command="get_fake_acspt_detail", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Get the details of all fake acepts"},
-	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time\n  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
-	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower\n  Param: Node ID"},
-	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower\n  Param: Node ID"},
+	{.command="run_multi_clis", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Run multiple CLI commands at a time" CRLF "  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)"},
+	{.command="switch_leader", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Switch leader to specific follower" CRLF "  Param: Node ID"},
+	{.command="remove_follower", .authority=AUTHORITY_LEADER|AUTHORITY_ROOT, .description="Leader remove specific follower" CRLF "  Param: Node ID"},
 	{.command="exit", .authority=AUTHORITY_ALL, .description="Exit the session"}
 };
 
@@ -152,25 +152,25 @@ static const int SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE = sizeof(interactive_
 // " * type\n"
 // " * severity\n"
 // " * category\n";
-static const string ConfigCommandSearchEventDescritpion = string("Set rules for searching event\n")
-													    + string(" * time_option\n  1) Last 24 hours  2) Last 7 days  3) Last 30 days\n")
-													    + string(" * time\n  Time format: YYYY/mm/dd_HH:MM-YYYY/mm/dd_HH:MM\n")
-													    + string(" * type\n  ") + join(interactive_session_search_event_type_config_command, SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE) + string("\n")
-													    + string(" * severity\n  ") + join(interactive_session_search_event_severity_config_command, SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE) + string("\n")
-													    + string(" * category\n  ") + join(interactive_session_search_event_category_config_command, SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE) + string("\n")
-														+ string(" * description\n  sub-string in the description\n")
+static const string ConfigCommandSearchEventDescritpion = string("Set rules for searching event" CRLF)
+													    + string(" * time_option" CRLF "  1) Last 24 hours  2) Last 7 days  3) Last 30 days" CRLF)
+													    + string(" * time" CRLF "  Time format: YYYY/mm/dd_HH:MM-YYYY/mm/dd_HH:MM" CRLF)
+													    + string(" * type" CRLF "  ") + join(interactive_session_search_event_type_config_command, SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE) + string(CRLF)
+													    + string(" * severity" CRLF "  ") + join(interactive_session_search_event_severity_config_command, SEARCH_EVENT_SEVERITY_CONFIG_COMMAND_SIZE) + string(CRLF)
+													    + string(" * category" CRLF "  ") + join(interactive_session_search_event_category_config_command, SEARCH_EVENT_CATEGORY_CONFIG_COMMAND_SIZE) + string(CRLF)
+														+ string(" * description" CRLF "  sub-string in the description" CRLF)
 														+ string(" Dismiss the setting: unset");
 
-static const string ConfigCommandSetupClusterDescritpion = string("Set configurations for cluster setup\n")
-                                                          + string(" * network\n  network  Ex: 10.206.24.0\n")
-                                                          + string(" * netmask_digits\n  netmask digit  Ex: 23\n")
+static const string ConfigCommandSetupClusterDescritpion = string("Set configurations for cluster setup" CRLF)
+                                                          + string(" * network" CRLF "  network  Ex: 10.206.24.0" CRLF)
+                                                          + string(" * netmask_digits" CRLF "  netmask digit  Ex: 23" CRLF)
 														  + string(" Caution: can only be set while cluster is single (no other Followers)");
 
-static const string ConfigCommandMonitorSystemDescritpion = string("Set configurations for monitoring system\n")
-                                                          + string(" * period\n  monitor period in seconds");
+static const string ConfigCommandMonitorSystemDescritpion = string("Set configurations for monitoring system" CRLF)
+                                                          + string(" * period" CRLF "  monitor period in seconds");
 														  
-static const string ConfigCommandSyncClusterDescritpion = string("Set configurations for synchronizing data in the cluster\n")
-                                                        + string(" * folderpath\n  folder path");
+static const string ConfigCommandSyncClusterDescritpion = string("Set configurations for synchronizing data in the cluster" CRLF)
+                                                        + string(" * folderpath" CRLF "  folder path");
 
 static const ConfigCommandAttribute interactive_session_config_command_attr[InteractiveSessionConfigCommandSize] = 
 {
@@ -215,9 +215,9 @@ static const char* INTERACTIVE_PROMPT = "FC> ";
 static const char* INTERACTIVE_CONFIG_PROMPT = "FC(config)> ";
 // static const char* INCORRECT_COMMAND_ARGUMENT_FORMAT = "Incorrect command[%s] argument: %s";
 
-static string welcome_phrases = "\n************** Welcome to Finance Cluster CLI **************\n\n";
-static string incomplete_command_phrases = "\nIncomplete Command\n\n";
-static string incorrect_command_phrases = "\nIncorrect Command\n\n";
+static string welcome_phrases = CRLF"************** Welcome to Finance Cluster CLI **************"CRLF CRLF;
+static string incomplete_command_phrases = CRLF"Incomplete Command"CRLF CRLF;
+static string incorrect_command_phrases = CRLF"Incorrect Command"CRLF CRLF;
 
 static COMMAND_MAP command_map;
 static CONFIG_COMMAND_MAP config_command_map;
@@ -645,7 +645,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						{
 							WRITE_FORMAT_ERROR("Error!! Unknown config command: %s", argv_inner[0]);
 							char unknown_config_command_error[64];
-							snprintf(unknown_config_command_error, 64, "Unknown config command: %s\n", argv_inner[0]);
+							snprintf(unknown_config_command_error, 64, "Unknown config command: %s" CRLF, argv_inner[0]);
 							print_to_console(string(unknown_config_command_error));
 							can_execute = false;
 							break;
@@ -657,7 +657,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 							if (!check_command_authority(command_type))
 							{
 								WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s config command", authority_mask, GET_CONFIG_AUTHORITY(command_type), argv_inner[0]);
-								static string no_role_string("No Authority to Execute\n");
+								static string no_role_string("No Authority to Execute" CRLF);
 								print_to_console(no_role_string);
 								can_execute = false;
 							}						
@@ -677,7 +677,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						{
 							WRITE_FORMAT_ERROR("Error!! Unknown command: %s", argv_inner[0]);
 							char unknown_command_error[64];
-							snprintf(unknown_command_error, 64, "Unknown command: %s\n", argv_inner[0]);
+							snprintf(unknown_command_error, 64, "Unknown command: %s" CRLF, argv_inner[0]);
 							print_to_console(string(unknown_command_error));
 							can_execute = false;
 							break;
@@ -688,7 +688,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 							if (system_monitor && (strcmp(argv_inner[0], "stop_system_monitor") != 0))
 							{
 								WRITE_WARN("Warning!! System Monitor Enabled");
-								static string system_monitor_string("System Montior Enabled\n");
+								static string system_monitor_string("System Montior Enabled" CRLF);
 								print_to_console(system_monitor_string);
 								goto OUT;
 							}
@@ -702,7 +702,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 								// 	WRITE_FORMAT_WARN("The %s command requires privilege user", argv_inner[0]);
 								// }
 								WRITE_FORMAT_WARN("The User[mask: %d] doesn't have the authority[%d] to execute the %s command", authority_mask, GET_AUTHORITY(command_type), argv_inner[0]);
-								static string no_role_string("No Authority to Execute\n");
+								static string no_role_string("No Authority to Execute" CRLF);
 								print_to_console(no_role_string);
 								can_execute = false;
 							}						
@@ -725,10 +725,10 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 					{
 						char rsp_buf[RSP_BUF_SIZE + 1];
 						memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s config command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s config command in the session: %s, due to: %s" CRLF, argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
 						WRITE_WARN(rsp_buf);
-						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s" CRLF, argv_inner[0], GetErrorDescription(ret));
 						print_to_console(string(rsp_buf));
 					}
 					else
@@ -736,7 +736,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						static const int BUF_SIZE = 256;
 						char buf[BUF_SIZE];
 						snprintf(buf, BUF_SIZE, "Unexpected return while executing the config command[%s]: %s", argv_inner[0], GetErrorDescription(ret));
-						fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+						fprintf(stderr, "%s in %s:%d" CRLF, buf, __FILE__, __LINE__);
 						throw runtime_error(buf);
 					}
 				}
@@ -753,7 +753,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						snprintf(rsp_buf, RSP_BUF_SIZE, "Error occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if error occurs while executing the command and then exit
 						WRITE_ERROR(rsp_buf);
-						snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR  %s: %s" CRLF, argv_inner[0], GetErrorDescription(ret));
 						print_to_console(string(rsp_buf));
 						// return ret;				
 					}
@@ -761,10 +761,10 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 					{
 						char rsp_buf[RSP_BUF_SIZE + 1];
 						memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s\n", argv_inner[0], session_tag, GetErrorDescription(ret));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "Warning occurs while executing the %s command in the session: %s, due to: %s" CRLF, argv_inner[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
 						WRITE_WARN(rsp_buf);
-						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s\n", argv_inner[0], GetErrorDescription(ret));
+						snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING  %s: %s" CRLF, argv_inner[0], GetErrorDescription(ret));
 						print_to_console(string(rsp_buf));
 						// goto OUT;
 						// return ret;	
@@ -774,7 +774,7 @@ unsigned short InteractiveSession::session_thread_handler_internal()
 						static const int BUF_SIZE = 256;
 						char buf[BUF_SIZE];
 						snprintf(buf, BUF_SIZE, "Unexpected return while executing the command[%s]: %s", argv_inner[0], GetErrorDescription(ret));
-						fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+						fprintf(stderr, "%s in %s:%d" CRLF, buf, __FILE__, __LINE__);
 						throw runtime_error(buf);
 					}
 				}
@@ -905,20 +905,20 @@ unsigned short InteractiveSession::multi_clis_thread_handler_internal()
 			{
 				char rsp_buf[RSP_BUF_SIZE + 1];
 				memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Error occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Error occurs while executing the %s command in the session: %s, due to: %s" CRLF, multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
 // Show warning if error occurs while executing the command and then exit
 				WRITE_ERROR(rsp_buf);
-				snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "ERROR[%d]  %s: %s" CRLF, multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
 				print_to_console(string(rsp_buf));
 			}
 			else if (CHECK_WARN(ret))
 			{
 				char rsp_buf[RSP_BUF_SIZE + 1];
 				memset(rsp_buf, 0x0, sizeof(rsp_buf) / sizeof(rsp_buf[0]));
-				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Warning occurs while executing the %s command in the session: %s, due to: %s\n", multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "CLI[%d]: Warning occurs while executing the %s command in the session: %s, due to: %s" CRLF, multi_clis_line_index, cli_argv[0], session_tag, GetErrorDescription(ret));
 // Show warning if warn occurs while executing the command
 				WRITE_WARN(rsp_buf);
-				snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING[%d]  %s: %s\n", multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
+				snprintf(rsp_buf, RSP_BUF_SIZE, "WARNING[%d]  %s: %s" CRLF, multi_clis_line_index, cli_argv[0], GetErrorDescription(ret));
 				print_to_console(string(rsp_buf));
 			}
 		}
@@ -981,14 +981,14 @@ unsigned short InteractiveSession::print_prompt_to_console()const
 
 unsigned short InteractiveSession::print_search_rule_to_console()const
 {
-	print_to_console(string("\n# Search Rule #\n"));
+	print_to_console(string(CRLF "# Search Rule #" CRLF));
 	char buf[DEF_STRING_SIZE];
 	if (event_search_rule.need_search_event_time)
 	{
 		tm search_event_time_begin = *localtime(&event_search_rule.search_event_time_begin);
 		tm search_event_time_end = *localtime(&event_search_rule.search_event_time_end);
 		// char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Time Range  %d/%02d/%02d_%02d:%02d:%02d -> %d/%02d/%02d_%02d:%02d:%02d\n", 
+		snprintf(buf, DEF_STRING_SIZE, "Time Range  %d/%02d/%02d_%02d:%02d:%02d -> %d/%02d/%02d_%02d:%02d:%02d" CRLF, 
 			search_event_time_begin.tm_year + 1900, 
 			search_event_time_begin.tm_mon + 1, 
 			search_event_time_begin.tm_mday, 
@@ -1007,26 +1007,26 @@ unsigned short InteractiveSession::print_search_rule_to_console()const
 	if (event_search_rule.need_search_event_type)
 	{
 		// char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Type  %s\n", GetEventTypeDescription(event_search_rule.search_event_type));
-		print_to_console(string(buf) + string("\n"));
+		snprintf(buf, DEF_STRING_SIZE, "Type  %s" CRLF, GetEventTypeDescription(event_search_rule.search_event_type));
+		print_to_console(string(buf) + string(CRLF));
 	}
 	if (event_search_rule.need_search_event_severity)
 	{
 		// char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Severity  %s\n", GetEventSeverityDescription(event_search_rule.search_event_severity));
-		print_to_console(string(buf) + string("\n"));
+		snprintf(buf, DEF_STRING_SIZE, "Severity  %s" CRLF, GetEventSeverityDescription(event_search_rule.search_event_severity));
+		print_to_console(string(buf) + string(CRLF));
 	}
 	if (event_search_rule.need_search_event_category)
 	{
 		// char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Category  %s\n", GetEventCategoryDescription(event_search_rule.search_event_category));
-		print_to_console(string(buf) + string("\n"));
+		snprintf(buf, DEF_STRING_SIZE, "Category  %s" CRLF, GetEventCategoryDescription(event_search_rule.search_event_category));
+		print_to_console(string(buf) + string(CRLF));
 	}
 	if (event_search_rule.need_search_event_description)
 	{
 		// char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Description  %s\n", event_search_rule.search_event_description.c_str());
-		print_to_console(string(buf) + string("\n"));
+		snprintf(buf, DEF_STRING_SIZE, "Description  %s" CRLF, event_search_rule.search_event_description.c_str());
+		print_to_console(string(buf) + string(CRLF));
 	}
 	return RET_SUCCESS;
 }
@@ -1086,11 +1086,11 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 
 	unsigned short ret = RET_SUCCESS;
 	string usage_string;
-	usage_string += string("====================== Usage ======================\n");
+	usage_string += string("====================== Usage ======================" CRLF);
 	for (int i = 0; i < InteractiveSessionCommandSize; i++)
 	{
 		if (CHECK_AUTHORITY(i, authority_mask))
-			usage_string += string("* ") + GET_COMMAND(i) + string("\n Description: ") + GET_DESCRIPTION(i) + string("\n");	
+			usage_string += string("* ") + GET_COMMAND(i) + string(CRLF" Description: ") + GET_DESCRIPTION(i) + string(CRLF);	
 	}
 	// usage_string += string("* help\n Description: The usage\n");
 	// usage_string += string("* exit\n Description: Exit the session\n");
@@ -1127,7 +1127,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	// 		usage_string += string("  Param: The filepath of defining CLI commands (ex. /home/super/cli_commands)\n");
 	// 	}
 	// }
-	usage_string += string("===================================================\n\n");
+	usage_string += string("===================================================" CRLF CRLF);
 
 	ret = print_to_console(usage_string);
 	return ret;
@@ -1164,14 +1164,14 @@ unsigned short InteractiveSession::handle_get_role_command(int argc, char **argv
 	else
 		role_string = "Follower";
 
-	role_string += string("\n\n");
+	role_string += string(CRLF CRLF);
 	print_to_console(role_string);
 	return RET_SUCCESS;
 }
 
 unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, char **argv)
 {
-	static const char* CLUSTER_DETAIL_TITLE = "\n====================== Cluster Info ======================\n";
+	static const char* CLUSTER_DETAIL_TITLE = CRLF "====================== Cluster Info ======================" CRLF;
 	static const char* NODE_TYPE_LIST[] = {"Leader","Follower"};
 	assert(manager != NULL && "manager should NOT be NULL");
 
@@ -1206,7 +1206,7 @@ unsigned short InteractiveSession::handle_get_cluster_detail_command(int argc, c
 		int node_type_index = (strcmp(cluster_node_token, cluster_detail_param.cluster_token) == 0 ? LEADER : FOLLOWER);
 		bool is_local_node = (cluster_detail_param.node_id == cluster_node.node_id ? true : false);
 		char buf[RSP_BUF_SIZE];
-		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *\n":  "%d %s %s\n"), cluster_node.node_id, cluster_node_token, NODE_TYPE_LIST[node_type_index]);
+		snprintf(buf, RSP_BUF_SIZE, (is_local_node ? "%d %s %s *" CRLF:  "%d %s %s" CRLF), cluster_node.node_id, cluster_node_token, NODE_TYPE_LIST[node_type_index]);
 		++iter;
 		cluster_detail_string += string(buf);
 	}
@@ -1254,7 +1254,7 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 
 			map<int, string>& cluster_data_map = cluster_system_info_param.cluster_data_map;
 	// Print data in cosole
-			string system_info_string("*** System Info ***\n");
+			string system_info_string("*** System Info ***" CRLF);
 			map<int, string>::iterator iter = cluster_data_map.begin();
 			while (iter != cluster_data_map.end())
 			{
@@ -1266,13 +1266,13 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 				if (CHECK_FAILURE(ret))
 					return ret;
 				char buf[DEF_STRING_SIZE];
-				snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
+				snprintf(buf, DEF_STRING_SIZE, "%s" CRLF, node_token.c_str());
 				system_info_string += string(buf);
 				system_info_string += ((string)iter->second);
-				system_info_string += string("\n**********\n");
+				system_info_string += string(CRLF "**********" CRLF);
 				++iter;
 			}
-			system_info_string += string("\n");
+			system_info_string += string(CRLF);
 			ret = print_to_console(system_info_string);
 		}
 		break;
@@ -1282,9 +1282,9 @@ unsigned short InteractiveSession::handle_get_system_info_command(int argc, char
 		    ret = manager->get(PARAM_SYSTEM_INFO, (void*)&system_info_param);
 		 	if (CHECK_FAILURE(ret))
 				return ret;
-			string system_info_string("*** System Info (Local) ***\n");
+			string system_info_string("*** System Info (Local) ***" CRLF);
 			system_info_string += system_info_param.system_info;
-			system_info_string += string("\n**********\n");
+			system_info_string += string(CRLF "**********" CRLF);
 			ret = print_to_console(system_info_string);
 		}
 		break;
@@ -1328,21 +1328,21 @@ unsigned short InteractiveSession::handle_search_event_command(int argc, char **
 	{
 		// list<EventEntry*>::iterator iter_event = event_list.begin();
 		// int event_line_size = event_line_list.size();
-		print_to_console(string("\n"));
+		print_to_console(string(CRLF));
 		list<string>::iterator iter_event_line = event_line_list.begin();
 		int event_count = 0;
 		while (iter_event_line != event_line_list.end())
 		{
 			// EventEntry* event_entry = (PEVENT_ENTRY)*iter_event;
-			string event_line = (string)*iter_event_line + string("\n");
+			string event_line = (string)*iter_event_line + string(CRLF);
 			print_to_console(event_line);
 			// iter_event++;
 			iter_event_line++;
 			event_count++;
 		}
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "\n ***  %d event(s) found  ***\n", event_count);
-		print_to_console(string(buf) + string("\n"));
+		snprintf(buf, DEF_STRING_SIZE, CRLF " ***  %d event(s) found  ***" CRLF, event_count);
+		print_to_console(string(buf) + string(CRLF));
 	}
 	list<EventEntry*>::iterator iter_clean = event_list.begin();
 	while (iter_clean != event_list.end())
@@ -1373,7 +1373,7 @@ unsigned short InteractiveSession::handle_list_search_rule_command(int argc, cha
 	if (enable_search_rule)
 		print_search_rule_to_console();
 	else
-		print_to_console(string("\n*** No search rule ***\n\n"));
+		print_to_console(string(CRLF "*** No search rule ***" CRLF CRLF));
 	return ret;
 }
 // unsigned short InteractiveSession::handle_get_node_system_info_command(int argc, char **argv)
@@ -1432,7 +1432,7 @@ unsigned short InteractiveSession::handle_get_running_setup_command(int argc, ch
 
 unsigned short InteractiveSession::handle_start_system_monitor_command(int argc, char **argv)
 {
-	static string system_monitor_string("*** System Monitor ***\n While Monitoring the system, the CLI commands will NOT take effect\n It's required to stop system monitor first\n Type: quit to stop\n**********************\n\n");
+	static string system_monitor_string("*** System Monitor ***" CRLF " While Monitoring the system, the CLI commands will NOT take effect" CRLF " It's required to stop system monitor first" CRLF " Type: quit to stop" CRLF "**********************" CRLF CRLF);
 	if (argc != 1)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
@@ -1470,7 +1470,7 @@ unsigned short InteractiveSession::handle_start_system_monitor_command(int argc,
 
 unsigned short InteractiveSession::handle_stop_system_monitor_command(int argc, char **argv)
 {
-	static string system_monitor_string("*** System Monitor ***\n STOP\n**********************\n\n");
+	static string system_monitor_string("*** System Monitor ***" CRLF " STOP" CRLF "**********************" CRLF CRLF);
 	if (argc != 1)
 	{
 		WRITE_FORMAT_WARN("WANRING!! Incorrect command: %s", argv[0]);
@@ -1540,13 +1540,13 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		WRITE_FORMAT_WARN("The folder[%s] being synchronized does NOT exist", sync_folderpath.c_str());
 		return RET_FAILURE_NOT_FOUND;
 	}
-	print_to_console(string(" folder: ") + sync_folderpath + string("  ***\n"));
+	print_to_console(string(" folder: ") + sync_folderpath + string("  ***" CRLF));
 
 	string file_tx_token = gen_random_string();
 	ret = manager->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST, (void*)&file_tx_token);
 	if (ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
 	{
-		print_to_console(string("File transfer resource busy !!! Try later......\n"));
+		print_to_console(string("File transfer resource busy !!! Try later......" CRLF));
 		return ret;
 	}
 	unsigned short ret_file_tx_token;
@@ -1575,7 +1575,7 @@ unsigned short InteractiveSession::handle_sync_folder_command(int argc, char **a
 		string full_filepath = (string)(*iter);
 		// printf("* %s\n", full_filepath.c_str());
 		WRITE_FORMAT_DEBUG("Synchorinize the file: %s", full_filepath.c_str());
-		print_to_console(string(" *** file synchorinization: ") + full_filepath + string(" ***\n"));
+		print_to_console(string(" *** file synchorinization: ") + full_filepath + string(" ***" CRLF));
 		ClusterFileTransferParam cluster_file_transfer_param;
 // Start to transfer the file
 		cluster_file_transfer_param.session_id = session_id;
@@ -1644,7 +1644,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 	ret = manager->set(PARAM_FILE_TRANSFER_TOKEN_REQUEST, (void*)&file_tx_token);
 	if (ret == RET_WARN_FILE_TRANSFER_RESOURCE_BUSY)
 	{
-		print_to_console(string("File transfer resource busy !!! Try later......\n"));
+		print_to_console(string("File transfer resource busy !!! Try later......" CRLF));
 		return ret;
 	}
 	unsigned short ret_file_tx_token;
@@ -1664,7 +1664,7 @@ unsigned short InteractiveSession::handle_sync_file_command(int argc, char **arg
 		goto OUT1;
 	}
 // Start to transfer the file
-	print_to_console(string(" *** file synchorinization ***\n"));
+	print_to_console(string(" *** file synchorinization ***" CRLF));
 	cluster_file_transfer_param.session_id = session_id;
 	ret = manager->set(PARAM_FILE_TRANSFER, (void*)&cluster_file_transfer_param, (void*)filepath);
 	// printf("[PARAM_FILE_TRANSFER], ret description: %s\n", GetErrorDescription(ret));
@@ -1698,7 +1698,7 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The Follower ID[%d] does NOT exist", follower_node_id);
 			WRITE_WARN(buf);
-			print_to_console(string(buf) + string("\n"));
+			print_to_console(string(buf) + string(CRLF));
 			return RET_WARN_INTERACTIVE_COMMAND;
 		}
 		else
@@ -1725,7 +1725,7 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a folder[%s] is busy in Follower[%s]", remote_folderpath, follower_node_token);
 			WRITE_WARN(buf);
-			print_to_console(string(buf) + string("\n"));
+			print_to_console(string(buf) + string(CRLF));
 			ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 		}
 		else if (remote_sync_file_ret == RET_FAILURE_NOT_FOUND)
@@ -1746,7 +1746,7 @@ unsigned short InteractiveSession::handle_remote_sync_folder_command(int argc, c
 	else
 	{
 		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_folderpath, follower_node_token, true);
-		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully\n", remote_folderpath, follower_node_token);
+		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully" CRLF, remote_folderpath, follower_node_token);
 		WRITE_DEBUG(buf);
 		print_to_console(string(buf));
 	}
@@ -1775,7 +1775,7 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The Follower ID[%d] does NOT exist", follower_node_id);
 			WRITE_WARN(buf);
-			print_to_console(string(buf) + string("\n"));
+			print_to_console(string(buf) + string(CRLF));
 			return RET_WARN_INTERACTIVE_COMMAND;
 		}
 		else
@@ -1802,14 +1802,14 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The resource of transfering a file[%s] is busy in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
-			print_to_console(string(buf) + string("\n"));
+			print_to_console(string(buf) + string(CRLF));
 			ret = RET_WARN_FILE_TRANSFER_RESOURCE_BUSY;
 		}
 		else if (remote_sync_file_ret == RET_FAILURE_NOT_FOUND)
 		{
 			snprintf(buf, DEF_LONG_STRING_SIZE, "The file[%s] does NOT exist in Follower[%s]", remote_filepath, follower_node_token);
 			WRITE_WARN(buf);
-			print_to_console(string(buf) + string("\n"));
+			print_to_console(string(buf) + string(CRLF));
 			ret = RET_WARN_REMOTE_FILE_TRANSFER_FAILURE;
 		}
 		else
@@ -1823,7 +1823,7 @@ unsigned short InteractiveSession::handle_remote_sync_file_command(int argc, cha
 	else
 	{
 		WRITE_EVT_RECORDER(RemoteSyncDataEventCfg, remote_filepath, follower_node_token, false);
-		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully\n", remote_filepath, follower_node_token);
+		snprintf(buf, DEF_LONG_STRING_SIZE, "Remote transfer a file[%s] in Follower[%s] successfully" CRLF, remote_filepath, follower_node_token);
 		WRITE_DEBUG(buf);
 		print_to_console(string(buf));
 	}
@@ -1865,7 +1865,7 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 		char buf[DEF_STRING_SIZE];
 		map<int, string>& cluster_simulator_version_map = cluster_simulator_version_param.cluster_data_map;
 // Print data in cosole
-		string simulator_version_string("simulator version\n");
+		string simulator_version_string("simulator version" CRLF);
 		map<int, string>::iterator iter = cluster_simulator_version_map.begin();
 		while (iter != cluster_simulator_version_map.end())
 		{
@@ -1876,11 +1876,11 @@ unsigned short InteractiveSession::handle_get_simulator_version_command(int argc
 			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_STRING_SIZE, "%s  %s" CRLF, node_token.c_str(), ((string)iter->second).c_str());
 			simulator_version_string += string(buf);
 			++iter;
 		}
-		simulator_version_string += string("\n");
+		simulator_version_string += string(CRLF);
 		ret = print_to_console(simulator_version_string);
 	}
 	return RET_SUCCESS;
@@ -2055,12 +2055,12 @@ unsigned short InteractiveSession::handle_get_fake_acspt_config_value_command(in
 		return ret;
 	const list<string>& config_line_list = fake_acspt_config_value_param.config_line_list;
 	list<string>::const_iterator iter = config_line_list.begin();
-	string fake_acspt_config_value_string("*** Fake Acspt Config Value ***\n");
+	string fake_acspt_config_value_string("*** Fake Acspt Config Value ***" CRLF);
 	while(iter != config_line_list.end())
 	{
 		string config_line = (string)*iter;
 		fake_acspt_config_value_string += config_line;
-		fake_acspt_config_value_string += string("\n");
+		fake_acspt_config_value_string += string(CRLF);
 		iter++;	
 	}
 	ret = print_to_console(fake_acspt_config_value_string);
@@ -2239,7 +2239,7 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
 		char buf[DEF_VERY_LONG_STRING_SIZE];
 		map<int, string>& cluster_fake_acspt_state_map = cluster_fake_acspt_state_param.cluster_data_map;
 // Print data in cosole
-		string fake_acspt_state_string("*** Fake Acspt State ***\n");
+		string fake_acspt_state_string("*** Fake Acspt State ***" CRLF);
 		map<int, string>::iterator iter = cluster_fake_acspt_state_map.begin();
 		while (iter != cluster_fake_acspt_state_map.end())
 		{
@@ -2250,11 +2250,11 @@ unsigned short InteractiveSession::handle_get_fake_acspt_state_command(int argc,
 			ret = cluster_map.get_node_token(node_id, node_token);
 			if (CHECK_FAILURE(ret))
 				return ret;
-			snprintf(buf, DEF_VERY_LONG_STRING_SIZE, "%s  %s\n", node_token.c_str(), ((string)iter->second).c_str());
+			snprintf(buf, DEF_VERY_LONG_STRING_SIZE, "%s  %s" CRLF, node_token.c_str(), ((string)iter->second).c_str());
 			fake_acspt_state_string += string(buf);
 			++iter;
 		}
-		fake_acspt_state_string += string("\n");
+		fake_acspt_state_string += string(CRLF);
 		ret = print_to_console(fake_acspt_state_string);
 	}
 	return RET_SUCCESS;
@@ -2292,9 +2292,9 @@ unsigned short InteractiveSession::handle_get_fake_acspt_detail_command(int argc
 		char buf[DEF_VERY_SHORT_STRING_SIZE];
 		map<int, string>& cluster_fake_acspt_detail_map = cluster_fake_acspt_detail_param.cluster_data_map;
 // Print data in cosole
-		string fake_acspt_detail_string("*** Fake Acspt Detail ***\n");
+		string fake_acspt_detail_string("*** Fake Acspt Detail ***" CRLF);
 		map<int, string>::iterator iter = cluster_fake_acspt_detail_map.begin();
-		string newline_str("\n");
+		string newline_str(CRLF);
 		while (iter != cluster_fake_acspt_detail_map.end())
 		{
 			int node_id = (int)iter->first;
@@ -2409,7 +2409,7 @@ unsigned short InteractiveSession::handle_switch_leader_command(int argc, char *
 	if (!found)
 	{
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Fails to switch unknown node[%d] to LEADER\n", node_id);
+		snprintf(buf, DEF_STRING_SIZE, "Fails to switch unknown node[%d] to LEADER" CRLF, node_id);
 		WRITE_ERROR(buf);
 		print_to_console(string(buf));
 		return RET_WARN_INTERACTIVE_COMMAND;
@@ -2447,7 +2447,7 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 		return ret;
 	if (cluster_map.size() == 1)
 	{
-		print_to_console(string("Only single node in the cluster. No FOLLOWERs exist !!!\n"));
+		print_to_console(string("Only single node in the cluster. No FOLLOWERs exist !!!" CRLF));
 		return RET_WARN_INTERACTIVE_COMMAND;		
 	}
 	bool found = false;
@@ -2458,7 +2458,7 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 	if (!found)
 	{
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Fails to remove unknown FOLLOWER[%d]\n", follower_node_id);
+		snprintf(buf, DEF_STRING_SIZE, "Fails to remove unknown FOLLOWER[%d]" CRLF, follower_node_id);
 		WRITE_ERROR(buf);
 		print_to_console(string(buf));
 		return RET_WARN_INTERACTIVE_COMMAND;
@@ -2470,7 +2470,7 @@ unsigned short InteractiveSession::handle_remove_follower_command(int argc, char
 	if (leader_node_id == follower_node_id)
 	{
 		char buf[DEF_STRING_SIZE];
-		snprintf(buf, DEF_STRING_SIZE, "Fails to remove the node[%d] since it's LEADER\n", follower_node_id);
+		snprintf(buf, DEF_STRING_SIZE, "Fails to remove the node[%d] since it's LEADER" CRLF, follower_node_id);
 		WRITE_ERROR(buf);
 		print_to_console(string(buf));
 		return RET_WARN_INTERACTIVE_COMMAND;
@@ -2543,13 +2543,13 @@ unsigned short InteractiveSession::handle_config_help_command(int argc, char **a
 
 	unsigned short ret = RET_SUCCESS;
 	string usage_string;
-	usage_string += string("====================== Usage ======================\n");
+	usage_string += string("====================== Usage ======================" CRLF);
 	for (int i = 0; i < InteractiveSessionConfigCommandSize; i++)
 	{
 		if (CHECK_AUTHORITY(i, authority_mask))
-			usage_string += string("* ") + GET_CONFIG_COMMAND(i) + string("\n Description: ") + GET_CONFIG_DESCRIPTION(i) + string("\n");	
+			usage_string += string("* ") + GET_CONFIG_COMMAND(i) + string(CRLF " Description: ") + GET_CONFIG_DESCRIPTION(i) + string(CRLF);	
 	}
-	usage_string += string("===================================================\n\n");
+	usage_string += string("===================================================" CRLF CRLF);
 
 	ret = print_to_console(usage_string);
 	return ret;
@@ -2880,7 +2880,7 @@ unsigned short InteractiveSession::notify(NotifyType notify_type, void* notify_p
     		static const int BUF_SIZE = 256;
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
-    		fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+    		fprintf(stderr, "%s in %s:%d" CRLF, buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;
@@ -2901,7 +2901,7 @@ unsigned short InteractiveSession::async_handle(NotifyCfg* notify_cfg)
     		char buf[BUF_SIZE];
     		snprintf(buf, BUF_SIZE, "Unknown notify type: %d, %s", notify_type, GetNotifyDescription(notify_type));
     		// fprintf(stderr, "%s in InteractiveSession::async_handle()", buf);
-		    fprintf(stderr, "%s in %s:%d\n", buf, __FILE__, __LINE__);
+		    fprintf(stderr, "%s in %s:%d" CRLF, buf, __FILE__, __LINE__);
     		throw std::invalid_argument(buf);
     	}
     	break;

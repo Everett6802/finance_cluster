@@ -387,7 +387,11 @@ unsigned short read_file_lines_ex(std::list<std::string>& line_list, const char*
 		}
 		last_character_in_string_index = strlen(line_buf) - 1;
 		if (line_buf[last_character_in_string_index] == '\n')
+		{
+			if (last_character_in_string_index >= 1 && line_buf[last_character_in_string_index - 1] == '\r')
+				last_character_in_string_index--;
 			line_buf[last_character_in_string_index] = '\0';
+		}
 		string line_str(line_buf);
 		line_list.push_back(line_str);
 	}

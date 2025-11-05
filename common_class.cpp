@@ -2,6 +2,8 @@
 #include <signal.h>
 #include <stdexcept>
 #include <algorithm>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "common.h"
 
 
@@ -1529,8 +1531,8 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 
 				map<int, string>& cluster_data_map = cluster_system_monitor_param.cluster_data_map;
 // Print data in cosole
-				system_monitor_string = string("*** System Monitor ***\n");
-				system_monitor_string += string(" @ ") + curtime_str + string("\n**********************\n\n");
+				system_monitor_string = string("*** System Monitor ***" CRLF);
+				system_monitor_string += string(" @ ") + curtime_str + string(CRLF "**********************" CRLF CRLF);
 
 				map<int, string>::iterator iter = cluster_data_map.begin();
 				while (iter != cluster_data_map.end())
@@ -1541,13 +1543,13 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 					if (CHECK_FAILURE(ret))
 						return ret;
 					char buf[DEF_STRING_SIZE];
-					snprintf(buf, DEF_STRING_SIZE, "%s\n", node_token.c_str());
+					snprintf(buf, DEF_STRING_SIZE, "%s" CRLF, node_token.c_str());
 					system_monitor_string += string(buf);
 					system_monitor_string += ((string)iter->second);
-					system_monitor_string += string("\n**********\n");
+					system_monitor_string += string(CRLF "**********" CRLF);
 					++iter;
 				}
-				system_monitor_string += string("\n");
+				system_monitor_string += string(CRLF);
 			}
 			break;
 			case FOLLOWER:
@@ -1556,10 +1558,10 @@ unsigned short MonitorSystemTimerThread::monitor_system_timer_thread_handler_int
 			    ret = manager->get(PARAM_SYSTEM_MONITOR, (void*)&system_monitor_param);
 			 	if (CHECK_FAILURE(ret))
 					return ret;
-				system_monitor_string = string("*** System Monitor (Local) ***\n");
-				system_monitor_string += string(" @ ") + curtime_str + string("\n**********************\n\n");
+				system_monitor_string = string("*** System Monitor (Local) ***" CRLF);
+				system_monitor_string += string(" @ ") + curtime_str + string(CRLF "**********************" CRLF CRLF);
 				system_monitor_string += system_monitor_param.system_monitor_data;
-				system_monitor_string += string("\n**********\n");
+				system_monitor_string += string(CRLF "**********" CRLF);
 			}
 			break;
 			default:
@@ -1726,6 +1728,7 @@ const char* EventFileAccess::get_event_log_filepath()const
 		if (event_log_filepath == NULL)
 			throw bad_alloc();
 		snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
+		// printf("Event log file path: %s\n", event_log_filepath);
 	}
 	return event_log_filepath;
 }
@@ -1784,18 +1787,37 @@ unsigned short EventFileAccess::remove_space_from_sides(string& new_string, cons
 
 unsigned short EventFileAccess::initialize()
 {
-    // char current_working_directory[DEF_LONG_STRING_SIZE];
-  	// getcwd(current_working_directory, sizeof(current_working_directory));
-    // char event_log_filepath[DEF_LONG_STRING_SIZE];
-    // snprintf(event_log_filepath, DEF_LONG_STRING_SIZE, "%s/%s/%s", current_working_directory, EVENT_FOLDERNAME, EVENT_FILENAME);
+	// Ensure the event folder exists before opening the log file
+	char current_working_directory[DEF_LONG_STRING_SIZE];
+	if (getcwd(current_working_directory, sizeof(current_working_directory)) == NULL)
+	{
+		WRITE_FORMAT_ERROR("getcwd() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
 
- 	WRITE_FORMAT_ERROR("Open the event log file: %s", get_event_log_filepath());
+	char event_folder_path[DEF_LONG_STRING_SIZE];
+	memset(event_folder_path, 0x0, sizeof(char) * DEF_LONG_STRING_SIZE);
+	snprintf(event_folder_path, DEF_LONG_STRING_SIZE, "%s/%s", current_working_directory, EVENT_FOLDERNAME);
+	// printf("Event folder path: %s, %d\n", event_folder_path, (int)strlen(event_folder_path));
+
+	// Try to create the folder if it does not exist.
+	// mkdir returns 0 on success, -1 on failure. If it fails because the folder already exists (EEXIST) it's fine.
+	if (mkdir(event_folder_path, 0755) != 0)
+	{
+		if (errno != EEXIST)
+		{
+			WRITE_FORMAT_ERROR("mkdir(%s) fails, due to: %s", event_folder_path, strerror(errno));
+			return RET_FAILURE_SYSTEM_API;
+		}
+	}
+
+	WRITE_FORMAT_ERROR("Open the event log file: %s", get_event_log_filepath());
 	event_log_fp = fopen(get_event_log_filepath(), "a+");
- 	if (event_log_fp == NULL)
- 	{
- 		WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
-  		return RET_FAILURE_SYSTEM_API;	
-  	}
+	if (event_log_fp == NULL)
+	{
+		WRITE_FORMAT_ERROR("fopen() fails, due to: %s", strerror(errno));
+		return RET_FAILURE_SYSTEM_API;
+	}
 	return RET_SUCCESS;
 }
 

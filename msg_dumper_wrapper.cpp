@@ -494,6 +494,8 @@ unsigned short MsgDumperWrapper::parse_config()
 		if (ech != NULL)
 		{
 			int end_pos = ech - buf;
+			if (buf[end_pos - 1] == '\r')
+				end_pos--;
 			buf[end_pos] = '\0';
 		}
 		string config(buf);

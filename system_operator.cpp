@@ -99,11 +99,10 @@ unsigned short SystemOperator::get_cpu_info(std::string& cpu_info)
 	static const char* CMDS[] = {CMD_MODEL_NAME, CMD_CORE_NUMBER};
 	static const char* DATA_FIELDS[] = {"   Model:  ", "   Core:  "};
 	static const int CMDS_SIZE = sizeof(CMDS) / sizeof(CMDS[0]);
-	cpu_info = string("CPU:\n");
+	cpu_info = string("CPU:" CRLF);
 	unsigned short ret = RET_SUCCESS;
 	for (int i = 0 ; i < CMDS_SIZE ; i++)
 	{
-
 		FILE *fp = popen(CMDS[i], "r");
 		char *line = NULL;
 		size_t line_len = 0;
@@ -121,7 +120,7 @@ unsigned short SystemOperator::get_cpu_info(std::string& cpu_info)
 			goto OUT;		
 		}
 		// memory_info += (data_info + string("\n"));
-		cpu_info += (string(DATA_FIELDS[i]) + data_info + string("\n"));
+		cpu_info += (string(DATA_FIELDS[i]) + data_info + string(CRLF));
 OUT:
 		if (line != NULL)
 		{
@@ -158,7 +157,7 @@ unsigned short SystemOperator::get_memory_info(std::string& memory_info)
 		WRITE_FORMAT_ERROR("get_line_info() fails, due to: %s", GetErrorDescription(ret));
 		goto OUT;		
 	}
-	memory_info += (data_info + string("\n"));
+	memory_info += (data_info + string(CRLF));
 OUT:
 	if (line != NULL)
 	{
@@ -180,17 +179,25 @@ unsigned short SystemOperator::get_disk_info(std::string& disk_info)
 	unsigned short ret = RET_SUCCESS;
 	FILE *fp = popen(CMD, "r");
 	char *line = NULL;
-	size_t line_len = 0;
-   	string data_info;
-	if (getline(&line, &line_len, fp) == -1)
+	size_t line_len = 0; // buffer length, not the string length
+	size_t line_read = 0; // real size of the read string
+	string data_info;
+	if ((line_read = getline(&line, &line_len, fp)) == -1)
 	{
 		WRITE_FORMAT_ERROR("getline() fails, due to: %s", strerror(errno));
 		ret = RET_FAILURE_SYSTEM_API;
 		goto OUT;
 	}
+	// for (int i = 0 ; i < line_len ; i++)
+	// {
+	// 	putchar(line[i]);
+	// }
+	// printf("\n");
+	if (line_read >= 1 && line[line_read - 1] == '\n')
+		line[line_read - 1] = '\0';
 	data_info = string(line);
-	// printf("line: %s", line);
-	disk_info += (data_info /*+ string("\n")*/);
+	printf("line: %s, %d\n", line, strlen(line));
+	disk_info += (data_info + string(CRLF));
 OUT:
 	if (line != NULL)
 	{
@@ -205,21 +212,24 @@ OUT:
 	return ret;
 }
 
-unsigned short SystemOperator::get_network_info(std::string& network_info)
+unsigned short SystemOperator:: get_network_info(std::string& network_info)
 {
 	static const char* CMD_NETWORK = "ifconfig | grep inet | grep netmask | awk '{print $2, $4}'";
 	static const char* CMD_GATEWAY = "route -n | grep -E '^0.0.0.0' | awk '{print $2}'";
-	network_info = string("Network:\n");
+	network_info = string("Network:" CRLF);
 	unsigned short ret = RET_SUCCESS;
 	char *line = NULL;
-	size_t line_len = 0;
+	size_t line_len = 0; // buffer length, not the string length
+	size_t line_read = 0; // real size of the read string
     char* rest = NULL;
     char* line_tmp = NULL; 
 // Find the IP and netmask
 	FILE *fp_network = popen(CMD_NETWORK, "r");
 	bool found = false;
-	while (getline(&line, &line_len, fp_network) != -1)
+	while ((line_read = getline(&line, &line_len, fp_network)) != -1)
 	{
+		if (line_read >= 1 && line[line_read - 1] == '\n')
+			line[line_read - 1] = '\0';
 		line_tmp = line;
 		char* ip = strtok_r(line_tmp, " ", &rest);
 		char* netmask = strtok_r(NULL, " ", &rest);
@@ -227,8 +237,8 @@ unsigned short SystemOperator::get_network_info(std::string& network_info)
 		IPv4Addr ipv4_addr(ip);
 		if (ipv4_addr.is_same_network(host_netmask_digits, host_network))
 		{
-			network_info += (string("   IP:  ") + string(ip) + string("\n"));
-			network_info += (string("   Netmask:  ") + string(netmask)/* + string("\n")*/);
+			network_info += (string("   IP:  ") + string(ip) + string(CRLF));
+			network_info += (string("   Netmask:  ") + string(netmask) + string(CRLF));
 			found = true;
 		}
 		if (line != NULL)
@@ -252,13 +262,15 @@ unsigned short SystemOperator::get_network_info(std::string& network_info)
 	}
 // Find the Gateway
 	FILE *fp_gateway = popen(CMD_GATEWAY, "r");
-	if (getline(&line, &line_len, fp_gateway) == -1)
+	if ((line_read = getline(&line, &line_len, fp_gateway)) == -1)
 	{
 		WRITE_FORMAT_ERROR("getline() fails, due to: %s", strerror(errno));
 		ret = RET_FAILURE_SYSTEM_API;
 		goto OUT2;		
 	}
-	network_info += (string("   Gateway:  ") + string(line)/* + string("\n")*/);
+	if (line_read >= 1 && line[line_read - 1] == '\n')
+		line[line_read - 1] = '\0';
+	network_info += (string("   Gateway:  ") + string(line) + string(CRLF));
 OUT2:
 	if (line != NULL)
 	{
@@ -312,11 +324,13 @@ unsigned short SystemOperator::get_os_info(string& os_info)
 // Find the string length of the linux platform
 	token_ptr_end = token_ptr;
 	while (*token_ptr_end != '\r' && *token_ptr_end != '\n' && *token_ptr_end != '\0') token_ptr_end++;
+	if (strlen(token_ptr_end) >= 1 && *(token_ptr_end - 1) == '\r')
+		token_ptr_end--;
 	data_info_len = token_ptr_end - token_ptr;
 // Get the correct string of linux platform
 	data_info = string(token).substr(data_info_pos, data_info_len);
 	// printf("OS: data_info: %s\n", data_info.c_str());
-	os_info += (data_info + string("\n")); 
+	os_info += (data_info + string(CRLF)); 
 OUT:
 	if (line != NULL)
 	{
@@ -446,7 +460,7 @@ unsigned short SystemOperator::get_cpu_usage(string& cpu_usage, unsigned int sle
 		jiffies_count_sum[i][1] = jiffies_count[i][0] + jiffies_count[i][1] + jiffies_count[i][6];
 	}
 	cpu_usage_value = (float)(jiffies_count_sum[1][1] - jiffies_count_sum[0][1]) * 100.0 / (jiffies_count_sum[1][0] - jiffies_count_sum[0][0]);
-	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, " cpu usage: %.2f % \n", cpu_usage_value);
+	snprintf(cpu_usage_value_str, DEF_SHORT_STRING_SIZE, " cpu usage: %.2f % " CRLF, cpu_usage_value);
 	cpu_usage = cpu_usage_value_str;
 OUT:
 	for (int i = 0 ; i < CMD_COUNT; i++)
@@ -483,7 +497,7 @@ unsigned short SystemOperator::get_memory_usage(string& memory_usage)
 		goto OUT;
 	}
 	memory_usage_value = atof(line) * 100.0;
-	snprintf(memory_usage_value_str, DEF_SHORT_STRING_SIZE, " memory usage: %.2f % \n", memory_usage_value);
+	snprintf(memory_usage_value_str, DEF_SHORT_STRING_SIZE, " memory usage: %.2f % " CRLF, memory_usage_value);
 	memory_usage = memory_usage_value_str;
 OUT:
 	if (line != NULL)
@@ -535,7 +549,7 @@ unsigned short SystemOperator::get_disk_usage(string& disk_usage)
 		goto OUT;
 	}
 	disk_usage_value = atoi(line2);
-	snprintf(disk_usage_value_str, DEF_SHORT_STRING_SIZE, " disk usage: %d % \n", disk_usage_value);
+	snprintf(disk_usage_value_str, DEF_SHORT_STRING_SIZE, " disk usage: %d % " CRLF, disk_usage_value);
 	disk_usage = disk_usage_value_str;
 OUT:
 	if (line2 != NULL)
