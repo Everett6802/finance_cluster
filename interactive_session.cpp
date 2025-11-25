@@ -303,7 +303,8 @@ InteractiveSession::InteractiveSession(PINOTIFY notify, PIMANAGER mgr, int clien
 	monitor_system_timer_thread(NULL),
 	// system_monitor_period(0),
 	is_config_mode(false),
-	cluster_config_updated(false)
+	cluster_config_updated(false),
+	is_tty(false)
 {
 	IMPLEMENT_MSG_DUMPER()
 	IMPLEMENT_EVT_RECORDER()
@@ -370,6 +371,7 @@ unsigned short InteractiveSession::initialize(/*int system_monitor_period_value*
 		WRITE_FORMAT_ERROR("Fail to create a handler thread of interactive session[%s], due to: %s", session_tag, strerror(errno));
 		return RET_FAILURE_HANDLE_THREAD;
 	}
+	is_tty = isatty(sock_fd);
 	WRITE_EVT_RECORDER(TelnetConsoleEventCfg, inet_ntoa(sock_addr.sin_addr), session_id, 0);
 	return RET_SUCCESS;
 }
@@ -950,24 +952,47 @@ void InteractiveSession::multi_clis_thread_cleanup_handler_internal()
 
 unsigned short InteractiveSession::print_to_console(const string& response)const
 {
-	const char* response_ptr = response.c_str();
-	int response_size = response.size();
-	int n;
-	while (response_size > 0)
+	// bool isTTY = isatty(sock_fd);
+	if (is_tty)
 	{
-		n = write(sock_fd, response_ptr, response_size);
-		if (n < 0)
+		const char* response_ptr = response.c_str();
+		int response_size = response.size();
+		int n;
+		while (response_size > 0)
 		{
-			WRITE_FORMAT_ERROR("write() fails, due to: %s", strerror(errno));		
-			return RET_FAILURE_SYSTEM_API;
+			n = write(sock_fd, response_ptr, response_size);
+			if (n < 0)
+			{
+				WRITE_FORMAT_ERROR("write() fails, due to: %s", strerror(errno));		
+				return RET_FAILURE_SYSTEM_API;
+			}
+			else if(n < response_size)
+			{
+				response_ptr += n;
+				response_size -= n;
+			}
+			else
+				break;
 		}
-		else if(n < response_size)
+	}
+	else
+	{
+		const int CHUNK_SIZE = 2048;  // 避免一次 write 太大
+		const char* ptr = response.c_str();
+		int remaining = response.size();
+		int n;
+		while (remaining > 0)
 		{
-			response_ptr += n;
-			response_size -= n;
+			int to_write = remaining > CHUNK_SIZE ? CHUNK_SIZE : remaining;
+			n = write(sock_fd, ptr, to_write);
+			if (n < 0)
+			{
+				WRITE_FORMAT_ERROR("write() fails, due to: %s", strerror(errno));
+				return RET_FAILURE_SYSTEM_API;
+			}
+			ptr += n;
+			remaining -= n;
 		}
-		else
-			break;
 	}
 	return RET_SUCCESS;
 }
@@ -1087,11 +1112,13 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	unsigned short ret = RET_SUCCESS;
 	string usage_string;
 	usage_string += string("====================== Usage ======================" CRLF);
+	// print_to_console(string("====================== Usage ======================" CRLF));
 	for (int i = 0; i < InteractiveSessionCommandSize; i++)
 	{
 		if (CHECK_AUTHORITY(i, authority_mask))
-			usage_string += string("* ") + GET_COMMAND(i) + string(CRLF" Description: ") + GET_DESCRIPTION(i) + string(CRLF);	
-	}
+			usage_string += string("* ") + GET_COMMAND(i) + string(CRLF" Description: ") + GET_DESCRIPTION(i) + string(CRLF);
+			// print_to_console(string("* ") + GET_COMMAND(i) + string(CRLF" Description: ") + GET_DESCRIPTION(i) + string(CRLF));
+		}
 	// usage_string += string("* help\n Description: The usage\n");
 	// usage_string += string("* exit\n Description: Exit the session\n");
 	// usage_string += string("* get_cluster_detail\n Description: Get the cluster detail info\n");
@@ -1128,7 +1155,7 @@ unsigned short InteractiveSession::handle_help_command(int argc, char **argv)
 	// 	}
 	// }
 	usage_string += string("===================================================" CRLF CRLF);
-
+	// print_to_console(string("===================================================" CRLF CRLF));
 	ret = print_to_console(usage_string);
 	return ret;
 }

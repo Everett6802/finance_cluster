@@ -58,6 +58,7 @@ private:
 	bool is_config_mode;
 	EventSearchRule event_search_rule;
 	bool cluster_config_updated;
+	bool is_tty;
 
 	bool check_command_authority(int command_type);
 	bool check_config_command_authority(int command_type);
