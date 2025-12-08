@@ -561,7 +561,7 @@ unsigned short ClusterMgr::close_console()
 		is_local_follower(local_follower);
 	if (!local_follower)
 	{
-		static string close_console_message = "Switch Rule: Follower -> Leader\nThe session will be closed due to authority change\nPlease reconnect...\n";
+		static string close_console_message = "Switch Rule: Follower -> Leader" CRLF "The session will be closed due to authority change" CRLF "Please reconnect..." CRLF;
 		assert(interactive_server != NULL && "interactive_server should NOT be NULL");
 		WRITE_FORMAT_DEBUG("Close the console seesion in the Node[%s]...", node_token);
 		interactive_server->print_console(close_console_message);

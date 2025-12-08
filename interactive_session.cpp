@@ -123,11 +123,14 @@ static const CommandAttribute interactive_session_command_attr[InteractiveSessio
 };
 
 static const char* interactive_session_unset_search_event_config_command = "unset";
+
 static const char* interactive_session_search_event_type_config_command[] = 
 {
 	"operate_node",
 	"telnet_console",
-	"sync_data"
+	"sync_data",
+	"remote_sync_data",
+	"update_config"
 };
 static const int SEARCH_EVENT_TYPE_CONFIG_COMMAND_SIZE = sizeof(interactive_session_search_event_type_config_command) / sizeof(interactive_session_search_event_type_config_command[0]);
 
@@ -977,21 +980,46 @@ unsigned short InteractiveSession::print_to_console(const string& response)const
 	}
 	else
 	{
-		const int CHUNK_SIZE = 2048;  // 避免一次 write 太大
+		const int CHUNK_SIZE = 1024;  // 避免一次 write 太大
 		const char* ptr = response.c_str();
 		int remaining = response.size();
 		int n;
+// 		while (remaining > 0)
+// 		{
+// 			int to_write = remaining > CHUNK_SIZE ? CHUNK_SIZE : remaining;
+// 			n = write(sock_fd, ptr, to_write);
+// 			if (n < 0)
+// 			{
+// 				WRITE_FORMAT_ERROR("write() fails, due to: %s", strerror(errno));
+// 				return RET_FAILURE_SYSTEM_API;
+// 			}
+// 			ptr += n;
+// 			remaining -= n;
+// // ★★★ 這行是重點：避免 telnet 來不及吃資料 ★★★
+//         	usleep(1000);  // 1 ms delay（不會造成肉眼可見的變慢）
+// 		}
 		while (remaining > 0)
 		{
 			int to_write = remaining > CHUNK_SIZE ? CHUNK_SIZE : remaining;
-			n = write(sock_fd, ptr, to_write);
-			if (n < 0)
+
+			int chunk_written = 0;
+			while (chunk_written < to_write)
 			{
-				WRITE_FORMAT_ERROR("write() fails, due to: %s", strerror(errno));
-				return RET_FAILURE_SYSTEM_API;
+				int n = write(sock_fd, ptr + chunk_written, to_write - chunk_written);
+				if (n < 0)
+				{
+					if (errno == EINTR) continue;
+					perror("write");
+					return RET_FAILURE_SYSTEM_API;
+				}
+				chunk_written += n;
 			}
-			ptr += n;
-			remaining -= n;
+
+			ptr += to_write;
+			remaining -= to_write;
+
+			// usleep(1000);
+			usleep(500000);
 		}
 	}
 	return RET_SUCCESS;
@@ -1370,6 +1398,10 @@ unsigned short InteractiveSession::handle_search_event_command(int argc, char **
 		char buf[DEF_STRING_SIZE];
 		snprintf(buf, DEF_STRING_SIZE, CRLF " ***  %d event(s) found  ***" CRLF, event_count);
 		print_to_console(string(buf) + string(CRLF));
+	}
+	else
+	{
+		WRITE_FORMAT_ERROR("Error occurs while reading event log, due to: %s", GetErrorDescription(ret));
 	}
 	list<EventEntry*>::iterator iter_clean = event_list.begin();
 	while (iter_clean != event_list.end())
