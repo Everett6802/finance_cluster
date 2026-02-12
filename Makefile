@@ -24,12 +24,43 @@ OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
 # .o 依賴沒有 .d 檔案（include 變動不會 rebuild）
 DEPS := $(OBJS:.o=.d)
 
+# =========================
+# msg_dumper library
+# =========================
 LIB_MSG_DUMPER := libmsg_dumper.so
 LIB_MSG_DUMPER_HEADER := msg_dumper.h
 LIB_MSG_DUMPER_PATH := ../msg_dumper
 LIB_MSG_DUMPER_WRAPPER_FOLDER := wrapper
 LIB_MSG_DUMPER_WRAPPER_HEADER := msg_dumper_wrapper.h
 LIB_MSG_DUMPER_WRAPPER_SOURCE := msg_dumper_wrapper.cpp
+
+# =========================
+# Optional PG plugin (.so)
+# =========================
+LIB_PG_DB_ACCESS := libpg_db_access.so
+# 檢查這個檔案在不在，如果在就回傳檔名，不在就回傳空字串
+PG_SO := $(wildcard $(LIB_PG_DB_ACCESS))
+# 如果 PG_SO 不是空字串 → 條件成立
+ifneq ($(PG_SO),)
+    $(info PG plugin found — will copy)
+    COPY_PG = cp $(LIB_PG_DB_ACCESS) $(BIN_DIR)/
+else
+    $(info PG plugin not found — build without PG)
+    COPY_PG = @true
+endif
+
+# =========================
+# Link libraries
+# =========================
+# -L. -lmsg_dumper 是什麼意思？
+# -L. → 在目前目錄找 library
+# -lmsg_dumper → 找 libmsg_dumper.so => linker 會自動補：lib + 名字 + .so => 所以：-lmsg_dumper=>libmsg_dumper.so
+# -Wl,-rpath,'$$ORIGIN' 是什麼意思？
+# -Wl,xxx → 這是傳給 linker 的參數
+# rpath 是什麼？rpath = runtime library search path 意思：執行時去哪裡找 .so
+# $$ORIGIN 是什麼？$$ORIGIN 是一個特殊變數，代表執行檔所在的目錄
+# 所以 -Wl,-rpath,'$$ORIGIN' 的意思是：告訴 linker 在執行時從執行檔所在的目錄找 .so
+LIBS := -L. -lmsg_dumper -Wl,-rpath,'$$ORIGIN' -lrt -ldl -lpthread
 
 CONF_FILES := $(wildcard conf/*)
 #OUTPUT := $(OUTPUT_DIR)/finance_cluster

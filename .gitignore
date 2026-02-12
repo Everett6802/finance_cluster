@@ -8,3 +8,5 @@ libmsg_dumper.so
 msg_dumper.h
 msg_dumper_wrapper.h
 msg_dumper_wrapper.cpp
+libpg_db_access.so
+pg_db_access.h

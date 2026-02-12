@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <ctime>
 #include "msg_dumper_wrapper.h"
+#include "pg_db_access.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -550,10 +551,10 @@ class EventCfg;
 struct EventEntry;
 struct EventSearchRule;
 
-class IEventDeviceAccess
+class IEventLogger
 {
 public:
-	virtual ~IEventDeviceAccess(){}
+	virtual ~IEventLogger(){}
 
 	virtual unsigned short initialize()=0;
 	virtual unsigned short deinitialize()=0;
@@ -561,7 +562,7 @@ public:
 	virtual unsigned short write(const EventCfg* event_cfg)=0;
 	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchRule* event_search_criterion=NULL)=0;
 };
-typedef IEventDeviceAccess* PIEVENT_DEVICE_ACCESS;
+typedef IEventLogger* PIEVENT_LOGGER;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Class
@@ -1596,7 +1597,7 @@ typedef EventSearchRule* PEVENT_SEARCH_RULE;
 
 ///////////////////////////////////////////////////
 
-class EventFileAccess : public IEventDeviceAccess
+class EventFileLogger : public IEventLogger
 {
 	DECLARE_MSG_DUMPER()
 	static char* EVENT_FOLDERNAME;
@@ -1608,8 +1609,8 @@ private:
 	unsigned short remove_space_from_sides(std::string& new_string, const char* old_string);
 
 public:
-	EventFileAccess();
-	~EventFileAccess();
+	EventFileLogger();
+	~EventFileLogger();
 
 	virtual unsigned short initialize();
 	virtual unsigned short deinitialize();
@@ -1620,19 +1621,29 @@ public:
 
 ///////////////////////////////////////////////////
 
-// class EventSharedMemoryAccess : public IEventDeviceAccess
-// {
-// 	DECLARE_MSG_DUMPER()
+class EventDBLogger : public IEventLogger
+{
+	DECLARE_MSG_DUMPER()
 
-// public:
-// 	EventFileAccess();
-// 	~EventFileAccess();
+private:
+	void* api_handle;
+	FP_pg_db_access_initialize fp_pg_db_access_initialize;
+	FP_pg_db_access_write fp_pg_db_access_write;
+	FP_pg_db_access_read fp_pg_db_access_read;
+	FP_pg_db_access_deinitialize fp_pg_db_access_deinitialize;
 
-// 	virtual unsigned short initialize();
-// 	virtual unsigned short deinitialize();
-// 	virtual unsigned short write(const PEVENT_CFG event_cfg);
-// 	virtual unsigned short read();
-// };
+	bool export_api();
+
+public:
+	EventDBLogger();
+	~EventDBLogger();
+
+	virtual unsigned short initialize();
+	virtual unsigned short deinitialize();
+	virtual EventDevice get_type()const;
+	virtual unsigned short write(const EventCfg* event_cfg);
+	virtual unsigned short read(std::list<EventEntry*>* event_list, std::list<std::string>* event_line_list=NULL, EventSearchRule* event_search_criterion=NULL);
+};
 
 ///////////////////////////////////////////////////
 
@@ -1645,7 +1656,7 @@ private:
 	static EventRecorder* instance;
 
 	int ref_count;
-	PIEVENT_DEVICE_ACCESS event_device_access;
+	PIEVENT_LOGGER event_logger;
 	PNOTIFY_THREAD notify_thread;
 
 	EventRecorder();

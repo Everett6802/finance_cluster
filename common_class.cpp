@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <signal.h>
+#include <dlfcn.h>
 #include <stdexcept>
 #include <algorithm>
 #include <sys/stat.h>
@@ -1229,15 +1230,15 @@ unsigned short NotifyThread::notify_thread_handler_internal()
 		{
 			pthread_cond_wait(&notify_cond, &notify_mtx);
 		}
-		// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_STRING_SIZE, "Thread[%s]=> The worker thread to write the data......", worker_thread_name);
+		// WRITE_DEBUG_FORMAT_SYSLOG(DB_ACCESS_STRING_SIZE, "Thread[%s]=> The worker thread to write the data......", worker_thread_name);
 // Move the message
 		int notify_buffer_vector_size = notify_buffer_vector.size();
-//		WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Thread[%s]=> There are totally %d data in the queue", worker_thread_name, notify_buffer_vector_size);
+//		WRITE_DEBUG_FORMAT_SYSLOG(DB_ACCESS_LONG_STRING_SIZE, "Thread[%s]=> There are totally %d data in the queue", worker_thread_name, notify_buffer_vector_size);
 		if (notify_buffer_vector_size > 0)
 		{
 			for (int i = 0 ; i < notify_buffer_vector_size ; i++)
 			{
-//				WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Thread[%s]=> Move the message[%s] to another buffer", worker_thread_name, notify_buffer_vector[i]->data);
+//				WRITE_DEBUG_FORMAT_SYSLOG(DB_ACCESS_LONG_STRING_SIZE, "Thread[%s]=> Move the message[%s] to another buffer", worker_thread_name, notify_buffer_vector[i]->data);
 				PNOTIFY_CFG notify_cfg =  notify_buffer_vector[i];
 				notify_buffer_vector[i] = NULL;
 				notify_execute_vector.push_back(notify_cfg);
@@ -1405,7 +1406,7 @@ unsigned short NotifyThread::deinitialize()
 
 unsigned short NotifyThread::add_event(const PNOTIFY_CFG notify_cfg)
 {
-	// WRITE_DEBUG_FORMAT_SYSLOG(MSG_DUMPER_LONG_STRING_SIZE, "Write message [severity: %d, message: %s]", severity, msg);
+	// WRITE_DEBUG_FORMAT_SYSLOG(DB_ACCESS_LONG_STRING_SIZE, "Write message [severity: %d, message: %s]", severity, msg);
 	assert(notify_cfg != NULL && "notify_cfg should NOT be NULL");
 	notify_cfg->addref(__FILE__, __LINE__);
 	pthread_mutex_lock(&notify_mtx);
@@ -1703,21 +1704,21 @@ unsigned short MonitorSystemTimerThread::set_period(int period)
 
 //////////////////////////////////////////////////////////
 
-char* EventFileAccess::EVENT_FOLDERNAME = "log";
-char* EventFileAccess::EVENT_FILENAME = "event.log";
+char* EventFileLogger::EVENT_FOLDERNAME = "log";
+char* EventFileLogger::EVENT_FILENAME = "event.log";
 
-EventFileAccess::EventFileAccess() :
+EventFileLogger::EventFileLogger() :
 	event_log_fp(NULL)
 {
 	IMPLEMENT_MSG_DUMPER()
 }
 	
-EventFileAccess::~EventFileAccess()
+EventFileLogger::~EventFileLogger()
 {
 	RELEASE_MSG_DUMPER()
 }
 
-const char* EventFileAccess::get_event_log_filepath()const
+const char* EventFileLogger::get_event_log_filepath()const
 {
 	static char* event_log_filepath = NULL;
 	if (event_log_filepath == NULL)
@@ -1733,8 +1734,8 @@ const char* EventFileAccess::get_event_log_filepath()const
 	return event_log_filepath;
 }
 
-// unsigned short EventFileAccess::remove_space_from_sides(char **new_string, const char* old_string)
-unsigned short EventFileAccess::remove_space_from_sides(string& new_string, const char* old_string)
+// unsigned short EventFileLogger::remove_space_from_sides(char **new_string, const char* old_string)
+unsigned short EventFileLogger::remove_space_from_sides(string& new_string, const char* old_string)
 {
 	assert(old_string != NULL && "old_string should NOT be NULL");
 	// unsigned short ret = RET_SUCCESS;
@@ -1785,7 +1786,7 @@ unsigned short EventFileAccess::remove_space_from_sides(string& new_string, cons
 	return RET_SUCCESS;
 }
 
-unsigned short EventFileAccess::initialize()
+unsigned short EventFileLogger::initialize()
 {
 	// Ensure the event folder exists before opening the log file
 	char current_working_directory[DEF_LONG_STRING_SIZE];
@@ -1821,9 +1822,9 @@ unsigned short EventFileAccess::initialize()
 	return RET_SUCCESS;
 }
 
-unsigned short EventFileAccess::deinitialize()
+unsigned short EventFileLogger::deinitialize()
 {
-	// fprintf(stderr, "EventFileAccess::deinitialize()\n");
+	// fprintf(stderr, "EventFileLogger::deinitialize()\n");
 	if (event_log_fp != NULL)
 	{
 		fclose(event_log_fp);
@@ -1832,9 +1833,9 @@ unsigned short EventFileAccess::deinitialize()
 	return RET_SUCCESS;
 }
 
-EventDevice EventFileAccess::get_type()const{return EVENT_DEVICE_FILE;}
+EventDevice EventFileLogger::get_type()const{return EVENT_DEVICE_FILE;}
 
-unsigned short EventFileAccess::write(const EventCfg* event_cfg)
+unsigned short EventFileLogger::write(const EventCfg* event_cfg)
 {
 	assert(event_cfg != NULL && "event_cfg should NOT be NULL");
 	assert(event_log_fp != NULL && "event_log_fp should NOT be NULL");
@@ -1864,7 +1865,7 @@ Here, the programmer can use the fflush function to make sure that the current s
 	return ret;
 }
 
-unsigned short EventFileAccess::read(list<PEVENT_ENTRY>* event_list, list<string>* event_line_list, EventSearchRule* event_search_rule)
+unsigned short EventFileLogger::read(list<PEVENT_ENTRY>* event_list, list<string>* event_line_list, EventSearchRule* event_search_rule)
 {
 	unsigned short ret = RET_SUCCESS;
 	list<string>* line_list = NULL;
@@ -2002,6 +2003,108 @@ OUT:
 
 //////////////////////////////////////////////////////////
 
+EventDBLogger::EventDBLogger() :
+	api_handle(NULL),
+	fp_pg_db_access_initialize(NULL),
+	fp_pg_db_access_write(NULL),
+	fp_pg_db_access_read(NULL),
+	fp_pg_db_access_deinitialize(NULL)
+{
+	IMPLEMENT_MSG_DUMPER()
+}
+	
+EventDBLogger::~EventDBLogger()
+{
+	deinitialize();
+	RELEASE_MSG_DUMPER()
+}
+
+bool EventDBLogger::export_api()
+{
+	fp_pg_db_access_initialize = (FP_pg_db_access_initialize)dlsym(api_handle, "pg_db_access_initialize");
+	if (fp_pg_db_access_initialize == NULL)
+	{
+		fprintf(stderr, "dlsym() fails when exporting pg_db_access_initialize() due to %s\n", dlerror());
+		return false;
+	}
+	fp_pg_db_access_write = (FP_pg_db_access_write)dlsym(api_handle, "pg_db_access_write");
+	if (fp_pg_db_access_write == NULL)
+	{
+		fprintf(stderr, "dlsym() fails when exporting pg_db_access_write() due to %s\n", dlerror());
+		return false;
+	}
+	fp_pg_db_access_read = (FP_pg_db_access_read)dlsym(api_handle, "pg_db_access_read");
+	if (fp_pg_db_access_read == NULL)
+	{
+		fprintf(stderr, "dlsym() fails when exporting pg_db_access_read() due to %s\n", dlerror());
+		return false;
+	}
+	fp_pg_db_access_deinitialize = (FP_pg_db_access_deinitialize)dlsym(api_handle, "pg_db_access_deinitialize");
+	if (fp_pg_db_access_deinitialize == NULL)
+	{
+		fprintf(stderr, "dlsym() fails when exporting pg_db_access_deinitialize() due to %s\n", dlerror());
+		return false;
+	}
+	return true;
+}
+
+unsigned short EventDBLogger::initialize()
+{
+	fprintf(stderr, "EventDBLogger::initialize()\n");
+// Load library
+	unsigned short ret = DB_ACCESS_SUCCESS;
+	api_handle = dlopen("libpg_db_access.so", RTLD_NOW);
+	if (api_handle == NULL)
+	{
+		fprintf(stderr, "dlopen() fails, due to %s\n", dlerror());
+		return DB_ACCESS_FAILURE_LOAD_LIBRARY;
+	}
+
+// Export the APIs
+	if (!export_api())
+	{
+		fprintf(stderr, "Fail to export the APIs\n");
+		return DB_ACCESS_FAILURE_EXPORT_API;
+	}
+	ret = fp_pg_db_access_initialize();
+	return ret;
+}
+
+unsigned short EventDBLogger::deinitialize()
+{
+	fprintf(stderr, "EventDBLogger::deinitialize()\n");
+	unsigned short ret = DB_ACCESS_SUCCESS;
+	ret = fp_pg_db_access_deinitialize();
+	return ret;
+}
+
+EventDevice EventDBLogger::get_type()const{return EVENT_DEVICE_DB;}
+
+unsigned short EventDBLogger::write(const EventCfg* event_cfg)
+{
+	fprintf(stderr, "EventDBLogger::write()\n");
+	assert(event_cfg != NULL && "event_cfg should NOT be NULL");
+	unsigned short ret = DB_ACCESS_SUCCESS;
+// 	event_cfg->get_type();
+// 	const char* event_description = event_cfg->get_str();
+// 	int event_description_len = strlen(event_description);
+// // event description
+// 	// fprintf(stderr, "Write event to DB: %s", event_description);
+// 	WRITE_FORMAT_DEBUG("Write event to DB: %s", event_description);
+	ret = fp_pg_db_access_write();
+	return ret;
+}
+
+unsigned short EventDBLogger::read(list<PEVENT_ENTRY>* event_list, list<string>* event_line_list, EventSearchRule* event_search_rule)
+{
+	fprintf(stderr, "EventDBLogger::read()\n");
+	unsigned short ret = DB_ACCESS_SUCCESS;
+	ret = fp_pg_db_access_read();
+	return ret;
+}
+
+//////////////////////////////////////////////////////////
+
 EventRecorder* EventRecorder::instance = NULL;
 
 EventRecorder* EventRecorder::get_instance(const char* callable_file_name, unsigned long callable_line_no)
@@ -2029,7 +2132,7 @@ EventRecorder* EventRecorder::get_instance(const char* callable_file_name, unsig
 }
 
 EventRecorder::EventRecorder() :
-	event_device_access(NULL),
+	event_logger(NULL),
 	notify_thread(NULL),
 	ref_count(0)
 {
@@ -2044,7 +2147,7 @@ EventRecorder::~EventRecorder()
 
 unsigned short EventRecorder::initialize()
 {
-	unsigned short ret = MSG_DUMPER_SUCCESS;
+	unsigned short ret = RET_SUCCESS;
 // Initialize the worker thread for handling events
 	notify_thread = new NotifyThread(this, "EventRecorder Notify Thread");
 	if (notify_thread == NULL)
@@ -2054,22 +2157,32 @@ unsigned short EventRecorder::initialize()
 		return ret;
 	// sleep(1);
 	usleep(100000);
-	event_device_access = new EventFileAccess();
-	if (event_device_access == NULL)
+	event_logger = new EventDBLogger();
+	if (event_logger == NULL)
 		throw bad_alloc();
-	ret = event_device_access->initialize();
-	if (CHECK_FAILURE(ret))
-		return ret;
+	unsigned short ret_db_logger = event_logger->initialize();
+	if (ret_db_logger != DB_ACCESS_SUCCESS)
+	{
+		WRITE_FORMAT_WARN("Fails to initialize the EventDBLogger due to: %s", GetErrorDescription(ret_db_logger));
+		delete event_logger;
+		WRITE_WARN("Switch to EventFileLogger");
+		event_logger = new EventFileLogger();
+		if (event_logger == NULL)
+			throw bad_alloc();
+		ret = event_logger->initialize();
+		if (CHECK_FAILURE(ret))
+			return ret;
+	}
 	return ret;
 }
 
 void EventRecorder::deinitialize()
 {
-	if (event_device_access != NULL)
+	if (event_logger != NULL)
 	{
-		event_device_access->deinitialize();
-		delete event_device_access;
-		event_device_access = NULL;
+		event_logger->deinitialize();
+		delete event_logger;
+		event_logger = NULL;
 	}
 // Stop the event thread
 	if (notify_thread != NULL)
@@ -2120,12 +2233,12 @@ unsigned short EventRecorder::async_handle(NotifyCfg* notify_cfg)
     {
     	case NOTIFY_ADD_EVENT:
     	{
-    		// assert(event_device_access != NULL && "event_device_access should NOT be NULL");
+    		// assert(event_logger != NULL && "event_logger should NOT be NULL");
     		PNOTIFY_EVENT_CFG notify_event_cfg = (PNOTIFY_EVENT_CFG)notify_cfg;
     		PEVENT_CFG event_cfg = (PEVENT_CFG)notify_event_cfg->get_event_cfg();
     		assert(event_cfg != NULL && "event_cfg should NOT be NULL");
-    		WRITE_FORMAT_DEBUG("Write event[%s] into device[%s]...", GetEventTypeDescription(event_cfg->get_type()), GetEventDeviceDescription(event_device_access->get_type()));
-    		ret = event_device_access->write(event_cfg);
+    		WRITE_FORMAT_DEBUG("Write event[%s] into device[%s]...", GetEventTypeDescription(event_cfg->get_type()), GetEventDeviceDescription(event_logger->get_type()));
+    		ret = event_logger->write(event_cfg);
 			SAFE_RELEASE(event_cfg);
     	}
     	break;
@@ -2183,6 +2296,6 @@ unsigned short EventRecorder::read(list<EventEntry*>* event_list, list<string>* 
 {
 	unsigned short ret = RET_SUCCESS;
 	assert(event_list != NULL && "event_list should NOT be NULL");
-    ret = event_device_access->read(event_list, event_line_list, event_search_rule);
+    ret = event_logger->read(event_list, event_line_list, event_search_rule);
 	return ret;
 }
