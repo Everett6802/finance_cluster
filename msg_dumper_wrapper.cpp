@@ -301,13 +301,14 @@ unsigned short MsgDumperWrapper::check_facility_name(const char* facility_name)
 MsgDumperWrapper::MsgDumperWrapper() :
 	ref_count(0),
 	api_handle(NULL),
-	fp_msg_dumper_initialize(NULL),
 	fp_msg_dumper_get_version(NULL),
+	fp_msg_dumper_set_severity_index(NULL),
 	fp_msg_dumper_set_severity(NULL),
-	fp_msg_dumper_set_facility(NULL),
+	fp_msg_dumper_get_severity_index(NULL),
 	fp_msg_dumper_get_severity(NULL),
-	fp_msg_dumper_get_facility(NULL),
+	fp_msg_dumper_initialize(NULL),
 	fp_msg_dumper_write_msg(NULL),
+	fp_msg_dumper_write_format_msg(NULL),
 	fp_msg_dumper_deinitialize(NULL),
 	fp_msg_dumper_get_error_description(NULL)
 {
@@ -317,61 +318,120 @@ MsgDumperWrapper::~MsgDumperWrapper(){deinitialize();}
 
 bool MsgDumperWrapper::export_api()
 {
+	// fp_msg_dumper_get_version = (FP_msg_dumper_get_version)dlsym(api_handle, "msg_dumper_get_version");
+	// if (fp_msg_dumper_get_version == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_version() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_initialize = (FP_msg_dumper_initialize)dlsym(api_handle, "msg_dumper_initialize");
+	// if (fp_msg_dumper_initialize == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_initialize() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_set_severity = (FP_msg_dumper_set_severity)dlsym(api_handle, "msg_dumper_set_severity");
+	// if (fp_msg_dumper_set_severity == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_set_severity() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_set_facility = (FP_msg_dumper_set_facility)dlsym(api_handle, "msg_dumper_set_facility");
+	// if (fp_msg_dumper_set_facility == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_set_facility() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_get_severity = (FP_msg_dumper_get_severity)dlsym(api_handle, "msg_dumper_get_severity");
+	// if (fp_msg_dumper_get_severity == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_severity() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_get_facility = (FP_msg_dumper_get_facility)dlsym(api_handle, "msg_dumper_get_facility");
+	// if (fp_msg_dumper_get_facility == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_facility() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_write_msg = (FP_msg_dumper_write_msg)dlsym(api_handle, "msg_dumper_write_msg");
+	// if (fp_msg_dumper_write_msg == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_write_msg() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_deinitialize = (FP_msg_dumper_deinitialize)dlsym(api_handle, "msg_dumper_deinitialize");
+	// if (fp_msg_dumper_deinitialize == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_deinitialize() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
+	// fp_msg_dumper_get_error_description = (FP_msg_dumper_get_error_description)dlsym(api_handle, "msg_dumper_get_error_descriptions");
+	// if (fp_msg_dumper_deinitialize == NULL)
+	// {
+	// 	fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_error_description() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+	// 	return false;
+	// }
 	fp_msg_dumper_get_version = (FP_msg_dumper_get_version)dlsym(api_handle, "msg_dumper_get_version");
 	if (fp_msg_dumper_get_version == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_version() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_get_version() due to %s\n", dlerror());
 		return false;
 	}
-	fp_msg_dumper_initialize = (FP_msg_dumper_initialize)dlsym(api_handle, "msg_dumper_initialize");
-	if (fp_msg_dumper_initialize == NULL)
+	fp_msg_dumper_set_severity_index = (FP_msg_dumper_set_severity_index)dlsym(api_handle, "msg_dumper_set_severity_index");
+	if (fp_msg_dumper_set_severity_index == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_initialize() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_set_severity_index() due to %s\n", dlerror());
 		return false;
 	}
 	fp_msg_dumper_set_severity = (FP_msg_dumper_set_severity)dlsym(api_handle, "msg_dumper_set_severity");
 	if (fp_msg_dumper_set_severity == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_set_severity() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_set_severity() due to %s\n", dlerror());
 		return false;
 	}
-	fp_msg_dumper_set_facility = (FP_msg_dumper_set_facility)dlsym(api_handle, "msg_dumper_set_facility");
-	if (fp_msg_dumper_set_facility == NULL)
+	fp_msg_dumper_get_severity_index = (FP_msg_dumper_get_severity_index)dlsym(api_handle, "msg_dumper_get_severity_index");
+	if (fp_msg_dumper_get_severity_index == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_set_facility() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_get_severity() due to %s\n", dlerror());
 		return false;
 	}
 	fp_msg_dumper_get_severity = (FP_msg_dumper_get_severity)dlsym(api_handle, "msg_dumper_get_severity");
 	if (fp_msg_dumper_get_severity == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_severity() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_get_severity() due to %s\n", dlerror());
 		return false;
 	}
-	fp_msg_dumper_get_facility = (FP_msg_dumper_get_facility)dlsym(api_handle, "msg_dumper_get_facility");
-	if (fp_msg_dumper_get_facility == NULL)
+	fp_msg_dumper_initialize = (FP_msg_dumper_initialize)dlsym(api_handle, "msg_dumper_initialize");
+	if (fp_msg_dumper_initialize == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_facility() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_initialize() due to %s\n", dlerror());
 		return false;
 	}
 	fp_msg_dumper_write_msg = (FP_msg_dumper_write_msg)dlsym(api_handle, "msg_dumper_write_msg");
 	if (fp_msg_dumper_write_msg == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_write_msg() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_write_msg() due to %s\n", dlerror());
+		return false;
+	}
+	fp_msg_dumper_write_format_msg = (FP_msg_dumper_write_format_msg)dlsym(api_handle, "msg_dumper_write_format_msg");
+	if (fp_msg_dumper_write_format_msg == NULL)
+	{
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_write_format_msg() due to %s\n", dlerror());
 		return false;
 	}
 	fp_msg_dumper_deinitialize = (FP_msg_dumper_deinitialize)dlsym(api_handle, "msg_dumper_deinitialize");
 	if (fp_msg_dumper_deinitialize == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_deinitialize() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_deinitialize() due to %s\n", dlerror());
 		return false;
 	}
-	fp_msg_dumper_get_error_description = (FP_msg_dumper_get_error_description)dlsym(api_handle, "msg_dumper_get_error_descriptions");
-	if (fp_msg_dumper_deinitialize == NULL)
+	fp_msg_dumper_get_error_description = (FP_msg_dumper_get_error_description)dlsym(api_handle, "msg_dumper_get_error_description");
+	if (fp_msg_dumper_get_error_description == NULL)
 	{
-		fprintf(stderr, "%sdlsym() fails when exporting msg_dumper_get_error_description() due to %s\n", MSG_DUMPER_ERROR_COLOR, dlerror());
+		fprintf(stderr, "dlsym() fails when exporting msg_dumper_get_error_description() due to %s\n", dlerror());
 		return false;
 	}
-
 	return true;
 }
 
@@ -427,7 +487,7 @@ unsigned short MsgDumperWrapper::initialize()
 		fprintf(stderr, "%sfp_msg_dumper_initialize() fails, due to %d\n", MSG_DUMPER_ERROR_COLOR, ret);
 		return ret;
 	}
-	write_msg_mut = PTHREAD_MUTEX_INITIALIZER;
+	write_msg_mtx = PTHREAD_MUTEX_INITIALIZER;
 	return ret;
 }
 
@@ -437,7 +497,7 @@ void MsgDumperWrapper::deinitialize()
 #ifdef DO_DEBUG
 	printf("Close the library\n");
 #endif
-	pthread_mutex_destroy(&write_msg_mut);
+	pthread_mutex_destroy(&write_msg_mtx);
 	fp_msg_dumper_deinitialize();
 
 	if (fmt_msg_buf != NULL)
@@ -738,12 +798,12 @@ unsigned short MsgDumperWrapper::write(const char* file_name, unsigned long line
 {
 	// fprintf(stderr, "MsgDumperWrapper::write [linux_severity: %d, message: %s]\n", linux_severity, msg);
 	unsigned short ret = MSG_DUMPER_SUCCESS;
-	pthread_mutex_lock(&write_msg_mut);
+	pthread_mutex_lock(&write_msg_mtx);
 	string msg_title(get_code_pos_str(file_name, line_no));
 	string msg_body(msg);
 	string msg_whole = msg_title + msg_body;
 	ret = fp_msg_dumper_write_msg(linux_severity, msg_whole.c_str());
-	pthread_mutex_unlock(&write_msg_mut);
+	pthread_mutex_unlock(&write_msg_mtx);
 	if (CHECK_FAILURE(ret))
 		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
 	return ret;
@@ -752,7 +812,7 @@ unsigned short MsgDumperWrapper::write(const char* file_name, unsigned long line
 unsigned short MsgDumperWrapper::format_write(const char* file_name, unsigned long line_no, unsigned short linux_severity, const char* msg_fmt, ...)
 {
 	unsigned short ret = MSG_DUMPER_SUCCESS;
-	pthread_mutex_lock(&write_msg_mut);
+	pthread_mutex_lock(&write_msg_mtx);
 	string msg_title(get_code_pos_str(file_name, line_no));
 	va_list ap;
 	va_start(ap, msg_fmt);
@@ -761,7 +821,7 @@ unsigned short MsgDumperWrapper::format_write(const char* file_name, unsigned lo
     // FORMAT_WRITE(linux_severity, msg_fmt);
     string msg_whole = msg_title + msg_body;
 	ret = fp_msg_dumper_write_msg(linux_severity, msg_whole.c_str());
-	pthread_mutex_unlock(&write_msg_mut);
+	pthread_mutex_unlock(&write_msg_mtx);
 	if (CHECK_FAILURE(ret))
 		fprintf(stderr, "%sfp_msg_dumper_write_msg() fails, resaon: %s\n", MSG_DUMPER_ERROR_COLOR, fp_msg_dumper_get_error_description());
 	return ret;

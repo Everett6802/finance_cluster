@@ -28,36 +28,46 @@ if (msg_dumper != NULL)\
 	msg_dumper = NULL;\
 }
 
-#define SET_SEVERITY(func_name, func_value)\
-msg_dumper->func_name(func_value);
+// #define SET_SEVERITY(func_name, func_value)\
+// msg_dumper->func_name(func_value);
 
-#define GET_SEVERITY(func_name)\
-msg_dumper->func_name();
+// #define GET_SEVERITY(func_name)\
+// msg_dumper->func_name();
 
-#define STATIC_SET_SEVERITY(func_name, func_value)\
+// #define STATIC_SET_SEVERITY(func_name, func_value)\
+// do{\
+// DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
+// SET_SEVERITY(func_name, func_value);\
+// RELEASE_MSG_DUMPER();\
+// }while(0);
+
+// #define WRITE_MSG_DUMPER(priority, message)\
+// msg_dumper->write(__FILE__, __LINE__, priority, message)
+
+// #define WRITE_FORMAT_MSG_DUMPER(priority, message_format, ...)\
+// msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, ##__VA_ARGS__)
+
+#define WRITE_MSG_DUMPER(priority, message_format, ...)\
+msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, ##__VA_ARGS__)
+
+// #define STATIC_WRITE_MSG_DUMPER(priority, message)\
+// do{\
+// DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
+// WRITE_MSG_DUMPER(priority, message);\
+// RELEASE_MSG_DUMPER();\
+// }while(0);
+
+// #define STATIC_WRITE_FORMAT_MSG_DUMPER(priority, message_format, ...)\
+// do{\
+// DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
+// WRITE_FORMAT_MSG_DUMPER(priority, message_format, __VA_ARGS__);\
+// RELEASE_MSG_DUMPER();\
+// }while(0);
+
+#define STATIC_WRITE_MSG_DUMPER(priority, message_format, ...)\
 do{\
 DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
-SET_SEVERITY(func_name, func_value);\
-RELEASE_MSG_DUMPER();\
-}while(0);
-
-#define WRITE_MSG_DUMPER(priority, message)\
-msg_dumper->write(__FILE__, __LINE__, priority, message)
-
-#define WRITE_FORMAT_MSG_DUMPER(priority, message_format, ...)\
-msg_dumper->format_write(__FILE__, __LINE__, priority, message_format, __VA_ARGS__)
-
-#define STATIC_WRITE_MSG_DUMPER(priority, message)\
-do{\
-DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
-WRITE_MSG_DUMPER(priority, message);\
-RELEASE_MSG_DUMPER();\
-}while(0);
-
-#define STATIC_WRITE_FORMAT_MSG_DUMPER(priority, message_format, ...)\
-do{\
-DECLARE_AND_IMPLEMENT_STATIC_MSG_DUMPER();\
-WRITE_FORMAT_MSG_DUMPER(priority, message_format, __VA_ARGS__);\
+WRITE_FORMAT_MSG_DUMPER(priority, message_format, ##__VA_ARGS__);\
 RELEASE_MSG_DUMPER();\
 }while(0);
 
@@ -65,95 +75,115 @@ RELEASE_MSG_DUMPER();\
 
 #if defined SHOW_MSG_DUMPER
 
-#define SET_LOG_SEVERITY(linux_severity) SET_SEVERITY(set_log_severity, linux_severity)
-#define SET_SYSLOG_SEVERITY(linux_severity) SET_SEVERITY(set_syslog_severity, linux_severity)
-#define GET_LOG_SEVERITY() GET_SEVERITY(get_log_severity)
-#define GET_SYSLOG_SEVERITY() GET_SEVERITY(get_syslog_severity)
+// #define SET_LOG_SEVERITY(linux_severity) SET_SEVERITY(set_log_severity, linux_severity)
+// #define SET_SYSLOG_SEVERITY(linux_severity) SET_SEVERITY(set_syslog_severity, linux_severity)
+// #define GET_LOG_SEVERITY() GET_SEVERITY(get_log_severity)
+// #define GET_SYSLOG_SEVERITY() GET_SEVERITY(get_syslog_severity)
 
-#define SET_LOG_SEVERITY_BY_NAME(severity_name) SET_SEVERITY(set_log_severity_by_name, severity_name)
-#define SET_SYSLOG_SEVERITY_BY_NAME(severity_name) SET_SEVERITY(set_syslog_severity_by_name, severity_name)
-#define GET_LOG_SEVERITY_BY_NAME() GET_SEVERITY(get_log_severity_by_name)
-#define GET_SYSLOG_SEVERITY_BY_NAME() GET_SEVERITY(get_syslog_severity_by_name)
+// #define SET_LOG_SEVERITY_BY_NAME(severity_name) SET_SEVERITY(set_log_severity_by_name, severity_name)
+// #define SET_SYSLOG_SEVERITY_BY_NAME(severity_name) SET_SEVERITY(set_syslog_severity_by_name, severity_name)
+// #define GET_LOG_SEVERITY_BY_NAME() GET_SEVERITY(get_log_severity_by_name)
+// #define GET_SYSLOG_SEVERITY_BY_NAME() GET_SEVERITY(get_syslog_severity_by_name)
 
-#define SET_LOG_SEVERITY_CONFIG(linux_severity) SET_SEVERITY(set_log_severity_config, linux_severity)
-#define SET_SYSLOG_SEVERITY_CONFIG(linux_severity) SET_SEVERITY(set_syslog_severity_config, linux_severity)
-#define GET_LOG_SEVERITY_CONFIG() GET_SEVERITY(get_log_severity_config)
-#define GET_SYSLOG_SEVERITY_CONFIG() GET_SEVERITY(get_syslog_severity_config)
+// #define SET_LOG_SEVERITY_CONFIG(linux_severity) SET_SEVERITY(set_log_severity_config, linux_severity)
+// #define SET_SYSLOG_SEVERITY_CONFIG(linux_severity) SET_SEVERITY(set_syslog_severity_config, linux_severity)
+// #define GET_LOG_SEVERITY_CONFIG() GET_SEVERITY(get_log_severity_config)
+// #define GET_SYSLOG_SEVERITY_CONFIG() GET_SEVERITY(get_syslog_severity_config)
 
-#define STATIC_SET_LOG_SEVERITY(linux_severity) STATIC_SET_SEVERITY(set_log_severity, linux_severity)
-#define STATIC_SET_SYSLOG_SEVERITY(linux_severity) STATIC_SET_SEVERITY(set_syslog_severity, linux_severity)
+// #define STATIC_SET_LOG_SEVERITY(linux_severity) STATIC_SET_SEVERITY(set_log_severity, linux_severity)
+// #define STATIC_SET_SYSLOG_SEVERITY(linux_severity) STATIC_SET_SEVERITY(set_syslog_severity, linux_severity)
 
-#define STATIC_SET_LOG_SEVERITY_BY_NAME(severity_name) STATIC_SET_SEVERITY(set_log_severity_by_name, severity_name)
-#define STATIC_SET_SYSLOG_SEVERITY_BY_NAME(severity_name) STATIC_SET_SEVERITY(set_syslog_severity_by_name, severity_name)
+// #define STATIC_SET_LOG_SEVERITY_BY_NAME(severity_name) STATIC_SET_SEVERITY(set_log_severity_by_name, severity_name)
+// #define STATIC_SET_SYSLOG_SEVERITY_BY_NAME(severity_name) STATIC_SET_SEVERITY(set_syslog_severity_by_name, severity_name)
 
-#define STATIC_SET_LOG_SEVERITY_CONFIG(linux_severity) STATIC_SET_SEVERITY(set_log_severity_config, linux_severity)
-#define STATIC_SET_SYSLOG_SEVERITY_CONFIG(linux_severity) STATIC_SET_SEVERITY(set_syslog_severity_config, linux_severity)
+// #define STATIC_SET_LOG_SEVERITY_CONFIG(linux_severity) STATIC_SET_SEVERITY(set_log_severity_config, linux_severity)
+// #define STATIC_SET_SYSLOG_SEVERITY_CONFIG(linux_severity) STATIC_SET_SEVERITY(set_syslog_severity_config, linux_severity)
 
-#define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
-#define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
-#define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARNING, message)
-#define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
+// #define WRITE_DEBUG(message) WRITE_MSG_DUMPER(LOG_DEBUG, message)
+// #define WRITE_INFO(message) WRITE_MSG_DUMPER(LOG_INFO, message)
+// #define WRITE_WARN(message) WRITE_MSG_DUMPER(LOG_WARNING, message)
+// #define WRITE_ERROR(message) WRITE_MSG_DUMPER(LOG_ERR, message)
 
-#define WRITE_FORMAT_DEBUG(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_DEBUG, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_INFO(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_INFO, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_WARN(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_WARNING, message_format, __VA_ARGS__)
-#define WRITE_FORMAT_ERROR(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
+// #define WRITE_FORMAT_DEBUG(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_DEBUG, message_format, __VA_ARGS__)
+// #define WRITE_FORMAT_INFO(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_INFO, message_format, __VA_ARGS__)
+// #define WRITE_FORMAT_WARN(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_WARNING, message_format, __VA_ARGS__)
+// #define WRITE_FORMAT_ERROR(message_format, ...) WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
 
-#define STATIC_WRITE_DEBUG(message) STATIC_WRITE_MSG_DUMPER(LOG_DEBUG, message)
-#define STATIC_WRITE_INFO(message) STATIC_WRITE_MSG_DUMPER(LOG_INFO, message)
-#define STATIC_WRITE_WARN(message) STATIC_WRITE_MSG_DUMPER(LOG_WARNING, message)
-#define STATIC_WRITE_ERROR(message) STATIC_WRITE_MSG_DUMPER(LOG_ERR, message)
+// #define STATIC_WRITE_DEBUG(message) STATIC_WRITE_MSG_DUMPER(LOG_DEBUG, message)
+// #define STATIC_WRITE_INFO(message) STATIC_WRITE_MSG_DUMPER(LOG_INFO, message)
+// #define STATIC_WRITE_WARN(message) STATIC_WRITE_MSG_DUMPER(LOG_WARNING, message)
+// #define STATIC_WRITE_ERROR(message) STATIC_WRITE_MSG_DUMPER(LOG_ERR, message)
 
-#define STATIC_WRITE_FORMAT_DEBUG(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_DEBUG, message_format, __VA_ARGS__)
-#define STATIC_WRITE_FORMAT_INFO(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_INFO, message_format, __VA_ARGS__)
-#define STATIC_WRITE_FORMAT_WARN(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_WARNING, message_format, __VA_ARGS__)
-#define STATIC_WRITE_FORMAT_ERROR(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
+// #define STATIC_WRITE_FORMAT_DEBUG(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_DEBUG, message_format, __VA_ARGS__)
+// #define STATIC_WRITE_FORMAT_INFO(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_INFO, message_format, __VA_ARGS__)
+// #define STATIC_WRITE_FORMAT_WARN(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_WARNING, message_format, __VA_ARGS__)
+// #define STATIC_WRITE_FORMAT_ERROR(message_format, ...) STATIC_WRITE_FORMAT_MSG_DUMPER(LOG_ERR, message_format, __VA_ARGS__)
+
+#define WRITE_DEBUG(message_format, ...) WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_DEBUG, message_format, __VA_ARGS__)
+#define WRITE_INFO(message_format, ...) WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_INFO, message_format, __VA_ARGS__)
+#define WRITE_WARN(message_format, ...) WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_WARN, message_format, __VA_ARGS__)
+#define WRITE_ERROR(message_format, ...) WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_ERROR, message_format, __VA_ARGS__)
+
+#define STATIC_WRITE_DEBUG(message_format, ...) STATIC_WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_DEBUG, message_format, __VA_ARGS__)
+#define STATIC_WRITE_INFO(message_format, ...) STATIC_WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_INFO, message_format, __VA_ARGS__)
+#define STATIC_WRITE_WARN(message_format, ...) STATIC_WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_WARN, message_format, __VA_ARGS__)
+#define STATIC_WRITE_ERROR(message_format, ...) STATIC_WRITE_MSG_DUMPER(MSG_DUMPER_SEVERITY_ERROR, message_format, __VA_ARGS__)
 
 #else
 
-#define SET_LOG_SEVERITY(linux_severity) 
-#define SET_SYSLOG_SEVERITY(linux_severity) 
-#define GET_LOG_SEVERITY() 
-#define GET_SYSLOG_SEVERITY()
+// #define SET_LOG_SEVERITY(linux_severity) 
+// #define SET_SYSLOG_SEVERITY(linux_severity) 
+// #define GET_LOG_SEVERITY() 
+// #define GET_SYSLOG_SEVERITY()
 
-#define SET_LOG_SEVERITY_BY_NAME(severity_name)
-#define SET_SYSLOG_SEVERITY_BY_NAME(severity_name)
-#define GET_LOG_SEVERITY_BY_NAME()
-#define GET_SYSLOG_SEVERITY_BY_NAME()
+// #define SET_LOG_SEVERITY_BY_NAME(severity_name)
+// #define SET_SYSLOG_SEVERITY_BY_NAME(severity_name)
+// #define GET_LOG_SEVERITY_BY_NAME()
+// #define GET_SYSLOG_SEVERITY_BY_NAME()
 
-#define SET_LOG_SEVERITY_CONFIG(linux_severity)
-#define SET_SYSLOG_SEVERITY_CONFIG(linux_severity)
-#define GET_LOG_SEVERITY_CONFIG()
-#define GET_SYSLOG_SEVERITY_CONFIG()
+// #define SET_LOG_SEVERITY_CONFIG(linux_severity)
+// #define SET_SYSLOG_SEVERITY_CONFIG(linux_severity)
+// #define GET_LOG_SEVERITY_CONFIG()
+// #define GET_SYSLOG_SEVERITY_CONFIG()
 
-#define STATIC_SET_LOG_SEVERITY(linux_severity)
-#define STATIC_SET_SYSLOG_SEVERITY(linux_severity)
+// #define STATIC_SET_LOG_SEVERITY(linux_severity)
+// #define STATIC_SET_SYSLOG_SEVERITY(linux_severity)
 
-#define STATIC_SET_LOG_SEVERITY_BY_NAME(severity_name)
-#define STATIC_SET_SYSLOG_SEVERITY_BY_NAME(severity_name)
+// #define STATIC_SET_LOG_SEVERITY_BY_NAME(severity_name)
+// #define STATIC_SET_SYSLOG_SEVERITY_BY_NAME(severity_name)
 
-#define STATIC_SET_LOG_SEVERITY_CONFIG(linux_severity)
-#define STATIC_SET_SYSLOG_SEVERITY_CONFIG(linux_severity)
+// #define STATIC_SET_LOG_SEVERITY_CONFIG(linux_severity)
+// #define STATIC_SET_SYSLOG_SEVERITY_CONFIG(linux_severity)
 
-#define WRITE_DEBUG(message)
-#define WRITE_INFO(message)
-#define WRITE_WARN(message)
-#define WRITE_ERROR(message)
+// #define WRITE_DEBUG(message)
+// #define WRITE_INFO(message)
+// #define WRITE_WARN(message)
+// #define WRITE_ERROR(message)
 
-#define WRITE_FORMAT_DEBUG(message_format, ...)
-#define WRITE_FORMAT_INFO(message_format, ...)
-#define WRITE_FORMAT_WARN(message_format, ...)
-#define WRITE_FORMAT_ERROR(message_format, ...)
+// #define WRITE_FORMAT_DEBUG(message_format, ...)
+// #define WRITE_FORMAT_INFO(message_format, ...)
+// #define WRITE_FORMAT_WARN(message_format, ...)
+// #define WRITE_FORMAT_ERROR(message_format, ...)
 
-#define STATIC_WRITE_DEBUG(message)
-#define STATIC_WRITE_INFO(message)
-#define STATIC_WRITE_WARN(message)
-#define STATIC_WRITE_ERROR(message)
+// #define STATIC_WRITE_DEBUG(message)
+// #define STATIC_WRITE_INFO(message)
+// #define STATIC_WRITE_WARN(message)
+// #define STATIC_WRITE_ERROR(message)
 
-#define STATIC_WRITE_FORMAT_DEBUG(message_format, ...)
-#define STATIC_WRITE_FORMAT_INFO(message_format, ...)
-#define STATIC_WRITE_FORMAT_WARN(message_format, ...)
-#define STATIC_WRITE_FORMAT_ERROR(message_format, ...)
+// #define STATIC_WRITE_FORMAT_DEBUG(message_format, ...)
+// #define STATIC_WRITE_FORMAT_INFO(message_format, ...)
+// #define STATIC_WRITE_FORMAT_WARN(message_format, ...)
+// #define STATIC_WRITE_FORMAT_ERROR(message_format, ...)
+
+#define WRITE_DEBUG(message_format, ...)
+#define WRITE_INFO(message_format, ...)
+#define WRITE_WARN(message_format, ...)
+#define WRITE_ERROR(message_format, ...)
+
+#define STATIC_WRITE_DEBUG(message_format, ...)
+#define STATIC_WRITE_INFO(message_format, ...)
+#define STATIC_WRITE_WARN(message_format, ...)
+#define STATIC_WRITE_ERROR(message_format, ...)
 
 #endif
 
@@ -173,17 +203,27 @@ private:
 
 	int ref_count;
 	void* api_handle;
-	FP_msg_dumper_initialize fp_msg_dumper_initialize;
+	// FP_msg_dumper_initialize fp_msg_dumper_initialize;
+	// FP_msg_dumper_get_version fp_msg_dumper_get_version;
+	// FP_msg_dumper_set_severity fp_msg_dumper_set_severity;
+	// FP_msg_dumper_set_facility fp_msg_dumper_set_facility;
+	// FP_msg_dumper_get_severity fp_msg_dumper_get_severity;
+	// FP_msg_dumper_get_facility fp_msg_dumper_get_facility;
+	// FP_msg_dumper_write_msg fp_msg_dumper_write_msg;
+	// FP_msg_dumper_deinitialize fp_msg_dumper_deinitialize;
+	// FP_msg_dumper_get_error_description fp_msg_dumper_get_error_description;
 	FP_msg_dumper_get_version fp_msg_dumper_get_version;
+	FP_msg_dumper_set_severity_index fp_msg_dumper_set_severity_index;
 	FP_msg_dumper_set_severity fp_msg_dumper_set_severity;
-	FP_msg_dumper_set_facility fp_msg_dumper_set_facility;
+	FP_msg_dumper_get_severity_index fp_msg_dumper_get_severity_index;
 	FP_msg_dumper_get_severity fp_msg_dumper_get_severity;
-	FP_msg_dumper_get_facility fp_msg_dumper_get_facility;
+	FP_msg_dumper_initialize fp_msg_dumper_initialize;
 	FP_msg_dumper_write_msg fp_msg_dumper_write_msg;
+	FP_msg_dumper_write_format_msg fp_msg_dumper_write_format_msg;
 	FP_msg_dumper_deinitialize fp_msg_dumper_deinitialize;
 	FP_msg_dumper_get_error_description fp_msg_dumper_get_error_description;
 
-	pthread_mutex_t write_msg_mut;
+	pthread_mutex_t write_msg_mtx;
 	unsigned short facility;
 	char *fmt_msg_buf;
 	int fmt_msg_buf_size;
